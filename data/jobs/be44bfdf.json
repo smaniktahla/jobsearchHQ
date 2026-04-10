@@ -1,0 +1,70 @@
+{
+  "id": "be44bfdf",
+  "title": "VP & AGC Global Trade Compliance",
+  "company": "BAE Systems USA",
+  "url": "https://www.indeed.com/viewjob?jk=7fec44b917e8d811",
+  "source": "jobspy_indeed",
+  "intake_source": "api",
+  "raw_jd": "**Job Description**  \n\nWhat's a career like at BAE Systems? Remarkable. The BAE Systems Inc. headquarters has an exciting opportunity for a senior Global Trade Compliance professional reporting to the VP \\& Chief Counsel (CC) Global Trade and Compliance (GTC). The VP \\& AGC GTC will lead the Global Trade Compliance function at BAE Systems.  \n\nThis role will conduct Trade Compliance Audits and run the Company\u2019s annual Risk Management Plan. The role will lead investigations by coordinating with the Sector Global Trade Directors in each of our sectors and their Trade Compliance Managers. The role will assist in providing strategic direction for the Department, in coordination with the Chief Counsel GTC and the VP Global Trade Licensing and Sanctions. The role will further develop our electronic tools for managing audits and disclosures.  \n\nResponsibilities include:* Lead the Global Trade Compliance function and be a senior leader within the Global Trade organization\n* Set the strategy and direction for the GTC function to ensure proactive, comprehensive audit and robust plans to address compliance problems before and after they happen\n* Oversee our annual trade compliance audit program\n* Conduct audits\n* Oversee and assist in conducting investigations of matters of interest and drafting voluntary disclosures\n* Assist with development of trade compliance policy and procedures\n* Lead GTC\u2019s continuous improvement, development and corrective action efforts\n* Provide and develop training for the export/import program in conjunction with the VP GTLS\n* Work closely with the CC GTC and VP GTLS to understand compliance problems as they arise in the Sectors, and formulate successful changes to our program to address compliance issues\n* Participate in the Global Trade Steering Committee\n* Foster cross\\-Sector, and cross\\-functions collaboration\n* Directly engage with USG on compliance issues\n* Manage a team of 3 direct reports and 4 indirect reports\n\n**Location:** Falls Church, VA. Hybrid work environment. Must be on\\-site in Falls Church 3 days a week.  \n\n  \n\n**Required Education, Experience, \\& Skills**  \n\n* Juris Doctor degree with 10\\+ years of experience\n* In depth understanding of U.S. Export and Import controls including extensive experience as an Empowered Official for businesses handling ITAR and EAR controlled material.\n* A general understanding of the export control regimes for other countries in which BAE Systems Inc. operates (Sweden, UK, Turkey) and/or does significant business (EU, Japan, Korea, Australia)\n* Strong leadership skills and collaborative approach to problem solving\n* Must be able to deliver executive level training/ presentations\n* Strong written and oral communication skills to provide briefings to attorneys and Global Trade Function, as well as to senior business management personnel\n* Ability to engage with the USG on compliance issues\n* Secret Clearance and ability to get Top Secret Clearance\n* Travel 40%\n\n  \n\n**Preferred Education, Experience, \\& Skills**  \n\n* Prior Department of State or Department of Commerce export regulatory experience\n\n  \n\n**Pay Information**  \n\nFull\\-Time Salary Range: $200222 \\- $340378  \n\n  \n\nPlease note: This range is based on our market pay structures. However, individual salaries are determined by a variety of factors including, but not limited to: business considerations, local market conditions, and internal equity, as well as candidate qualifications, such as skills, education, and experience.\n  \n\n  \n\nEmployee Benefits: At BAE Systems, we support our employees in all aspects of their life, including their health and financial well\\-being. Regular employees scheduled to work 20\\+ hours per week are offered: health, dental, and vision insurance; health savings accounts; a 401(k) savings plan; disability coverage; and life and accident insurance. We also have an employee assistance program, a legal plan, and other perks including discounts on things like home, auto, and pet insurance. Our leave programs include paid time off, paid holidays, as well as other types of leave, including paid parental, military, bereavement, and any applicable federal and state sick leave. Employees may participate in the company recognition program to receive monetary or non\\-monetary recognition awards. Other incentives may be available based on position level and/or job specifics.  \n\n  \n\n**About BAE Systems, Inc.**  \n\nBAE Systems, Inc. is the U.S. subsidiary of BAE Systems plc, an international defense, aerospace and security company which delivers a full range of products and services for air, land and naval forces, as well as advanced electronics, security, information technology solutions and customer support services. Improving the future and protecting lives is an ambitious mission, but it\u2019s what we do at BAE Systems. Working here means using your passion and ingenuity where it counts \u2013 defending national security with breakthrough technology, superior products, and intelligence solutions. As you develop the latest technology and defend national security, you will continually hone your skills on a team\u2014making a big impact on a global scale. At BAE Systems, you\u2019ll find a rewarding career that truly makes a difference.  \n\n  \n\nThis position will be posted for at least 5 calendar days. The posting will remain active until the position is filled, or a qualified pool of candidates is identified.",
+  "pay_range": "$200,222 - $340,378/year",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 0,
+    "scope_impact": 1,
+    "pay_alignment": 2,
+    "gut_interest": 0,
+    "total": 3,
+    "skills_rationale": "This role requires a JD degree and extensive export/import control expertise including ITAR/EAR experience as an Empowered Official. The candidate's background is in data analytics, BI architecture, and financial systems - completely different domain from international trade law and compliance.",
+    "scope_rationale": "The seniority level appears appropriate - senior leadership role managing teams and setting strategy. However, this is a legal/compliance executive position requiring deep regulatory expertise rather than technical/data architecture leadership.",
+    "pay_rationale": "Salary range of $200K-$340K overlaps well with candidate's W2 target range of $160K-$220K, though the upper end exceeds expectations.",
+    "keyword_gaps": [
+      "Juris Doctor",
+      "ITAR",
+      "EAR",
+      "Export Controls",
+      "Import Controls",
+      "Trade Compliance",
+      "Legal Experience",
+      "Empowered Official",
+      "Regulatory Affairs"
+    ],
+    "red_flags": [
+      "Requires JD degree",
+      "Requires Secret Clearance with ability to get Top Secret",
+      "40% travel requirement",
+      "Must be on-site 3 days/week in Falls Church"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "This is a legitimate senior legal/compliance role at a major defense contractor, but represents a complete career pivot from data analytics to international trade law. The role requires a law degree and specialized regulatory expertise the candidate lacks entirely. While the pay is good and leadership scope appropriate, the fundamental skill mismatch makes this unsuitable despite the candidate's strong technical and analytical background."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "Source: indeed | Posted: 2026-04-09 | Type: fulltime",
+  "created_at": "2026-04-10T15:16:41.809850",
+  "updated_at": "2026-04-10T15:16:53.080031",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-10T15:16:53.079966"
+    }
+  ]
+}

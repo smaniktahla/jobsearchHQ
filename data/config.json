@@ -1,0 +1,31 @@
+{
+  "w2_salary_min": 160000,
+  "w2_salary_max": 220000,
+  "contract_hourly_min": 85,
+  "contract_hourly_max": 125,
+  "follow_up_days": 14,
+  "follow_up_email": "salil.maniktahla@gmail.com",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user": "",
+  "smtp_password": "",
+  "deal_breakers": [
+    "must relocate",
+    "on-site only outside DC metro",
+    "requires TS/SCI"
+  ],
+  "preferred_keywords": [
+    "data architecture",
+    "analytics",
+    "BI",
+    "ERP",
+    "financial systems",
+    "data engineering",
+    "Python",
+    "SQL",
+    "Tableau",
+    "Power BI",
+    "leadership",
+    "mentorship"
+  ]
+}

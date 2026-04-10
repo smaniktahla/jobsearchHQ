@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/static/logo.png">
+<title>Job Search HQ</title>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d27;--surface2:#232736;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--yellow:#fbbf24;--red:#f87171;--orange:#fb923c;--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+.app{display:flex;min-height:100vh}.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto}.main{flex:1;margin-left:220px;padding:24px 32px}
+.logo{padding:12px 20px 20px;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text-dim);cursor:pointer;font-size:14px;transition:all .15s}.nav-item:hover,.nav-item.active{color:var(--text);background:var(--surface2)}.nav-item.active{border-left:3px solid var(--accent)}.nav-item svg{width:18px;height:18px;flex-shrink:0}.nav-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}.card-header{font-size:13px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px}.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px}.stat-value{font-size:28px;font-weight:700}.stat-label{font-size:12px;color:var(--text-dim);margin-top:2px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#6ba0f8}.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text-dim)}.btn-sm{padding:5px 10px;font-size:12px}.btn-danger{background:var(--red);color:#fff}.btn-success{background:var(--green);color:#000}.btn-warning{background:var(--orange);color:#000}
+input,textarea,select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:14px;width:100%;font-family:inherit}input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}textarea{resize:vertical;min-height:120px}label{font-size:13px;color:var(--text-dim);margin-bottom:4px;display:block}.form-group{margin-bottom:16px}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:10px 12px;color:var(--text-dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}td{padding:10px 12px;border-bottom:1px solid var(--border)}tr:hover td{background:var(--surface2)}tr{cursor:pointer}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}.badge-w2{background:rgba(79,143,247,.15);color:var(--accent)}.badge-contract{background:rgba(52,211,153,.15);color:var(--green)}.badge-c2h{background:rgba(251,191,36,.15);color:var(--yellow)}.badge-ignore{background:rgba(139,143,163,.15);color:var(--text-dim)}.badge-new{background:rgba(79,143,247,.15);color:var(--accent)}.badge-scored{background:rgba(251,191,36,.15);color:var(--yellow)}.badge-applied{background:rgba(52,211,153,.15);color:var(--green)}.badge-interview{background:rgba(251,146,60,.15);color:var(--orange)}.badge-offer{background:rgba(52,211,153,.2);color:var(--green)}.badge-rejected{background:rgba(248,113,113,.15);color:var(--red)}.badge-passed{background:rgba(139,143,163,.15);color:var(--text-dim)}.badge-followup{background:rgba(248,113,113,.2);color:var(--red);animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.score-big{font-size:48px;font-weight:800;text-align:center;padding:20px}.score-high{color:var(--green)}.score-mid{color:var(--yellow)}.score-low{color:var(--red)}.score-bar{display:flex;gap:8px;align-items:center;margin:4px 0}.score-bar-label{width:100px;font-size:12px;color:var(--text-dim);flex-shrink:0}.score-bar-track{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}.score-bar-fill{height:100%;border-radius:4px;transition:width .3s}
+.view{display:none}.view.active{display:block}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px}.tab{padding:10px 20px;font-size:13px;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.funnel{display:flex;gap:4px;margin-bottom:24px}.funnel-step{flex:1;text-align:center;padding:12px 8px;background:var(--surface);border-radius:var(--radius)}.funnel-step .count{font-size:24px;font-weight:700}.funnel-step .label{font-size:11px;color:var(--text-dim);text-transform:uppercase}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.loading-msg{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;padding:12px}
+.detail-grid{display:grid;grid-template-columns:1fr 320px;gap:20px}@media(max-width:900px){.detail-grid{grid-template-columns:1fr}}
+.cover-letter{background:var(--surface2);border-radius:var(--radius);padding:16px;margin:12px 0;white-space:pre-wrap;font-size:13px;line-height:1.7}.cl-variant-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin-bottom:8px}
+.follow-up-card{border-left:3px solid var(--orange)}.follow-up-card.overdue{border-left-color:var(--red)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:center;justify-content:center}.modal-overlay.show{display:flex}.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto}.modal h2{font-size:18px;margin-bottom:16px}
+.contact-info{background:var(--surface2);border-radius:6px;padding:12px;margin-top:8px;font-size:12px}
+.mt-8{margin-top:8px}.mt-16{margin-top:16px}.mb-16{margin-bottom:16px}.flex{display:flex}.gap-8{gap:8px}.gap-16{gap:16px}.items-center{align-items:center}.justify-between{justify-content:space-between}.text-dim{color:var(--text-dim)}.text-sm{font-size:13px}h1{font-size:22px;font-weight:700}h2{font-size:18px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidebar">
+  <div class="logo"><img src="/static/logo.png" alt="Job Search HQ" style="width:36px;height:36px;border-radius:6px">Job Search HQ</div>
+  <div class="nav-item active" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+  <div class="nav-item" data-view="add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Add Job</div>
+  <div class="nav-item" data-view="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search Boards</div>
+  <div class="nav-item" data-view="tracker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Tracker<span id="nav-followup-badge" class="nav-badge" style="display:none"></span></div>
+  <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
+  <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
+</nav>
+
+<div class="main">
+<!-- Dashboard -->
+<div id="view-dashboard" class="view active">
+  <div class="flex justify-between items-center mb-16"><h1>Dashboard</h1><button class="btn btn-primary" onclick="showView('add')">+ Add Job</button></div>
+  <div id="funnel" class="funnel"></div>
+  <div id="stats-row" class="stats-row"></div>
+  <div id="followup-alert" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div><strong id="followup-alert-count"></strong> job(s) need follow-up</div><button class="btn btn-warning btn-sm" onclick="showView('followups')">View</button></div></div>
+  <div class="card"><div class="card-header">Recent Jobs</div><div id="recent-jobs"></div></div>
+</div>
+
+<!-- Add Job -->
+<div id="view-add" class="view">
+  <h1 class="mb-16">Add Job</h1>
+  <div class="tabs"><div class="tab active" data-tab="paste">Paste JD</div><div class="tab" data-tab="url">From URL</div><div class="tab" data-tab="email">Email Forward</div></div>
+  <div id="tab-paste" class="tab-content"><div class="form-group"><label>Paste job description text</label><textarea id="jd-paste" rows="12" placeholder="Paste the full job description here..."></textarea></div></div>
+  <div id="tab-url" class="tab-content" style="display:none"><div class="form-group"><label>Job posting URL</label><input type="url" id="jd-url" placeholder="https://..."></div></div>
+  <div id="tab-email" class="tab-content" style="display:none"><div class="form-group"><label>Paste forwarded email body</label><textarea id="jd-email" rows="12" placeholder="Paste the forwarded email content here..."></textarea></div></div>
+  <div class="flex gap-8 mt-8"><button class="btn btn-primary" id="btn-add-job" onclick="submitJob()">Add &amp; Auto-Extract</button><div id="add-loading" class="loading-msg" style="display:none"><span class="spinner"></span> Extracting...</div></div>
+</div>
+
+<!-- Search Boards -->
+<div id="view-search" class="view">
+  <h1 class="mb-16">Search Job Boards</h1>
+  <div class="card mb-16">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="form-group"><label>Search Term</label><input type="text" id="search-term" placeholder="senior director information technology" value="senior director data analytics"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="search-location" value="Washington, DC"><div style="font-size:11px;color:var(--text-dim);margin-top:4px">Use standard format: "Washington, DC" or "New York, NY" or "Remote". LinkedIn metro names like "Washington DC-Baltimore Area" won't work for other boards.</div></div>
+      <div class="form-group"><label>Job Boards</label>
+        <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-indeed" checked style="width:auto"> Indeed</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-linkedin" checked style="width:auto"> LinkedIn</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-google" checked style="width:auto"> Google</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-glassdoor" style="width:auto"> Glassdoor</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-zip" style="width:auto"> ZipRecruiter</label>
+        </div>
+      </div>
+      <div class="form-group"><label>Results Per Board</label><input type="number" id="search-results" value="25" style="width:100px"></div>
+      <div class="form-group"><label>Posted Within (hours)</label><input type="number" id="search-hours" value="72" style="width:100px"></div>
+      <div class="form-group"><label>Distance (miles)</label><input type="number" id="search-distance" value="50" style="width:100px"></div>
+      <div class="form-group">
+        <label>Job Type</label>
+        <select id="search-jobtype" style="width:auto">
+          <option value="">All Types</option>
+          <option value="fulltime">Full Time</option>
+          <option value="contract">Contract</option>
+          <option value="parttime">Part Time</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="flex gap-16" style="margin-top:20px">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-remote" checked style="width:auto"> Remote Only</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-linkedin-desc" checked style="width:auto"> Fetch LinkedIn Descriptions (slower)</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-autoscore" style="width:auto"> Auto-Score (uses Claude API)</label>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-primary" id="btn-search" onclick="runSearch()">Search</button>
+    </div>
+    <div id="board-status" class="mt-8" style="display:none"></div>
+  </div>
+  <div id="search-results-section" style="display:none">
+    <div class="flex justify-between items-center mb-16">
+      <h2 id="search-results-title">Results</h2>
+      <button class="btn btn-ghost btn-sm" id="btn-score-all" onclick="scoreAllSearchResults()" style="display:none">Score All With Descriptions</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Source</th><th>Company</th><th>Title</th><th>Location</th><th>Pay</th><th>JD</th><th>Score</th><th></th></tr></thead>
+        <tbody id="search-results-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Tracker -->
+<div id="view-tracker" class="view">
+  <div class="flex justify-between items-center mb-16"><h1>Job Tracker</h1>
+    <div class="flex gap-8">
+      <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
+      <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
+    </div>
+  </div>
+  <div class="card table-wrap"><table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Lane</th><th>Status</th><th>Applied</th><th>Follow-Up</th><th></th></tr></thead><tbody id="tracker-body"></tbody></table></div>
+</div>
+
+<!-- Follow-Ups -->
+<div id="view-followups" class="view">
+  <div class="flex justify-between items-center mb-16"><h1>Follow-Ups</h1><button class="btn btn-warning btn-sm" onclick="sendDigest()">Send Email Digest</button></div>
+  <div id="followups-due" class="mb-16"></div>
+  <h2 class="mb-16">Upcoming</h2><div id="followups-upcoming"></div>
+</div>
+
+<!-- Job Detail -->
+<div id="view-detail" class="view">
+  <div class="flex items-center gap-8 mb-16"><button class="btn btn-ghost btn-sm" onclick="showView('tracker')">&larr; Back</button><h1 id="detail-title"></h1></div>
+  <div class="detail-grid">
+    <div>
+      <div class="card mb-16">
+        <div class="flex justify-between items-center">
+          <div><div class="text-dim text-sm" id="detail-company"></div><div class="text-dim text-sm" id="detail-meta"></div><div class="text-dim text-sm" id="detail-applied-info"></div></div>
+          <div class="flex gap-8"><select id="detail-status" onchange="updateJobStatus()" style="width:auto"><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select></div>
+        </div>
+      </div>
+
+      <div class="card mb-16" id="score-section" style="display:none"><div class="card-header">Score Breakdown</div><div id="score-breakdown"></div></div>
+
+      <!-- Contact / Follow-up -->
+      <div class="card mb-16 follow-up-card" id="detail-followup-card" style="display:none">
+        <div class="card-header">Follow-Up</div>
+        <div id="detail-followup-info" class="text-sm"></div>
+        <div id="detail-contact-info"></div>
+        <div class="flex gap-8 mt-8">
+          <button class="btn btn-success btn-sm" onclick="markFollowedUp()">I Followed Up</button>
+          <button class="btn btn-ghost btn-sm" onclick="snoozeFollowUp(7)">Snooze 7d</button>
+          <button class="btn btn-ghost btn-sm" onclick="openConfirmationParser()">Parse Confirmation Email</button>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="card mb-16">
+        <div class="card-header">Actions</div>
+        <div class="flex gap-8 mt-8" style="flex-wrap:wrap">
+          <button class="btn btn-primary" id="btn-score" onclick="scoreCurrentJob()">Score This Job</button>
+          <button class="btn btn-success" id="btn-applied" onclick="markApplied()">✓ Mark Applied</button>
+          <input type="date" id="applied-date" style="width:150px;font-size:12px" title="Applied date (defaults to today)">
+          <button class="btn btn-ghost" id="btn-resume" onclick="generateTailoredResume()" disabled>Tailored Resume (.docx)</button>
+          <button class="btn btn-ghost" id="btn-cover" onclick="generateCoverLetters()" disabled>Cover Letters</button>
+          <button class="btn btn-ghost" id="btn-email" onclick="openEmailComposer()" disabled>Send Email</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCurrentJob()">Delete</button>
+        </div>
+        <div id="action-loading" class="loading-msg" style="display:none"><span class="spinner"></span> <span id="action-msg">Working...</span></div>
+      </div>
+
+      <!-- Tailored Resume -->
+      <div id="tailored-resume-section" style="display:none">
+        <div class="card mb-16">
+          <div class="flex justify-between items-center">
+            <div class="card-header" style="margin-bottom:0">Tailored Resume</div>
+            <div class="flex gap-8">
+              <a id="docx-download-link" class="btn btn-success btn-sm" style="text-decoration:none;display:none" download>Download .docx</a>
+              <button class="btn btn-ghost btn-sm" onclick="copyTailoredResume()">Copy Text</button>
+            </div>
+          </div>
+          <div id="tailored-resume-content" class="cover-letter mt-8" style="max-height:400px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Cover Letters -->
+      <div id="cover-letters-section" style="display:none"><div class="card"><div class="card-header">Cover Letters</div><div id="cover-letters-content"></div></div></div>
+
+      <!-- Email History -->
+      <div id="email-history-section" style="display:none"><div class="card"><div class="card-header">Email History</div><div id="email-history-content"></div></div></div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div>
+      <div class="card mb-16" id="score-summary" style="display:none">
+        <div id="score-total" class="score-big">-</div>
+        <div style="text-align:center;margin-bottom:12px"><span id="score-lane-badge" class="badge"></span> <span id="score-resume-badge" class="badge"></span></div>
+        <div id="score-analysis" class="text-sm text-dim"></div>
+      </div>
+      <div class="card mb-16" id="gut-section" style="display:none"><div class="card-header">Gut Interest</div><div class="flex gap-8 mt-8"><button class="btn btn-ghost btn-sm" id="gut-0" onclick="setGut(0)">0 - Meh</button><button class="btn btn-primary btn-sm" id="gut-1" onclick="setGut(1)">1 - Interested</button></div></div>
+      <div class="card mb-16" id="flags-section" style="display:none"><div class="card-header">Flags &amp; Gaps</div><div id="flags-content"></div></div>
+      <div class="card"><div class="card-header">Job Description</div><div id="detail-jd" style="font-size:12px;max-height:400px;overflow-y:auto;white-space:pre-wrap;color:var(--text-dim)"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="view-settings" class="view">
+  <h1 class="mb-16">Settings</h1>
+  <div class="card mb-16"><div class="card-header">Pay Targets</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>W2 Salary Min ($)</label><input type="number" id="cfg-w2-min"></div><div class="form-group"><label>W2 Salary Max ($)</label><input type="number" id="cfg-w2-max"></div><div class="form-group"><label>Contract Hourly Min ($)</label><input type="number" id="cfg-hr-min"></div><div class="form-group"><label>Contract Hourly Max ($)</label><input type="number" id="cfg-hr-max"></div></div></div>
+  <div class="card mb-16"><div class="card-header">Email / Follow-Up</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>Follow-Up After (days)</label><input type="number" id="cfg-followup-days"></div><div class="form-group"><label>Notification Email</label><input type="email" id="cfg-followup-email"></div><div class="form-group"><label>Your Gmail Email (login username)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div><div class="form-group"><label>Gmail App Password</label><input type="password" id="cfg-smtp-pass" placeholder="16-character app password"></div><div class="form-group"><label>SMTP Host</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>SMTP Port</label><input type="number" id="cfg-smtp-port" placeholder="587"></div></div><button class="btn btn-ghost btn-sm mt-8" onclick="sendTestEmail()">Send Test Email</button><span id="test-email-status" class="text-sm" style="margin-left:8px"></span></div>
+  <div class="card mb-16"><div class="card-header">Deal Breakers</div><div class="form-group mt-8"><label>One per line</label><textarea id="cfg-dealbreakers" rows="4"></textarea></div></div>
+  <div class="card mb-16"><div class="card-header">Preferred Keywords</div><div class="form-group mt-8"><label>Comma-separated</label><input type="text" id="cfg-keywords"></div></div>
+  <button class="btn btn-primary" onclick="saveConfig()">Save Settings</button>
+  <h2 class="mt-16 mb-16">Resume Variants</h2><div id="resume-status" class="mb-16"></div>
+  <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full History (scoring)</option><option value="director">Director</option><option value="base">Base</option><option value="contract">Contract</option></select></div><div class="form-group"><label>Paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload</button></div>
+  <h2 class="mt-16 mb-16">Automation</h2><div class="card"><div class="card-header">Cron (daily digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
+</div>
+</div>
+</div>
+
+<!-- Email Compose Modal -->
+<div id="email-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal">
+  <h2>Send Email</h2>
+  <div class="form-group"><label>To</label><input type="email" id="email-to"></div>
+  <div class="form-group"><label>CC</label><input type="text" id="email-cc"></div>
+  <div class="form-group"><label>Subject</label><input type="text" id="email-subject"></div>
+  <div class="form-group"><label>Body</label><textarea id="email-body" rows="12"></textarea></div>
+  <div class="flex items-center gap-8 mb-16"><input type="checkbox" id="email-attach" checked style="width:auto"><label for="email-attach" style="margin:0">Attach tailored resume (.docx)</label></div>
+  <div class="flex gap-8"><button class="btn btn-primary" onclick="sendEmail()">Send</button><button class="btn btn-ghost" onclick="document.getElementById('email-modal').classList.remove('show')">Cancel</button></div>
+  <div id="email-send-status" class="loading-msg" style="display:none"><span class="spinner"></span> Sending...</div>
+</div>
+</div>
+
+<!-- Confirmation Parser Modal -->
+<div id="confirm-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal">
+  <h2>Parse Confirmation Email</h2>
+  <p class="text-dim text-sm mb-16">Paste the confirmation/acknowledgment email you received. We'll extract recruiter contact info for follow-up.</p>
+  <div class="form-group"><label>Email text</label><textarea id="confirm-email-text" rows="10" placeholder="Paste the email here..."></textarea></div>
+  <div class="flex gap-8"><button class="btn btn-primary" onclick="parseConfirmation()">Parse</button><button class="btn btn-ghost" onclick="document.getElementById('confirm-modal').classList.remove('show')">Cancel</button></div>
+  <div id="confirm-loading" class="loading-msg" style="display:none"><span class="spinner"></span> Parsing...</div>
+  <div id="confirm-result" style="display:none" class="mt-16"></div>
+</div>
+</div>
+
+<script>
+const API='';let currentJobId=null,allJobs=[],currentJob=null;
+
+function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch()}
+document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
+
+async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
+
+// Dashboard
+async function loadDashboard(){const[stats,jobs]=await Promise.all([api('/api/stats'),api('/api/jobs')]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';
+document.getElementById('funnel').innerHTML=['new','scored','applied','interview','offer'].map(s=>`<div class="funnel-step"><div class="count">${stats.by_status[s]||0}</div><div class="label">${s}</div></div>`).join('');
+document.getElementById('stats-row').innerHTML=`<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.avg_score}</div><div class="stat-label">Avg Score</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.score_distribution.high_8_10}</div><div class="stat-label">High (8-10)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${stats.score_distribution.mid_5_7}</div><div class="stat-label">Mid (5-7)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--orange)">${stats.follow_ups_due}</div><div class="stat-label">Follow-Ups</div></div>`;
+const r=jobs.slice(0,8);document.getElementById('recent-jobs').innerHTML=r.length?`<table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Status</th><th>Follow-Up</th></tr></thead><tbody>${r.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${followUpBadge(j)}</td></tr>`).join('')}</tbody></table>`:'<p class="text-dim text-sm" style="padding:12px">No jobs yet.</p>'}
+function updateFollowUpBadges(c){['nav-followup-badge','nav-followup-badge2'].forEach(id=>{const el=document.getElementById(id);if(c>0){el.style.display='inline';el.textContent=c}else el.style.display='none'})}
+
+// Add Job
+async function submitJob(){const t=document.querySelector('.tab.active').dataset.tab;let s,r;if(t==='paste'){s='manual_paste';r=document.getElementById('jd-paste').value}else if(t==='url'){s='url_scrape';r=document.getElementById('jd-url').value}else{s='email_forward';r=document.getElementById('jd-email').value}if(!r.trim())return alert('Provide input');document.getElementById('btn-add-job').disabled=true;document.getElementById('add-loading').style.display='flex';try{const j=await api('/api/intake?source='+s+'&raw_input='+encodeURIComponent(r),{method:'POST'});document.getElementById('jd-paste').value='';document.getElementById('jd-url').value='';document.getElementById('jd-email').value='';showDetail(j.id)}catch(e){alert(e.message)}finally{document.getElementById('btn-add-job').disabled=false;document.getElementById('add-loading').style.display='none'}}
+
+// Search Boards
+let lastSearchResults=[];
+function initSearch(){}
+
+const BOARD_LABELS={indeed:'Indeed',linkedin:'LinkedIn',google:'Google',glassdoor:'Glassdoor',zip_recruiter:'ZipRecruiter'};
+
+function updateBoardStatus(statuses){
+  const el=document.getElementById('board-status');
+  el.style.display='block';
+  el.innerHTML=`<div class="flex gap-8" style="flex-wrap:wrap">${Object.entries(statuses).map(([board,s])=>{
+    const icon=s.status==='done'?'✓':s.status==='error'?'✕':s.status==='searching'?'<span class="spinner"></span>':'⏳';
+    const color=s.status==='done'?'var(--green)':s.status==='error'?'var(--red)':s.status==='searching'?'var(--accent)':'var(--text-dim)';
+    const detail=s.status==='done'?`${s.created} found`+(s.skipped?`, ${s.skipped} dupes`:''):s.status==='error'?'failed':s.status==='searching'?'searching...':'queued';
+    return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 14px;min-width:140px"><div style="color:${color};font-weight:600;font-size:13px">${icon} ${BOARD_LABELS[board]||board}</div><div class="text-dim" style="font-size:11px">${detail}${s.time?' · '+s.time:''}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function renderSearchResults(){
+  document.getElementById('search-results-section').style.display='block';
+  const created=lastSearchResults.length;
+  const withDesc=lastSearchResults.filter(j=>j.has_description).length;
+  const unscored=lastSearchResults.filter(j=>j.has_description&&!j.score).length;
+  document.getElementById('search-results-title').textContent=`Results: ${created} imported`;
+  const scoreBtn=document.getElementById('btn-score-all');
+  if(unscored>0){scoreBtn.style.display='inline-flex';scoreBtn.textContent=`Score ${unscored} Jobs With Descriptions`}else scoreBtn.style.display='none';
+  document.getElementById('search-results-body').innerHTML=lastSearchResults.length?
+    lastSearchResults.map(j=>`<tr onclick="showDetail('${j.id}')" style="cursor:pointer">
+      <td><span class="badge badge-${j.source==='linkedin'?'w2':j.source==='indeed'?'contract':'scored'}">${esc(j.source)}</span></td>
+      <td>${esc(j.company||'—')}</td>
+      <td>${esc(j.title||'—')}</td>
+      <td class="text-dim">${esc(j.location||'—')}</td>
+      <td class="text-dim">${esc(j.pay_range||'—')}</td>
+      <td>${j.has_description?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--text-dim)">—</span>'}</td>
+      <td>${j.score!=null?scoreColor(j.score):'—'}</td>
+      <td><a href="${esc(j.job_url||'#')}" target="_blank" onclick="event.stopPropagation()" style="color:var(--accent);font-size:11px">Link</a></td>
+    </tr>`).join(''):'<tr><td colspan="8" class="text-dim">No results.</td></tr>';
+}
+
+async function runSearch(){
+  const sites=[];
+  if(document.getElementById('site-indeed').checked)sites.push('indeed');
+  if(document.getElementById('site-linkedin').checked)sites.push('linkedin');
+  if(document.getElementById('site-google').checked)sites.push('google');
+  if(document.getElementById('site-glassdoor').checked)sites.push('glassdoor');
+  if(document.getElementById('site-zip').checked)sites.push('zip_recruiter');
+  if(!sites.length)return alert('Select at least one job board');
+  const term=document.getElementById('search-term').value.trim();
+  if(!term)return alert('Enter a search term');
+
+  document.getElementById('btn-search').disabled=true;
+  lastSearchResults=[];
+  document.getElementById('search-results-section').style.display='none';
+
+  // Initialize per-board status
+  const statuses={};
+  sites.forEach(s=>statuses[s]={status:'queued',created:0,skipped:0,time:''});
+  updateBoardStatus(statuses);
+
+  const baseParams={
+    search_term:term,
+    location:document.getElementById('search-location').value.trim(),
+    results_wanted:+document.getElementById('search-results').value||25,
+    hours_old:+document.getElementById('search-hours').value||72,
+    is_remote:document.getElementById('search-remote').checked,
+    job_type:document.getElementById('search-jobtype').value,
+    distance:+document.getElementById('search-distance').value||50,
+    linkedin_fetch_description:document.getElementById('search-linkedin-desc').checked,
+    auto_score:document.getElementById('search-autoscore').checked,
+    skip_existing:true,
+  };
+
+  // Run all boards in parallel, update status as each resolves
+  const promises=sites.map(async(site)=>{
+    statuses[site].status='searching';
+    updateBoardStatus(statuses);
+    const start=Date.now();
+    try{
+      const res=await api('/api/search',{method:'POST',body:{...baseParams,sites:[site]}});
+      const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
+      const created=res.created||[];
+      const skipped=res.skipped||[];
+      statuses[site]={status:'done',created:created.length,skipped:skipped.length,time:elapsed};
+      lastSearchResults.push(...created);
+      renderSearchResults();
+    }catch(e){
+      const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
+      statuses[site]={status:'error',created:0,skipped:0,time:elapsed};
+    }
+    updateBoardStatus(statuses);
+  });
+
+  await Promise.all(promises);
+
+  document.getElementById('btn-search').disabled=false;
+}
+
+async function scoreAllSearchResults(){
+  const toScore=lastSearchResults.filter(j=>j.has_description&&!j.score).map(j=>j.id);
+  if(!toScore.length)return;
+  document.getElementById('btn-score-all').disabled=true;
+  document.getElementById('btn-score-all').textContent=`Scoring ${toScore.length} jobs...`;
+  try{
+    const res=await api('/api/jobs/score-batch',{method:'POST',body:toScore});
+    const scored=res.results?.filter(r=>r.status==='scored')||[];
+    for(const r of scored){const j=lastSearchResults.find(x=>x.id===r.id);if(j)j.score=r.total}
+    renderSearchResults();
+  }catch(e){alert('Batch scoring failed: '+e.message)}
+  finally{document.getElementById('btn-score-all').disabled=false}
+}
+
+// Tracker
+async function loadTracker(){let u='/api/jobs';const p=[];const l=document.getElementById('filter-lane')?.value;const s=document.getElementById('filter-status')?.value;if(l)p.push('lane='+l);if(s)p.push('status='+s);if(p.length)u+='?'+p.join('&');const jobs=await api(u);document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="8" class="text-dim">No jobs.</td></tr>'}
+
+// Follow-Ups
+async function loadFollowUps(){const d=await api('/api/follow-ups');updateFollowUpBadges(d.due_now.length);document.getElementById('followups-due').innerHTML=d.due_now.length?d.due_now.map(j=>fuCard(j,true)).join(''):'<div class="card text-dim text-sm">No follow-ups due.</div>';document.getElementById('followups-upcoming').innerHTML=d.upcoming.length?d.upcoming.map(j=>fuCard(j,false)).join(''):'<div class="card text-dim text-sm">None upcoming.</div>'}
+function fuCard(j,due){const d=j.days_since_applied||0,c=j.follow_up?.count||0,contact=j.follow_up?.contact_email?` · Contact: ${esc(j.follow_up.contact_email)}`:'';return`<div class="card mb-16 follow-up-card ${due?'overdue':''}" style="cursor:pointer" onclick="showDetail('${j.id}')"><div class="flex justify-between items-center"><div><strong>${esc(j.company)}</strong> — ${esc(j.title)}<div class="text-sm text-dim">Applied ${d}d ago · Sent: ${c}${contact}</div></div><div class="flex gap-8">${due?`<button class="btn btn-success btn-sm" onclick="event.stopPropagation();fuAction('${j.id}','done')">Done</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();fuAction('${j.id}','snooze')">Snooze</button>`:''}</div></div></div>`}
+async function fuAction(id,a){await api(`/api/jobs/${id}/${a==='done'?'mark-followed-up':'snooze-follow-up?days=7'}`,{method:'POST'});loadFollowUps()}
+async function sendDigest(){try{const r=await api('/api/follow-ups/send-digest',{method:'POST'});alert(r.sent?`Sent! (${r.count})`:'No follow-ups due.')}catch(e){alert(e.message)}}
+
+// Job Detail
+async function showDetail(id){currentJobId=id;const j=await api('/api/jobs/'+id);currentJob=j;showView('detail');
+document.getElementById('detail-title').textContent=j.title||'(Untitled)';document.getElementById('detail-company').textContent=j.company||'';document.getElementById('detail-meta').textContent=[j.pay_range,j.source,j.url].filter(Boolean).join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
+// Applied info
+const ai=document.getElementById('detail-applied-info');
+const appliedBtn=document.getElementById('btn-applied');
+const dateInput=document.getElementById('applied-date');
+dateInput.value=new Date().toISOString().split('T')[0]; // default today
+if(j.applied_at){const d=j.days_since_applied||0;ai.innerHTML=`Applied ${new Date(j.applied_at).toLocaleDateString()} (${d}d ago) · Follow-ups: ${j.follow_up?.count||0}`;appliedBtn.style.display='none';dateInput.style.display='none'}else{ai.textContent='';appliedBtn.style.display='inline-flex';dateInput.style.display='block'}
+// Follow-up card
+const fu=document.getElementById('detail-followup-card');const showFu=j.follow_up_due||(j.follow_up?.due_at&&(j.status==='applied'||j.status==='interview'));fu.style.display=showFu?'block':'none';if(showFu){fu.className='card mb-16 follow-up-card'+(j.follow_up_due?' overdue':'');const dd=j.follow_up?.due_at?new Date(j.follow_up.due_at).toLocaleDateString():'Not set';document.getElementById('detail-followup-info').innerHTML=j.follow_up_due?`<span style="color:var(--red)">⚠ Overdue!</span> Due: ${dd}`:`Next: ${dd}`;
+// Contact info
+const ci=document.getElementById('detail-contact-info');if(j.follow_up?.contact_email||j.follow_up?.contact_name||j.follow_up?.extracted_emails?.length){let cih=`<div class="contact-info">`;if(j.follow_up.contact_name||j.follow_up.contact_email){cih+=`<strong>Contact:</strong> ${esc(j.follow_up.contact_name||'')} ${j.follow_up.contact_email?`&lt;${esc(j.follow_up.contact_email)}&gt;`:''}${j.follow_up.contact_phone?` · ${esc(j.follow_up.contact_phone)}`:''}<br>`}if(j.follow_up.notes)cih+=`<em>${esc(j.follow_up.notes)}</em><br>`;if(j.follow_up.extracted_emails?.length)cih+=`<div class="mt-8" style="font-size:11px"><strong>Emails:</strong> ${j.follow_up.extracted_emails.map(e=>`<button class="btn btn-ghost btn-sm" onclick="setContactEmail('${esc(e)}')" style="font-size:10px;padding:2px 6px">${esc(e)}</button>`).join(' ')}</div>`;if(j.follow_up.extracted_links?.length)cih+=`<div class="mt-8" style="font-size:11px"><strong>Links:</strong> ${j.follow_up.extracted_links.map(u=>`<a href="${u.startsWith('http')?esc(u):'https://'+esc(u)}" target="_blank" style="color:var(--accent);font-size:10px;margin-right:8px">${esc(u)}</a>`).join('')}</div>`;cih+='</div>';ci.innerHTML=cih}else ci.innerHTML=''}
+// Score
+const hs=!!j.score;['score-section','score-summary','gut-section','flags-section'].forEach(id=>document.getElementById(id).style.display=hs?'block':'none');document.getElementById('btn-cover').disabled=!hs;document.getElementById('btn-resume').disabled=!hs;document.getElementById('btn-email').disabled=!(hs||j.cover_letters?.length);
+if(hs){const s=j.score;const cls=s.total>=8?'score-high':s.total>=5?'score-mid':'score-low';document.getElementById('score-total').className='score-big '+cls;document.getElementById('score-total').textContent=s.total+'/10';document.getElementById('score-lane-badge').className='badge badge-'+(s.recommended_lane==='w2_sniper'?'w2':s.recommended_lane==='contract_to_hire'?'c2h':s.recommended_lane);document.getElementById('score-lane-badge').textContent=laneLabel(s.recommended_lane);document.getElementById('score-resume-badge').className='badge badge-scored';document.getElementById('score-resume-badge').textContent='→ '+(s.recommended_resume||'none');document.getElementById('score-analysis').textContent=s.raw_analysis;document.getElementById('score-breakdown').innerHTML=[scoreBar('Skills',s.skills_match,4,s.skills_rationale),scoreBar('Scope',s.scope_impact,3,s.scope_rationale),scoreBar('Pay',s.pay_alignment,2,s.pay_rationale),scoreBar('Gut',s.gut_interest,1,'Your assessment')].join('');document.getElementById('gut-0').className=s.gut_interest===0?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';document.getElementById('gut-1').className=s.gut_interest===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';let fh='';if(s.bullshit_flag)fh+=`<div style="color:var(--red);margin:8px 0">⚠ ${esc(s.bullshit_reason)}</div>`;if(s.red_flags?.length)fh+=`<div class="mt-8"><strong>Red Flags:</strong><ul style="margin:4px 0 0 16px">${s.red_flags.map(f=>`<li class="text-sm">${esc(f)}</li>`).join('')}</ul></div>`;if(s.keyword_gaps?.length)fh+=`<div class="mt-8"><strong>Gaps:</strong><ul style="margin:4px 0 0 16px">${s.keyword_gaps.map(g=>`<li class="text-sm">${esc(g)}</li>`).join('')}</ul></div>`;document.getElementById('flags-content').innerHTML=fh||'<p class="text-dim text-sm">None</p>'}
+// Resume
+const hr=!!j.tailored_resume;document.getElementById('tailored-resume-section').style.display=hr?'block':'none';if(hr){document.getElementById('tailored-resume-content').textContent=j.tailored_resume;const dl=document.getElementById('docx-download-link');if(j.tailored_resume_docx){dl.style.display='inline-flex';dl.href=`/api/jobs/${j.id}/download-resume`}else dl.style.display='none'}
+// Cover letters
+const hc=j.cover_letters?.length>0;document.getElementById('cover-letters-section').style.display=hc?'block':'none';if(hc)document.getElementById('cover-letters-content').innerHTML=j.cover_letters.map(cl=>`<div class="cl-variant-label mt-16">${esc(cl.variant)}</div><div class="cover-letter">${esc(cl.content)}</div><div class="flex gap-8">${cl.docx_path?`<a href="/api/jobs/${j.id}/cover-letters/${cl.id}/download" class="btn btn-success btn-sm" style="text-decoration:none" download>Download .docx</a>`:''}<button class="btn btn-ghost btn-sm" onclick="copyText(this,\`${escAttr(cl.content)}\`)">Copy</button></div>`).join('');
+// Email history
+const he=j.emails?.length>0;document.getElementById('email-history-section').style.display=he?'block':'none';if(he)document.getElementById('email-history-content').innerHTML=j.emails.map(e=>`<div style="border-left:2px solid ${e.direction==='sent'?'var(--accent)':'var(--green)'};padding:8px 12px;margin:8px 0"><div class="text-sm"><strong>${e.direction==='sent'?'Sent':'Received'}</strong> · ${new Date(e.sent_at).toLocaleDateString()}</div><div class="text-dim text-sm">${e.subject?esc(e.subject):''}</div></div>`).join('')}
+
+// Actions
+async function markApplied(){
+  if(!currentJobId)return;
+  const dateInput=document.getElementById('applied-date');
+  const dateVal=dateInput.value; // YYYY-MM-DD or empty
+  const isoDate=dateVal?new Date(dateVal+'T12:00:00').toISOString():'';
+  showLoading('Marking applied...');
+  try{
+    await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{status:'applied',applied_at:isoDate}});
+    await showDetail(currentJobId);
+  }catch(e){alert(e.message)}
+  finally{hideLoading()}
+}
+async function scoreCurrentJob(){if(!currentJobId)return;document.getElementById('btn-score').disabled=true;showLoading('Scoring...');try{await api('/api/jobs/'+currentJobId+'/score',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-score').disabled=false;hideLoading()}}
+async function generateTailoredResume(){if(!currentJobId)return;document.getElementById('btn-resume').disabled=true;showLoading('Generating tailored resume + .docx...');try{await api('/api/jobs/'+currentJobId+'/tailored-resume',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-resume').disabled=false;hideLoading()}}
+async function generateCoverLetters(){if(!currentJobId)return;document.getElementById('btn-cover').disabled=true;showLoading('Generating cover letters...');try{await api('/api/jobs/'+currentJobId+'/cover-letters',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-cover').disabled=false;hideLoading()}}
+function copyTailoredResume(){navigator.clipboard.writeText(document.getElementById('tailored-resume-content').textContent)}
+async function updateJobStatus(){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{status:document.getElementById('detail-status').value}});await showDetail(currentJobId)}
+async function setGut(v){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{gut_interest:v}});await showDetail(currentJobId)}
+async function markFollowedUp(){if(!currentJobId)return;await api('/api/jobs/'+currentJobId+'/mark-followed-up',{method:'POST'});await showDetail(currentJobId)}
+async function snoozeFollowUp(d){if(!currentJobId)return;await api('/api/jobs/'+currentJobId+'/snooze-follow-up?days='+d,{method:'POST'});await showDetail(currentJobId)}
+async function setContactEmail(email){if(!currentJobId)return;await api('/api/jobs/'+currentJobId+'/set-contact?email='+encodeURIComponent(email),{method:'POST'});await showDetail(currentJobId)}
+async function deleteCurrentJob(){if(!currentJobId||!confirm('Delete?'))return;await api('/api/jobs/'+currentJobId,{method:'DELETE'});showView('tracker')}
+async function deleteJob(id){if(!confirm('Delete?'))return;await api('/api/jobs/'+id,{method:'DELETE'});loadTracker()}
+
+// Email Compose
+function openEmailComposer(){if(!currentJob)return;const m=document.getElementById('email-modal');const cl=currentJob.cover_letters?.[0];document.getElementById('email-to').value=currentJob.follow_up?.contact_email||'';document.getElementById('email-cc').value='';document.getElementById('email-subject').value=`Application: ${currentJob.title} - Salil Maniktahla`;document.getElementById('email-body').value=cl?.content||'';document.getElementById('email-attach').checked=!!currentJob.tailored_resume_docx;m.classList.add('show')}
+async function sendEmail(){const data={to:document.getElementById('email-to').value,subject:document.getElementById('email-subject').value,body:document.getElementById('email-body').value,cc:document.getElementById('email-cc').value,attach_resume:document.getElementById('email-attach').checked};if(!data.to)return alert('Enter a recipient');document.getElementById('email-send-status').style.display='flex';try{await api('/api/jobs/'+currentJobId+'/send-email',{method:'POST',body:data});document.getElementById('email-modal').classList.remove('show');alert('Email sent!');await showDetail(currentJobId)}catch(e){alert('Failed: '+e.message)}finally{document.getElementById('email-send-status').style.display='none'}}
+
+// Confirmation Parser
+function openConfirmationParser(){document.getElementById('confirm-email-text').value='';document.getElementById('confirm-result').style.display='none';document.getElementById('confirm-modal').classList.add('show')}
+async function parseConfirmation(){const txt=document.getElementById('confirm-email-text').value;if(!txt.trim())return alert('Paste email text');document.getElementById('confirm-loading').style.display='flex';try{const r=await api('/api/jobs/'+currentJobId+'/parse-confirmation?raw_email='+encodeURIComponent(txt),{method:'POST'});const p=r.parsed;let h=`<div class="card"><div class="card-header">Extracted Info</div>`;if(p.contact_email)h+=`<div>Best Contact: <strong>${esc(p.contact_email)}</strong></div>`;if(p.contact_name)h+=`<div>Name: ${esc(p.contact_name)}</div>`;if(p.contact_phone)h+=`<div>Phone: ${esc(p.contact_phone)}</div>`;if(p.portal_url)h+=`<div>Portal: <a href="${esc(p.portal_url)}" target="_blank" style="color:var(--accent)">${esc(p.portal_url)}</a></div>`;if(p.next_steps)h+=`<div>Next Steps: <em>${esc(p.next_steps)}</em></div>`;if(p.all_emails?.length)h+=`<div class="mt-8"><strong>All Emails Found:</strong><div class="flex gap-8 mt-8" style="flex-wrap:wrap">${p.all_emails.map(e=>`<button class="btn btn-ghost btn-sm" onclick="setContactEmail('${esc(e)}')" title="Set as contact email">${esc(e)}</button>`).join('')}</div></div>`;if(p.all_urls?.length)h+=`<div class="mt-8"><strong>All Links Found:</strong><ul style="margin:4px 0 0 16px">${p.all_urls.map(u=>`<li class="text-sm"><a href="${u.startsWith('http')?esc(u):'https://'+esc(u)}" target="_blank" style="color:var(--accent)">${esc(u)}</a></li>`).join('')}</ul></div>`;if(p.is_rejection)h+=`<div class="mt-8" style="color:var(--red)">⚠ This looks like a rejection.</div>`;if(p.is_interview_request)h+=`<div class="mt-8" style="color:var(--green)">✓ Interview request detected!</div>`;h+='</div>';document.getElementById('confirm-result').innerHTML=h;document.getElementById('confirm-result').style.display='block';setTimeout(()=>{document.getElementById('confirm-modal').classList.remove('show');showDetail(currentJobId)},3000)}catch(e){alert(e.message)}finally{document.getElementById('confirm-loading').style.display='none'}}
+
+// Settings
+async function loadSettings(){const c=await api('/api/config');document.getElementById('cfg-w2-min').value=c.w2_salary_min;document.getElementById('cfg-w2-max').value=c.w2_salary_max;document.getElementById('cfg-hr-min').value=c.contract_hourly_min;document.getElementById('cfg-hr-max').value=c.contract_hourly_max;document.getElementById('cfg-followup-days').value=c.follow_up_days;document.getElementById('cfg-followup-email').value=c.follow_up_email;document.getElementById('cfg-smtp-user').value=c.smtp_user;document.getElementById('cfg-smtp-pass').value=c.smtp_password;document.getElementById('cfg-smtp-host').value=c.smtp_host||'smtp.gmail.com';document.getElementById('cfg-smtp-port').value=c.smtp_port||587;document.getElementById('cfg-dealbreakers').value=c.deal_breakers.join('\n');document.getElementById('cfg-keywords').value=c.preferred_keywords.join(', ');const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div class="flex items-center gap-8" style="margin:4px 0"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${k}</strong>: ${v.loaded?v.length+' chars':'Not loaded'}</div>`).join('')}
+async function saveConfig(){await api('/api/config',{method:'PUT',body:{w2_salary_min:+document.getElementById('cfg-w2-min').value||160000,w2_salary_max:+document.getElementById('cfg-w2-max').value||220000,contract_hourly_min:+document.getElementById('cfg-hr-min').value||85,contract_hourly_max:+document.getElementById('cfg-hr-max').value||125,follow_up_days:+document.getElementById('cfg-followup-days').value||14,follow_up_email:document.getElementById('cfg-followup-email').value,smtp_host:document.getElementById('cfg-smtp-host').value||'smtp.gmail.com',smtp_port:+document.getElementById('cfg-smtp-port').value||587,smtp_user:document.getElementById('cfg-smtp-user').value,smtp_password:document.getElementById('cfg-smtp-pass').value,deal_breakers:document.getElementById('cfg-dealbreakers').value.split('\n').filter(Boolean),preferred_keywords:document.getElementById('cfg-keywords').value.split(',').map(s=>s.trim()).filter(Boolean)}});alert('Saved')}
+async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
+async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
+
+// Helpers
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function escAttr(s){return(s||'').replace(/`/g,'\\`').replace(/\$/g,'\\$')}
+function laneBadge(l){const m={w2_sniper:['W2 Sniper','w2'],contract:['Contract','contract'],contract_to_hire:['C2H','c2h'],ignore:['Ignore','ignore']};const[a,c]=m[l]||['—','ignore'];return`<span class="badge badge-${c}">${a}</span>`}
+function laneLabel(l){return{w2_sniper:'W2 Sniper',contract:'Contract',contract_to_hire:'C2H',ignore:'Ignore'}[l]||l}
+function statusBadge(s){return`<span class="badge badge-${s}">${s}</span>`}
+function scoreColor(t){const c=t>=8?'var(--green)':t>=5?'var(--yellow)':'var(--red)';return`<strong style="color:${c}">${t}/10</strong>`}
+function scoreBar(l,v,m,r){const p=(v/m*100).toFixed(0);const c=p>=75?'var(--green)':p>=50?'var(--yellow)':'var(--red)';return`<div class="score-bar"><div class="score-bar-label">${l} (${v}/${m})</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${p}%;background:${c}"></div></div></div><div style="font-size:11px;color:var(--text-dim);margin:0 0 8px 108px">${esc(r)}</div>`}
+function followUpBadge(j){if(j.follow_up_due)return'<span class="badge badge-followup">Follow Up!</span>';if(j.status==='applied'&&j.days_since_applied!=null)return`<span class="text-dim text-sm">${j.days_since_applied}d</span>`;return'—'}
+function daysAgo(s){if(!s)return'—';return Math.floor((Date.now()-new Date(s).getTime())/864e5)+'d ago'}
+function copyText(b,t){navigator.clipboard.writeText(t);b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)}
+function showLoading(m){document.getElementById('action-loading').style.display='flex';document.getElementById('action-msg').textContent=m}
+function hideLoading(){document.getElementById('action-loading').style.display='none'}
+
+loadDashboard();
+</script>
+</body>
+</html>

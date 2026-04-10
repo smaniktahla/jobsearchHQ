@@ -1,0 +1,61 @@
+{
+  "id": "de922d0a",
+  "title": "Senior Data Architect",
+  "company": "Humana",
+  "url": "https://www.linkedin.com/jobs/view/4396961251",
+  "source": "jobspy_linkedin",
+  "intake_source": "api",
+  "raw_jd": "**Become a part of our caring community**\n In this Senior Data Architect role, you will meaningfully contribute to data architecture, data integration, and interoperability for CenterWell's OneHome team. You will ensure data solutions are both technically robust and aligned with business and user needs. You will also establish and enforce data standards, models, and governance, while also prioritizing enhancements and new features based on business impact. Additionally, you will help improve communication across engineering, business stakeholders, and end\\-users to accelerate the development and deployment of high\\-quality data products.\n   \n\n  \n\n As a Senior Data Architect, you will spend approximately 60% of your time with data architecting and modeling related tasks and approximately 40% of your time coding. As main components of the tech stack, you will work with SQL Server and Snowflake. You will report to an Associate Director, Technology Solutions.\n   \n\n  \n\n The Senior Data Architect works in all data environments which includes data design, database architecture, metadata and repository creation. The Senior Data Architect work assignments involve moderately complex to complex issues where the analysis of situations or data requires an in\\-depth evaluation of variable factors.\n   \n\n  \n\n**Key Responsibilities**\n* Use data architecture, data integration, and interoperability best practices to make data available for analytics teams.\n* Work with CenterWell data and Humana membership data\n* Optimize data loading, storing, modeling, and pipelining\n* Develop blueprints for all data repositories, evaluating hardware and software platforms, and integrating systems.\n* Translate needs into long\\-term data architecture solutions.\n* Design and build dimensional database schemas.\n* Evaluate reusability of current data for separate analyses.\n* Conduct data sheering to rid the system of old, unused or duplicate data.\n* Review object and data models and the metadata repository to structure the data for better management and quicker access.\n* Begin to influence department's strategy.\n* Exercise considerable latitude in determining goals and approaches to assignments.\n\n\n**Required Qualifications**\n**Use your skills to make an impact**\n* Bachelor's Degree in Computer Science, Information Technology or related field\n* 5\\+ years of experience in data engineering\n* 2\\+ years of experience in data architecture\n* 3\\+ years of experience with Snowflake\n* Experience with Big Data Integration \\& Analytics\n* Experience with healthcare data\n\n\n**Preferred Qualifications**\n* Master's Degree\n\n\n**Additional Information**\n**Work Style:** \n This position's work style is open to either remote or hybrid from any of the locations listed below.\n   \n\n  \n\n**Hub Location Options:**\n* Louisville, KY\n* Atlanta, GA\n* Washington, DC (Arlington, VA)\n* Fort Lauderdale, FL\n* Boston, MA\n* Chicago, IL\n* Dallas, TX\n* New York, NY\n\n\n**Why Humana?**\n At Humana, We Know Your Well\\-being Is Important To You, And It's Important To Us Too. That's Why We're Committed To Making Resources Available To You That Will Enable You To Become Happier, Healthier, And More Productive In All Areas Of Your Life. Just To Name a Few\n   \n\n  \n\n* Work\\-Life Balance\n* Generous PTO package\n* Health benefits effective day 1\n* Annual Incentive Plan\n* 401K \\- Excellent company match\n* Well\\-being program\n* Paid Volunteer Time Off\n\n\n If you share our passion for helping people, we likely have the right place for you at Humana.\n   \n\n  \n\n**SSN Alert Statement**\n Humana values personal identity protection. Please be aware that applicants may be asked to provide their Social Security Number, if it is not already on file. When required, an email will be sent from Humana@myworkday.com with instructions on how to add the information into your official application on Humana's secure website.\n   \n\n  \n\n Travel: While this is a remote position, occasional travel to Humana's offices for training or meetings may be required.\n   \n\n  \n\n**Scheduled Weekly Hours**\n 40\n   \n\n  \n\n**Pay Range**\n The compensation range below reflects a good faith estimate of starting base pay for full time (40 hours per week) employment at the time of posting. The pay range may be higher or lower based on geographic location and individual pay will vary based on demonstrated job related skills, knowledge, experience, education, certifications, etc.\n   \n\n  \n\n $117,600 \\- $161,700 per year\n   \n\n  \n\n This job is eligible for a bonus incentive plan. This incentive opportunity is based upon company and/or individual performance.\n   \n\n  \n\n**Description Of Benefits**\n Humana, Inc. and its affiliated subsidiaries (collectively, \u201cHumana\u201d) offers competitive benefits that support whole\\-person well\\-being. Associate benefits are designed to encourage personal wellness and smart healthcare decisions for you and your family while also knowing your life extends outside of work. Among our benefits, Humana provides medical, dental and vision benefits, 401(k) retirement savings plan, time off (including paid time off, company and personal holidays, volunteer time off, paid parental and caregiver leave), short\\-term and long\\-term disability, life insurance and many other opportunities.\n   \n\n  \n\n**About Us**\n About Humana: Humana Inc. (NYSE: HUM) is a leading U.S. healthcare company. Through our Humana insurance services and our CenterWell healthcare services, we make it easier for the millions of people we serve to achieve their best health \u2013 delivering the care and service they need, when they need it. These efforts are leading to a better quality of life for people with Medicare and Medicaid, families, individuals, military service personnel, and communities at large. Learn more about what we offer at\u202fHumana.com\u202fand at\u202fCenterWell.com.\n   \n\n  \n\n**Equal Opportunity Employer**\n It is the policy of Humana not to discriminate against any employee or applicant for employment because of race, color, religion, sex, sexual orientation, gender identity, national origin, age, marital status, genetic information, disability or protected veteran status. It is also the policy of Humana to take affirmative action, in compliance with Section 503 of the Rehabilitation Act and VEVRAA, to employ and to advance in employment individuals with disability or protected veteran status, and to base all employment decisions only on valid job requirements. This policy shall apply to all employment actions, including but not limited to recruitment, hiring, upgrading, promotion, transfer, demotion, layoff, recall, termination, rates of pay or other forms of compensation and selection for training, including apprenticeship, at all levels of employment.",
+  "pay_range": "",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 3,
+    "scope_impact": 3,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 6,
+    "skills_rationale": "Strong match on data architecture, SQL Server/Snowflake, data integration, and healthcare domain experience. Candidate has extensive BI/analytics background with SQL, Python, data warehousing, and enterprise data architecture. Healthcare experience from consulting work aligns well.",
+    "scope_rationale": "Excellent scope match for a senior individual contributor role with some influence on department strategy. Candidate's background as Senior Data & Analytics Architect and BI leadership roles demonstrates appropriate seniority for this position.",
+    "pay_rationale": "Pay range $117,600-$161,700 is significantly below candidate's W2 target of $160,000-$220,000, with minimal overlap at the very top.",
+    "keyword_gaps": [
+      "Snowflake",
+      "Big Data",
+      "dimensional modeling"
+    ],
+    "red_flags": [
+      "Low pay range"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "This is a legitimate senior data architect role at a major healthcare company with good technical alignment and appropriate scope. The candidate's extensive data architecture, BI, and healthcare experience makes this a strong skills match. However, the pay range significantly undervalues the role relative to candidate expectations, making it not worth pursuing despite the good technical fit."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "Source: linkedin | Location: Remote | Posted: 2026-04-02 | Type: fulltime",
+  "created_at": "2026-04-10T14:53:12.512666",
+  "updated_at": "2026-04-10T14:53:21.447882",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-10T14:53:21.447859"
+    }
+  ]
+}

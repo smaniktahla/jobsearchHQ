@@ -1,0 +1,66 @@
+{
+  "id": "a550bd90",
+  "title": "MicroStrategy administrator",
+  "company": "GSA",
+  "url": "",
+  "source": "manual_paste",
+  "intake_source": "manual_paste",
+  "raw_jd": "Hi Salil,\n\nWe are looking for a MicroStrategy administrator for our federal customer GSA.\nWe are managing their mobile fleet management application.\nWe are looking for someone strong in MSTR reporting.\nThis is a 100% remote and 6 months contract.\n\nWill you be interested to discuss more about this role?",
+  "pay_range": "",
+  "market_lane": "contract",
+  "status": "scored",
+  "score": {
+    "skills_match": 4,
+    "scope_impact": 1,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 5,
+    "skills_rationale": "Perfect skills match - candidate has extensive MicroStrategy experience from multiple roles including Senior BI Consultant at Claraview/Teradata with 25,000-user platform, BI Consultant at Kinetic Networks, and early career at MicroStrategy itself. Strong MSTR reporting background exactly matches requirement.",
+    "scope_rationale": "Role appears to be individual contributor administrator position, which is significantly below candidate's current senior architect level and leadership experience. Candidate has managed teams and owned entire BI platforms - this seems like a step backward in scope.",
+    "pay_rationale": "No pay range provided, making it impossible to assess alignment with candidate's $85-125/hour contract target.",
+    "keyword_gaps": [],
+    "red_flags": [
+      "Extremely brief JD with minimal details",
+      "No pay range provided",
+      "Unclear scope and responsibilities"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "contract",
+    "recommended_lane": "contract",
+    "raw_analysis": "This is a legitimate but basic MicroStrategy admin role for GSA federal work. While the candidate has perfect technical fit with extensive MSTR experience, the role appears junior compared to their current senior architect level. The extremely brief job description lacks important details about pay, specific responsibilities, and growth potential, making it difficult to fully evaluate."
+  },
+  "cover_letters": [
+    {
+      "id": "701ec25b",
+      "job_id": "a550bd90",
+      "variant": "direct",
+      "content": "I am highly interested in the MicroStrategy administrator position for GSA. With over 15 years of hands-on MicroStrategy experience, I bring exactly the deep MSTR reporting expertise you need for the mobile fleet management application.\n\nMy MicroStrategy background spans multiple enterprise environments, including serving as a Senior BI Consultant at Claraview (Teradata) where I architected a 25,000-user enterprise reporting platform for Lowe's. I also worked directly at MicroStrategy as Operations Manager, leading engineering teams and driving significant cost savings through system optimization. Additionally, I hold MicroStrategy Certified Developer certification and have built dozens of production MSTR dashboards supporting hundreds of users across various sectors. Currently at the Department of Veterans Affairs, I continue delivering enterprise-scale reporting systems that support critical financial and operational decisions.\n\nThe 6-month remote contract structure aligns perfectly with my current consulting approach. I can rapidly onboard into your GSA environment and immediately contribute to the mobile fleet management application. My track record includes quickly mastering complex federal systems - I've successfully navigated VA's enterprise architecture and compliance requirements while delivering production-ready solutions under tight timelines.\n\nI'm ready to discuss how my proven MicroStrategy expertise can support your GSA engagement. My experience scaling MSTR platforms, combined with federal sector familiarity, positions me to hit the ground running on this critical fleet management system.",
+      "created_at": "2026-04-09T19:18:36.806544"
+    },
+    {
+      "id": "3a7e1617",
+      "job_id": "a550bd90",
+      "variant": "consultative",
+      "content": "Dear Hiring Manager,\n\nI understand you're seeking a MicroStrategy administrator to support GSA's mobile fleet management application, and I believe my extensive MSTR experience positions me well to address the reporting challenges inherent in federal fleet operations. Having worked as a Senior Data & Analytics Architect for the VA's FMBT division, I'm familiar with the complexities of federal data environments\u2014where system reliability, data accuracy, and stakeholder confidence are paramount.\n\nMy MicroStrategy background spans multiple environments and scales, from my early role as Operations Manager at MicroStrategy itself, to architecting a 25,000-user enterprise reporting platform at Lowe's during my time with Claraview/Teradata. More recently, I've built reporting systems that integrate legacy and modern ERP platforms, developed data validation processes that improved accuracy across complex datasets, and delivered dashboards used by federal leadership for critical operational decisions. This experience has taught me that effective MSTR administration goes beyond technical maintenance\u2014it requires understanding how fleet managers, procurement teams, and executives actually use reporting data to make decisions.\n\nFleet management applications typically generate large volumes of operational data that need to be transformed into actionable insights for multiple stakeholder groups. I've consistently delivered solutions that not only maintain system performance but also enhance data reliability and user adoption. My approach focuses on rapid onboarding into existing environments, identifying immediate improvement opportunities, and ensuring reporting systems remain stable and responsive under operational demands.\n\nI'd welcome the opportunity to discuss how my federal contracting experience and deep MicroStrategy expertise can support GSA's fleet management reporting needs. I'm available for a conversation at your convenience to explore the specific challenges you're facing and how we might address them together.\n\nBest regards,\nSalil Maniktahla",
+      "created_at": "2026-04-09T19:18:47.249127"
+    },
+    {
+      "id": "501e92d3",
+      "job_id": "a550bd90",
+      "variant": "brief",
+      "content": "I'm very interested in the MicroStrategy administrator role with GSA. My background includes extensive MSTR experience from multiple angles - as a technical architect for a 25,000-user enterprise reporting platform at Teradata/Claraview, delivering analytics solutions for major clients like Google and Wells Fargo at Kinetic Networks, and even early operational experience at MicroStrategy itself. I'm MicroStrategy Certified Developer with deep hands-on experience building reporting systems that scale.\n\nCurrently working as a Senior Data & Analytics Architect with the VA on enterprise reporting systems, I have the federal contracting experience and security clearance background (CISSP certified) that GSA work requires. The 6-month remote timeline works perfectly with my current availability, and I can hit the ground running with MSTR reporting for fleet management applications. Happy to discuss how my proven track record can support your GSA engagement.",
+      "created_at": "2026-04-09T19:18:53.394405"
+    }
+  ],
+  "notes": "",
+  "created_at": "2026-04-09T19:18:03.790297",
+  "updated_at": "2026-04-09T19:18:53.394501",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-09T19:18:19.329574"
+    }
+  ]
+}

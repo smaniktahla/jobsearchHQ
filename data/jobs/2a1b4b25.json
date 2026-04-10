@@ -1,0 +1,64 @@
+{
+  "id": "2a1b4b25",
+  "title": "Director of Commercial Operations & Analytics",
+  "company": "Eagle Creek Renewable Energy LLC",
+  "url": "https://www.linkedin.com/jobs/view/4385249725",
+  "source": "jobspy_linkedin",
+  "intake_source": "api",
+  "raw_jd": "**About the role:** \n As the Director of Commercial Operations \\& Analytics, you will lead our energy management and modeling efforts to ensure the tactical execution of our commercial strategy. You will serve as the operational lead for day\\-to\\-day market interactions. This role requires a blend of market knowledge, financial acumen, and the leadership presence to navigate a complex, fast\\-paced energy environment. The ideal candidate understands the nuances of U.S. ISO/RTO markets and can translate complex data into actionable commercial decisions.\n   \n\n  \n\n*This position is available out of any of Eagle Creek's corporate offices. Candidates not residing near an existing office are eligible to work in a remote capacity.*\n**Why Eagle Creek?**\n* A comprehensive benefits plan: Medical, Dental, Vision, HSA, FSA, Commuter benefits, Voluntary Life, 401(k) Match\n* Eleven paid holidays per year, plus a competitive PTO schedule and time off to volunteer or give back to your community\n* Access to a company\\-funded Employee Assistance Program\n* Employee discounts through ADP LifeMart\n* Tuition Reimbursement as well as access to trainings \\& mentors for Career Progression and Personal Development\n\n\n**Responsibilities:**\n* Develop and execute bidding strategies for Day\\-Ahead and Real\\-Time markets\n* Collaborate with Operations to dispatch hydro assets to optimize revenue while managing environmental and regulatory constraints\n* Oversee daily interaction with ISOs/RTOs\n* Translate immediate\\-term weather and streamflow data into daily generation targets\n* Oversee the development of predictive models that integrate relevant data and trends to inform commercial decision\\-making\n* Manage the operational compliance and settlement of Power Purchase Agreements (PPAs) and hedging instruments to mitigate price volatility\n* Ensure all commercial activities comply with FERC, NERC, and regional ISO market rules\n* Lead the data gathering for audit requests and market monitoring inquiries\n* Lead and mentor a team of analysts, fostering a culture of data\\-driven decision\\-making and continuous process improvement\n* Monitor ISO/RTO stakeholder processes for immediate operational impact and provide market intelligence updates to senior management\n* Maintain relationships with counterparties, including off\\-takers, and fulfill regular reporting requirements\n* Collaborate on financial and operational performance monitoring of portfolio facilities and associated reporting\n* Assist with integration of new regional acquisitions into the Company's operating platform\n\n\n**Minimum Qualifications:**\n* Bachelor\u2019s degree in Finance, Engineering, Economics, or Mathematics. MBA or Master\u2019s in a quantitative field preferred\n* Eight\\+ years of experience in energy trading, commercial operations, or asset management (specifically within US power markets)\n* Proficiency in Excel, SQL, or Python for data analysis\n* Proficiency with BI tools\n* Understanding of LMP (Locational Marginal Pricing), Ancillary Services, and Hydrological modeling\n* Ability to simplify and communicate complex technical data for non\\-technical stakeholders, company leadership, and Board members\n* Strong time management skills and ability to complete time\\-sensitive work\n* Outstanding organizational skills and attention to detail\n* Critical thinking skills, with the ability to identify and solve complex problems\n* Ability to use discretion in handling confidential information\n\n\n**Preferred Qualifications:**\n* Demonstrated knowledge of energy economics with specific application to North American power/energy markets\n* Demonstrated knowledge of energy industry regulatory environment\n* Experience with flexible power generation resources (gas\\-fired, hydropower, energy storage)",
+  "pay_range": "",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 2,
+    "scope_impact": 2,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 4,
+    "skills_rationale": "Strong overlap in SQL, Python, BI tools, data analysis, and team leadership. However, candidate lacks energy trading, ISO/RTO markets, LMP pricing, and hydrological modeling experience which are core requirements.",
+    "scope_rationale": "Director-level scope with team leadership, strategic decision-making, and stakeholder management aligns well with candidate's background leading teams and working at senior levels including CFO reporting relationships.",
+    "pay_rationale": "No salary range provided in the JD, making pay alignment assessment impossible.",
+    "keyword_gaps": [
+      "energy trading",
+      "ISO/RTO markets",
+      "LMP pricing",
+      "hydrological modeling",
+      "FERC compliance",
+      "power generation"
+    ],
+    "red_flags": [
+      "domain expertise mismatch - energy sector"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "While this director-level role matches the candidate's leadership experience and technical skills in analytics, it requires deep energy sector expertise the candidate lacks. The role demands specific knowledge of power markets, energy trading, and regulatory compliance that would take years to develop. Despite strong transferable skills in data analysis and team leadership, the domain knowledge gap is too significant for success in this specialized energy markets role."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "Source: linkedin | Location: Remote | Posted: 2026-03-20 | Type: fulltime",
+  "created_at": "2026-04-10T15:21:19.973131",
+  "updated_at": "2026-04-10T15:21:28.801965",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-10T15:21:28.801931"
+    }
+  ]
+}

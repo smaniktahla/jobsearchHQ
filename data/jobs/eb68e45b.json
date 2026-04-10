@@ -1,0 +1,65 @@
+{
+  "id": "eb68e45b",
+  "title": "Director of Information Technology",
+  "company": "MAG Aerospace",
+  "url": "",
+  "source": "manual_paste",
+  "intake_source": "manual_paste",
+  "raw_jd": "Position Summary\n\nMAG Aerospace is hiring for a Director of Information Technology who will lead enterprise technology strategy and operations to enable organizational success through innovative, secure, and scalable IT solutions.\n\nAs well, this position will oversee all technology components of the business while ensuring systems align with organizational goals and federal security requirements.\n\nThis position is mainly located on site at our Headquarters in Fairfax, VA - possible remote days available after initial performance period.\n\nPrimary Responsibilities\n\n Essential Duties and Responsibilities \n\n     Develop and execute comprehensive IT strategy aligned with business objectives \n     Manage and lead IT teams including developers, security analysts, support technicians, and vendor relationships \n     Oversee enterprise hardware and software programs and infrastructure \n     Evaluate and ensure adherence to federal technology requirements for security and compliance \n     Collaborate with department leaders to understand IT requirements and implement solutions accordingly \n     Design and implement company-wide technology updates and enhancement programs \n     Conduct regular assessments of organizational systems to identify risks, vulnerabilities, and improvement opportunities \n\nSecondary Responsibilities\n\n     Present technology recommendations and proposals to executive leadership and decision-makers \n     Develop and deliver training sessions to educate employees on new technology features and systems \n     Manage IT budget and vendor relationships for optimal cost-effectiveness \n     Create and maintain disaster recovery and business continuity plans \n     Oversee cybersecurity initiatives and incident response protocols \n     Support strategic planning and digital transformation initiatives \n\nRequirements\n\n     10+ years of experience in information technology roles 5+ years of management and leadership experience in IT environments \n     Proven experience managing diverse IT teams and cross-functional collaboration \n     Strong understanding of enterprise infrastructure, cloud platforms, and security frameworks. In particular hands on experience with Microsoft Azure, O365, ServiceNow, \n     Experience with federal technology compliance requirements and security standards including CMMC 2.0 and the Risk Management Framework, ITAR, and implementation and operations of higher classification environments. \n     Demonstrated ability to align technology strategy with business objectives \n     Project management experience with large-scale technology implementations \n     Knowledge of budget management and vendor relationship management \n\nEducation\n\n     Bachelor\u2019s in Computer Science, Information Security, or related field \n\nClearance\n\n     Secret \n     US Citizenship required \n\n Special Note \n\nThe position is contingent upon candidate\u2019s ability to meet physical and medical requirements as needed by the position; including compliance with all applicable federal, state, and local jurisdictional requirements.\n\nBenefits And Compensation\n\nAt MAG Aerospace, we value your contributions providing our employees with a robust Total Rewards package that supports your total well-being. Full-time and part-time employees working at least 30 hours a week on a regular basis are eligible to participate in MAG's Total Rewards programs. Our offerings include health, life, disability, financial, and retirement benefits as well as paid leave, professional development, and tuition assistance. Individuals that do not meet the threshold are only eligible for select offerings not inclusive of health benefits. We encourage you to learn more about our Total Rewards Program by visiting the Resource page on our Careers site: https://www.magaero.com/benefits/. Salary at MAG Aerospace is determined by various factors including but not limited to location, the particular combination of education, knowledge, skills, competencies, and experience as well as contract-specific affordability and organizational requirements. The projected compensation range for this position is $129500 to $240500 (annualized USD). The estimate displayed represents the typical salary range for this position and is just one component of MAG's total compensation package for employees.\n\nBenefits found in job post\n\nTuition assistance\n\nJob search faster with Premium\n\nAccess company insights like strategic",
+  "pay_range": "",
+  "market_lane": "w2_sniper",
+  "status": "scored",
+  "score": {
+    "skills_match": 2,
+    "scope_impact": 3,
+    "pay_alignment": 2,
+    "gut_interest": 1,
+    "total": 8,
+    "skills_rationale": "Strong leadership and strategy alignment match, but requires specific federal/defense contractor expertise (CMMC 2.0, ITAR, classification environments) that candidate lacks. Azure and enterprise infrastructure experience align well.",
+    "scope_rationale": "Perfect match for candidate's leadership trajectory. Role requires IT director-level strategic thinking, team management, and enterprise-wide technology oversight - all areas where candidate has demonstrated success.",
+    "pay_rationale": "Salary range of $129,500-$240,500 overlaps well with candidate's W2 target of $160,000-$220,000, providing good compensation alignment.",
+    "keyword_gaps": [
+      "CMMC 2.0",
+      "ITAR",
+      "Secret clearance",
+      "ServiceNow",
+      "classification environments"
+    ],
+    "red_flags": [
+      "Requires Secret clearance",
+      "On-site requirement in Fairfax, VA",
+      "Federal defense contractor compliance requirements"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "director",
+    "recommended_lane": "w2_sniper",
+    "raw_analysis": "This is a legitimate senior IT leadership role that matches the candidate's management experience and strategic thinking capabilities. However, it requires specific defense contractor expertise (CMMC, ITAR, classification environments) that the candidate lacks. The Secret clearance requirement and primarily on-site work in Fairfax could be challenging, though the pay range aligns well with targets."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "",
+  "created_at": "2026-04-09T20:10:55.598932",
+  "updated_at": "2026-04-09T21:18:25.495673",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-09T20:11:21.700049"
+    }
+  ]
+}

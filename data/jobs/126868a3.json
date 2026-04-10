@@ -1,0 +1,68 @@
+{
+  "id": "126868a3",
+  "title": "Senior Manager of Donor Experience & Retention",
+  "company": "Good360",
+  "url": "https://www.indeed.com/viewjob?jk=9a5d4a0f6ffba47c",
+  "source": "jobspy_indeed",
+  "intake_source": "api",
+  "raw_jd": "**Senior Manager of Donor Experience \\& Retention**\n\n\n\n\n**Department:** Marketing \\& Fundraising  \n\n**Reports To:** Vice President of Individual Giving\n\n**Location:** Hybrid \u2013 Alexandria, VA\n\n**FLSA Status:** Exempt  \n\n**Position Type:** Full Time\n\n\n\n\n**Good360 is Closing the Need Gap to Open Opportunity for All**\n\n\nJoin a fast\\-growing organization with a strong culture and powerful mission! As the global leader in product philanthropy and purposeful giving, Good360 partners with more than 400 socially responsible companies to source highly needed donated goods and distribute them through our network of more than 100,000 diverse nonprofits that support people in need. Good360 is the link between organizations with so much to give and communities in critical need, closing that gap and opening new opportunities for all. Since 1983, Good360 has distributed more than $18 billion in needed goods, including more than $3 billion in goods in 2025 alone. Good360 has been named the \\#2 charity on the Forbes list of America\u2019s Top 100 Charities for 2023 and 2024 and has a 4\\-star Charity Navigator rating.\n\n\nThe organization has also been recognized as both a top workplace in the Washington, DC metro area (by the Washington Post) and as a top nonprofit to work for in the United States (by NonProfit Times).\n\n\n**Position Summary**\n\n\n\n\nThe Senior Manager, Donor Experience \\& Retention is responsible for executing and optimizing donor lifecycle programs that support retention, renewal, and engagement. This role focuses on day\\-to\\-day program management, testing, and performance analysis across lifecycle communications and selected non\\-digital channels, under the strategic direction of the Vice President of Individual Giving.\n\n\n\n\n**Key Responsibilities include, but are not limited to the following:**\n\n\n\n\n**Lifecycle Program Execution**\n\n* Execute donor lifecycle programs, including onboarding, nurture, renewal, sustainer, and reactivation communications\n* Manage assigned lifecycle campaigns and journeys within defined strategy and priorities\n* Implement segmentation and treatment logic as defined in partnership with the VP of Individual Giving\n* Ensure lifecycle communications are executed consistently across email, SMS, and related touchpoints\n\n**Lifecycle Performance Monitoring**\n\n* Monitor and report on lifecycle performance metrics such as retention rate, revenue retention, sustainer conversion, and engagement indicators\n* Analyze results from lifecycle tests and campaigns and surface insights and recommendations\n* Support lifecycle forecasting and planning through analysis and reporting\n\n**Lifecycle Communications and Acknowledgements**\n\n* Oversee lifecycle email and SMS programs, including automated and triggered communications, ensuring execution aligns with defined strategy and standards\n* Oversee donor acknowledgement strategy and quality across channels, including timing, tone, accuracy, and donor experience standards\n* Partner with the Sr. Fundraising Coordinator to ensure acknowledgements are executed correctly and consistently\n* Review performance and donor feedback related to acknowledgements and lifecycle communications, and recommend improvements to messaging, cadence, and format\n\n**Non\\-digital Channel Support**\n\n* Support execution of non\\-digital donor programs such as direct mail, telemarketing, and canvassing, in partnership with the VP of Individual Giving and external vendors\n* Coordinate timelines, assets, and data inputs for offline campaigns\n* Support reporting and analysis related to offline donor efforts\n\n**Data, Systems and Coordination**\n\n* Partner with fundraising and database management colleagues to ensure accurate data use and reporting\n* Maintain documentation for lifecycle journeys, segments, and operational processes\n* Identify data or systems issues that affect lifecycle execution and escalate as needed\n\n**Cross\\-functional Collaboration**\n\n* Collaborate with the Director of Digital Fundraising to support alignment between acquisition and lifecycle execution\n* Work with storytelling, content gathering, and web teams to ensure lifecycle communications are supported by appropriate assets\n* Participate in shared planning and retrospectives across the Individual Giving program\n\n**Qualifications/Requirements**\n\n* Bachelor\u2019s degree in related field or equivalent experience\n* 7\\+ years of experience in donor experience, retention, or lifecycle marketing roles\n* Experience supporting direct mail or telemarketing programs in coordination with vendors or agencies.\n* Demonstrated experience executing lifecycle campaigns and donor journeys\n* Strong writing and editing skills\n* Working knowledge of Salesforce (Nonprofit Cloud or NPSP) or comparable CRM platforms\n* Experience with email and SMS platforms such as Dotdigital, Marketing Cloud, or similar\n* Familiarity with analytics and reporting tools such as GA4, Power BI, Tableau, or similar\n* Ability to manage multiple campaigns and deadlines in a complex environment\n\n**Benefits**\n\n\nOur team is Good360\u2019s greatest asset. We recognize that our team members contribute valuable skills, knowledge, experience, and passion that is critical to the pursuit of our mission and our progress toward closing the need gap. That is why we offer our team members numerous perks and benefits, including:\n\n* Medical, dental, and vision coverage programs\n* Employer paid Short\\-term and long\\-term disability and life insurance coverage\n* 403B plan with matching\n* Additional supplemental benefits include \u2013 FSA Plans, Accident Insurance, and supplement Life/AD\\&D coverage\n* Generous and flexible paid time off policy\n* Volunteer time off policy\n* Hybrid work environment\n\n\n\n\n**Salary Range**  \n\n$90,000 \u2013 $95,000 annually\n\n\n*Note: Compensation is based on a candidate's experience, skills, education, and geographic location. This range is based on Washington, D.C.\u2013Maryland\u2013Virginia (DMV) market data; offers to candidates outside this area will reflect local market data.*\n\n\n**Work Location**\n\nHybrid, based in our Old Town Alexandria, VA office (minimum of two days per week with Tuesday as an anchor day)\n\n\n*Note: While hybrid is strongly preferred, we are open to considering fully remote candidates residing in CO, DE, DC, FL, GA, IL, IN, KY, MD, MN, NE, NV, NC, OH, OR, PA, TN, TX, VA, WA, WV*.",
+  "pay_range": "$90,000 - $95,000/year",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 1,
+    "scope_impact": 1,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 2,
+    "skills_rationale": "While there's some overlap in analytics tools (Tableau, Power BI), this role focuses heavily on fundraising, donor lifecycle management, and nonprofit marketing - completely different from the candidate's data engineering and BI architecture background. The candidate has no fundraising, donor management, or nonprofit experience.",
+    "scope_rationale": "The role is at an appropriate senior level but in an entirely different domain. This is a marketing/fundraising position managing donor relationships and lifecycle campaigns, whereas the candidate's expertise is in technical data architecture and analytics for government/enterprise clients.",
+    "pay_rationale": "The stated salary range of $90,000-$95,000 is significantly below the candidate's W2 target range of $160,000-$220,000.",
+    "keyword_gaps": [
+      "donor experience",
+      "fundraising",
+      "lifecycle marketing",
+      "direct mail",
+      "telemarketing",
+      "nonprofit operations",
+      "Salesforce NPSP",
+      "email marketing platforms"
+    ],
+    "red_flags": [
+      "Complete career pivot required",
+      "Significant pay cut",
+      "No relevant nonprofit/fundraising experience"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "This is a nonprofit fundraising and donor lifecycle management role that requires completely different skills from the candidate's technical background. The position focuses on marketing campaigns, donor retention, and fundraising operations rather than data architecture or analytics. The salary range is also substantially below the candidate's targets, and there's no clear transferable experience from their government/enterprise BI background to nonprofit fundraising."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "Source: indeed | Location: Remote | Posted: 2026-04-08 | Type: fulltime",
+  "created_at": "2026-04-10T14:50:51.344004",
+  "updated_at": "2026-04-10T14:51:03.754763",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-10T14:51:03.754726"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+services:
+  jobsearch:
+    build: .
+    container_name: jobsearch
+    restart: unless-stopped
+    ports:
+      - "8093:8093"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - APP_PORT=8093

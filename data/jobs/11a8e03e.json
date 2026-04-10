@@ -1,0 +1,68 @@
+{
+  "id": "11a8e03e",
+  "title": "Program Security Representative (PSR) II",
+  "company": "gTANGIBLE Corporation",
+  "url": "https://www.indeed.com/viewjob?jk=7b1e6115bc7957fd",
+  "source": "jobspy_indeed",
+  "intake_source": "api",
+  "raw_jd": "gTANGIBLE Corporation (gTC), www.gtangible.com, is an S corporation and a registered Government contractor that provides services and solutions in:\n\n* National Security Programs\n* Professional, Administrative, and Management Support\n* Mission and Warfighter Support\n\n\n\n\nWe are a Service\\-Disabled Veteran Owned Small Business (SDVOSB) and the founder has years of successful experience in the Government contracting arena. Our leadership team is an exceptional group of Government contracting professionals. gTANGIBLE is in the process of identifying candidates for the following position.\n\n\n\n\n**Requisition Type: Non\\-Contingent (Open)**\n\n**Position Status: Full Time**\n\n**Position Title: Program Security Representative (PSR) II**\n\n**Location: Washington, DC**\n\n**Security Clearance Level: Top Secret/SCI, SAP Information eligible, consent for Counterintelligence polygraph**\n\n\n\n\n**Duties and Responsibilities**\n\nThe Program Security Representative's primary function is to provide multi\\-discipline security support for one or more of the customer's Special Access Programs (SAPs). The position will provide \"day\\-to\\-day\" multi\\-discipline analysis for Collateral, Sensitive Compartmented Information (SCI) and Special Access Program (SAP) activities. Duties include the following:\n\n* Ensure strict adherence to the provisions of the National Industrial Security Program Operating Manual, its Supplement, the DoD Overprint, Director of Central Intelligence Directives, Intelligence Community Directive, and SAP policy.\n* Assist in developing and executing approved policies and procedures for safeguarding SAP, SCI and collateral data in support of US military operations.\n* Provide day\\-to\\-day security support that includes continuous assessment of procedures to identify shortfalls and provide appropriate recommendations for revising and improving security policies, procedures, and systems.\n* Identify vulnerabilities, threats, and risks to test, training, and operational activities.\n* Assist in developing, implementing, and training the Operations Security program.\n* Assist in providing contractor and subordinate facility assistance and oversight.\n* Brief all levels of personnel, both in the government and senior civilian services, on a variety of security related topics.\n* Conduct and document SAP facility compliance reviews, follow\\-on facility reviews, and facility close\\-outs.\n* Monitor, report and track all corrective actions resulting from compliance reviews.\n* Ensure timely notification of pertinent security matters to program technical and management staff.\n* Conduct exploration of any loss, compromise, or suspected compromise of classified and/or sensitive information, including conducting preliminary inquiries and generating damage assessments resulting from the loss of classified information.\n* Coordinate with SAP security personnel to ensure lessons learned are incorporated into the curriculum for the SAP security educationawareness program.\n\n**Knowledge and Qualifications**\n\n* Bachelor's degree in a related area and 8\\-10 years of related experience OR Associates Degree in a related area and 10\\-12 years of related experience OR 12\u201314 years of equivalent experience without a degree.\n\t+ Security Fundamentals Professional Certification (SFPC) counts towards 3 years of experience\n\t+ Special Program Security Certification (SPSC) counts towards 5 years of experience\n\t+ Maximum equivalent experience for Security Professional Education Development (SPED) Certifications is no more than 5 years\n* Some SAP experience.\n* Prior active duty in the U.S. Air Force a plus.\n\n\nEqual Opportunity Employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, pregnancy, genetic information, disability, status as a protected veteran, or any other protected category under applicable federal, state, and local laws.",
+  "pay_range": "$nan - $nan",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 0,
+    "scope_impact": 0,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 0,
+    "skills_rationale": "This role requires specialized security expertise in Special Access Programs, clearance management, and National Industrial Security Program compliance - completely different from the candidate's data analytics and BI background. Zero technical overlap.",
+    "scope_rationale": "While the candidate has senior-level experience, this PSR role requires specialized security clearance and SAP expertise that is entirely outside their domain. The scope is appropriate but in a completely unrelated field.",
+    "pay_rationale": "No compensation information provided in the job description, making alignment assessment impossible.",
+    "keyword_gaps": [
+      "Special Access Programs",
+      "NISPOM",
+      "Security clearance management",
+      "Counterintelligence",
+      "SAP security",
+      "SFPC certification",
+      "SPSC certification"
+    ],
+    "red_flags": [
+      "Requires TS/SCI clearance",
+      "Requires SAP eligibility",
+      "Requires counterintelligence polygraph",
+      "Completely different career field from candidate background"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "This is a specialized government security role focused on Special Access Programs and clearance management, requiring TS/SCI with polygraph. The candidate's extensive background in data analytics, BI architecture, and financial systems has zero overlap with security program management. This represents a complete career field mismatch and requires security clearances the candidate likely doesn't possess."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "Source: indeed | Posted: 2026-04-09 | Type: fulltime",
+  "created_at": "2026-04-10T15:17:03.139778",
+  "updated_at": "2026-04-10T15:17:12.727454",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-10T15:17:12.727405"
+    }
+  ]
+}

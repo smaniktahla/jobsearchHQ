@@ -1,0 +1,70 @@
+SALIL MANIKTAHLA
+Springfield, VA  ·  571-215-8218  ·  salil.maniktahla@gmail.com  ·  linkedin.com/in/salilmaniktahla
+SUMMARY
+Hands-on data and platform leader with 25+ years of experience designing and stabilizing complex systems across data, infrastructure, and analytics. Currently leading data architecture and reporting for the Department of Veterans Affairs’ Financial Management Business Transformation (FMBT) program, delivering enterprise data pipelines, reconciliation systems, and executive reporting across a large-scale ERP modernization.
+Known for bridging infrastructure, data, and business needs—designing resilient systems, integrating disparate platforms, and stepping in hands-on to resolve complex technical challenges. Experienced in leading cross-functional teams through ambiguity, system transitions, and high-pressure delivery environments.
+CORE CAPABILITIES
+Data Platforms & Engineering
+    • Data pipelines, ETL/ELT, data modeling, system integration
+    • ERP data integration (iFAMS / Workday / legacy systems)
+    • Data validation, reconciliation, and audit-ready architectures
+Infrastructure & Systems
+    • Linux (Ubuntu), Docker, containerized environments, distributed systems
+    • Observability, monitoring, and system reliability
+Cloud & Platforms
+    • Azure (data services), CI/CD and deployment practices
+Leadership
+    • Cross-functional technical leadership (Finance, HR, IT)
+    • Architecture ownership and delivery coordination; mentoring engineers
+PROFESSIONAL EXPERIENCE
+Senior Data & Analytics Architect (Contractor)
+U.S. Department of Veterans Affairs – FMBT	Sep 2021 – Present
+    • Lead data architecture and reporting workstreams supporting rollout of VA’s enterprise ERP system (iFAMS)
+    • Designed and implemented data pipelines integrating legacy financial systems with ERP platforms, enabling consistent, reliable data flow
+    • Built enterprise reporting systems and executive dashboards supporting financial operations and decision-making
+    • Established data validation and reconciliation processes improving data quality and audit readiness
+    • Provided hands-on technical leadership in debugging, performance tuning, and system integration challenges
+    • Coordinated across finance, acquisition, and IT stakeholders to resolve system issues and meet delivery timelines
+Business Intelligence Analyst – Finance
+Howard University	Apr 2020 – Jul 2024
+    • Played key leadership role in multi-million-dollar Workday ERP implementation as one of three cross-functional drivers (Finance, HR, IT) during period of executive disruption (CIO departure, CFO loss)
+    • Helped stabilize delivery, resolve ongoing system and data issues, and drive the program to successful deployment
+    • Led Data Governance initiative, defining policies and improving data quality and validation across financial systems
+    • Designed and implemented enterprise BI data architecture and data warehouse
+    • Served as Workday Analytics Lead in collaboration with Deputy CFO
+    • Built dashboards and KPI frameworks supporting executive decision-making
+BI Partner / Strategist (Independent Consultant)
+Multiple Clients	Jul 2016 – Mar 2020
+    • Delivered data platforms, reporting systems, and analytics solutions across multiple clients and industries
+    • Led BI product deployments aligned with governance and release processes
+    • Mentored engineers and supported hiring, onboarding, and technical development
+    • Evaluated and improved systems for performance, scalability, and maintainability
+VitalSpring Technologies
+BI Senior Manager	May 2008 – Jul 2009
+
+    • Product Manager for BI/analytics across organization; designed dashboards identifying process bottlenecks, saving $70K+ in <6 months
+    • Led Agile delivery across analytics initiatives and mentored technical teams
+
+EARLIER EXPERIENCE
+Senior BI Consultant – Claraview (Teradata), 2006–2008
+    • Technical architect for 25,000-user enterprise reporting platform (Lowe’s); defined KPIs for Fortune 100 client
+BI Consultant – Kinetic Networks, 2005–2006
+    • Delivered analytics solutions for Google, Yahoo, Wells Fargo
+IT Specialist – U.S. Environmental Protection Agency, 2002–2005
+    • Led team of 6; defined IT strategy and built applications for National Center for Environmental Economics
+Operations Manager – MicroStrategy, 1999–2001
+    • Led engineering team; delivered integrated analytics systems; saved ~$312K/year through vendor optimization
+SELECTED SYSTEMS & INNOVATION
+    • Designed on-prem LLM/RAG platform for secure knowledge retrieval using local models with role-based access and audit logging
+    • Built containerized environments for data and application services across distributed infrastructure
+    • Designed integrated systems combining data pipelines, event-driven automation, and monitoring
+    • Operate advanced home lab (10GbE backbone, 100TB+ storage, Docker-based services, OPNsense HA routing)
+TECHNICAL SKILLS
+Data & Analytics: SQL, Python, ETL/ELT, Data Modeling, Data Pipelines
+BI Platforms: Tableau, Power BI, MicroStrategy
+Infrastructure: Linux (Ubuntu), Docker, Networking, Distributed Systems
+Cloud: Azure (data services), CI/CD practices
+AI/LLM: RAG pipelines, embeddings, vector search, local model deployment
+CERTIFICATIONS & EDUCATION
+B.A., Washington University in St. Louis
+CISSP  ·  Certified Scrum Master  ·  Tableau Certified Professional  ·  MicroStrategy Certified Developer

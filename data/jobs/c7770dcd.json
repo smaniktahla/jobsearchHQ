@@ -1,0 +1,66 @@
+{
+  "id": "c7770dcd",
+  "title": "Vice President of Engineering",
+  "company": "Activate Learning",
+  "url": "",
+  "source": "manual_paste",
+  "intake_source": "manual_paste",
+  "raw_jd": "About the job\nVice President of Engineering \n\n\nAbout Activate Learning\n\nActivate Learning is a leading provider of investigation-centered K-12 STEM curricula, including OpenSciEd and other K-12 science and math curricula. Our materials combine rigorous, phenomenon-based instructional design with a digital platform that supports teachers, students, and district administrators across the country. We operate a full-service model which includes physical curriculum kits, print consumables, and a growing digital subscription platform serving hundreds of districts in active adoption cycles.\n\nWe are growing rapidly and have reached an inflection point in how we develop and own our digital platform. This role sits at the center of that evolution.\n\nThe Opportunity\n\nIn the near term, you will take ownership of an existing platform, grow the in-house engineering team over time, and ensure the platform runs reliably while reshaping how development gets done. Looking further out, you will lead the technical thinking about where the platform needs to go \u2014 what the next generation of Activate Learning\u2019s digital infrastructure looks like, and how to get there without disrupting what exists today.\n\n\nThis role reports to the Chief Product Officer and works in close partnership with the product, curriculum, IT and customer support teams.\n\n\nWHAT YOU WILL OWN\n\nPlatform Ownership & Transition\n\n\u2022      Audit the existing platform: codebase quality, architecture, documentation, and technical debt\n\n\u2022      Define and lead the right model for platform development going forward, which may include a restructured relationship with our current development partner, expanded in-house capability, or both\n\n\u2022      Maintain and extend the current platform through the transition\n\n\u2022      Own platform operations, DevOps, uptime, and incident response\n\nTechnical Strategy & Architecture\n\n\u2022      Develop and maintain a long-term technical vision for the platform that supports Activate Learning\u2019s curriculum model as it grows in scale and complexity\n\n\u2022      Evaluate and guide adoption of AI capabilities: standards alignment tooling, assessment generation, virtual science investigations, and lesson customization features\n\n\u2022      Identify opportunities to evolve platform architecture in ways that reduce technical debt, improve scalability, and expand what the product team can build\n\n\u2022      Ensure the platform architecture supports deep district integrations, rostering, and administrative workflows\n\nTeam Building\n\n\u2022      Grow and develop the in-house engineering team\n\n\u2022      Establish engineering culture, standards, and practices that scale with the organization\n\n\u2022      Build a team capable of owning near-term platform operations while investing in longer-term technical progress\n\nIT, Security & Compliance\n\n\u2022      Own internal IT infrastructure: employee devices, systems access, software licensing, and onboarding/offboarding workflows\n\n\u2022      Lead the company\u2019s information security program, including policies, access controls, vulnerability management, and incident response\n\n\u2022      Drive SOC 2 Type II and ISO 27001:2022 compliance and maintain certification on an ongoing basis\n\n\u2022      Ensure platform and data practices meet FERPA, COPPA, and district Data Privacy Agreement requirements\n\n\u2022      Manage vendor security reviews and third-party risk assessments\n\nCross-functional Partnership\n\n\u2022      Partner with the CPO on roadmap feasibility, technical cost, and sequencing\n\n\u2022      Collaborate with curriculum leadership on platform features that meet the evolving needs of teachers while preserving curriculum fidelity\n\n\u2022      Work with QA and Product Support to maintain a clear, efficient bug escalation workflow\n\n\nWHAT WE ARE LOOKING FOR\n\nRequired\n\n\u2022      Genuine engineering background with the ability to engage credibly at the code and architecture level\n\n\u2022      Experience leading an engineering team through a period of significant change \u2014 platform migration, vendor transition, or team build-out\n\n\u2022      Demonstrated ability to hire and develop strong engineers and build team culture\n\n\u2022      Comfort with full-stack web platforms; familiarity with modern deployment pipelines, and cloud infrastructure\n\n\u2022      Clear, direct communicator who can translate technical complexity for non-technical stakeholders\n\nPreferred\n\n\u2022      Experience in edtech, curriculum publishing, or a domain where the product has instructional or content integrity requirements\n\n\u2022      Hands-on experience with SOC2 and ISO27001 compliance and information security program management\n\n\u2022      Familiarity with K\u201312 data privacy requirements (FERPA, COPPA, district DPA frameworks)\n\n\u2022      Experience with AI-assisted product features, not necessarily as a builder, but as a technical leader who has navigated AI integration decisions\n\n\u2022      Prior experience working alongside or transitioning from an external development partner\n\n\nBENEFITS\n\n\u2022      Excellent benefits, including medical, dental, vision, life, matching 401K and PTO.",
+  "pay_range": "",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 1,
+    "scope_impact": 0,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 1,
+    "skills_rationale": "While the candidate has strong technical leadership experience and platform architecture skills, this role requires deep software engineering management, team building from scratch, and hands-on coding capability. The candidate's background is primarily in data/BI architecture rather than full-stack web development and engineering team leadership.",
+    "scope_rationale": "This is a VP-level role requiring extensive engineering management experience, building teams from scratch, and leading major platform transitions. The candidate's experience is primarily in individual contributor and small team lead roles in data/analytics, not large-scale engineering organization leadership.",
+    "pay_rationale": "No salary range provided, but VP Engineering roles typically start around $250K+ total comp, well above the candidate's W2 target range of $160K-220K.",
+    "keyword_gaps": [
+      "full-stack web development",
+      "engineering team management",
+      "platform migration leadership",
+      "SOC2 compliance",
+      "FERPA/COPPA",
+      "edtech experience"
+    ],
+    "red_flags": [
+      "Significant scope mismatch - VP level vs IC/small team experience",
+      "No salary transparency",
+      "Requires extensive engineering management background candidate lacks"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "This VP Engineering role requires extensive software engineering management experience and team-building capabilities that don't align with the candidate's data/BI architecture background. The scope is significantly more senior than the candidate's experience level, focusing on leading engineering organizations rather than individual technical contributions. The role also requires deep edtech compliance knowledge and full-stack development oversight that the candidate hasn't demonstrated."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "",
+  "created_at": "2026-04-09T22:56:16.765224",
+  "updated_at": "2026-04-09T22:56:32.234856",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-09T22:56:32.234814"
+    }
+  ]
+}

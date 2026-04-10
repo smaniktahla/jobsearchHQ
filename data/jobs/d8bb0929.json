@@ -1,0 +1,63 @@
+{
+  "id": "d8bb0929",
+  "title": "Assistant Director, Analytics",
+  "company": "Service Employees International Union",
+  "url": "https://www.indeed.com/viewjob?jk=b5888dd8d9876a85",
+  "source": "jobspy_indeed",
+  "intake_source": "api",
+  "raw_jd": "**SEIU (Service Employees International Union)**\n\n\n**Job Title:** Assistant Director, Analytics\n\n\n**Grade:** MGT F\n\n\n**Salary:** $135,609\\.02\n\n\n**Location:** Washington, D.C. or Remote\n\n  \n\n\n**ORGANIZATIONAL OVERVIEW:** We are the Service Employees International Union (SEIU), a union of about 2 million diverse members in healthcare, the public sector, and property services. We believe in and fight for our Vision for a Just Society: where all workers are valued and all people respected\u2014no matter where we come from or what color we are; where all families and communities can thrive; and where we leave a better and more equitable world for generations to come. We are an antiracist union determined to check corporate power and uproot structural racism through unions\u2014worker power and collective action\u2014and government\u2014legislative and political action. We fight for Unions for All and a Government that Works for All so that all of us, across race and place, can have power together in unions and participate fully in our democracy.\n\n\n**PURPOSE:** The Assistant Director for Analytics leads the analytics team in the Data Systems and Analytics Department (DSA). This position is responsible for advising Senior\\-level leadership across SEIU and its affiliates on targeting, membership trends and opportunities, and program evaluation for SEIU\u2019s organizing, membership, and political efforts. The Assistant Director for Analytics will split their time between writing code and playing a key role in developing and guiding analysts.\n\n\n**DUTIES AND RESPONSIBILITIES:** (Any one position may not include all of the specific duties and responsibilities listed. Examples provide a general summary of the work required and should not be treated as a total and complete list of expected duties to be performed by employees in the classification).\n\n\n\nLeads and manages the team that is responsible for developing research methodologies, implementing those approaches, and providing strategic guidance to DSA and SEIU leadership. Primary responsibilities include:\n\n\n* Oversight of the development of standards and protocol for analytical and special projects.\n* Create and make recommendations on statistical models for growing the labor movement\n* Manage ad hoc analysis projects and program evaluation, balancing the priorities of multiple stakeholders including department directors and executive officers\n* Implement a data equity framework to continually improve fairness, inclusivity, and transparency in every project\n* Supervise analyst(s) with an emphasis on helping them grow their technical and professional skills\n* Use of Agile practices to document and monitor the progress of the team\n* Review code to ensure that SEIU is using best practices.\n* Consult on new projects under the guidance of the DSA Deputy Director of Analytics and Engineering and in collaboration with internal teams and external stakeholders on creative solutions to analytics challenges\n* Performs other duties as required to support the department and its mission\n\n\n**CONTACTS:** Includes SEIU staff, affiliate staff, local union staff, SEIU field staff, and outside partners and vendors.\n\n\n**DIRECTION AND DECISION MAKING:** This position reports to the DSA Deputy Director of Analytics and Engineering in the Data Systems and Analytics Department. Exercises independent judgment and makes decisions that may determine the success or failure of SEIU\u2019s analytics program.\n\n\n**EDUCATION AND EXPERIENCE:** At least 6 years of related work experience and 1 year of supervisory experience or or combination of education and experience that would provide for the following knowledge, skills, and abilities:\n\n\n* Experience managing multiple stakeholders and external vendors and can clearly articulate risks and dependencies on projects\n* Strong technical background in statistical analysis with expertise in at least one analytics domain area: (Machine Learning, Predictive Modeling, Business Intelligence, Data Visualization, Program Analysis, Field Experiments)\n* 6\\+ years of experience working primarily in data/analytics\n* 3\\+ years of experience with Python including familiarity with concepts like: Pandas, NumPy, Matplotlib, Scikit\\-learn. Equivalent experience in R is also welcomed as long as you\u2019re willing to learn Python\n* A deep understanding of SQL and familiarity with popular data warehouses, such as Redshift\n* Experience in an Agile Environment, preferably using JIRA\n* Ability to explain analytics concepts to stakeholders and ability to communicate effectively in both written and oral presentation\n* A high level of judgment, leadership, and commitment to the goals of SEIU and its leaders\n\n\n Preferred Skills\n\n\n* Knowledge of labor unions and their operations is helpful\n* Experience with: Gitlab\\-CI, Apache Airflow, DBT, REST API interactions, ETL/ELT\n* Proficiency in Google Sheets\n\n\n**PHYSICAL REQUIREMENTS:** Work is generally performed in an office setting. Extended hours and extensive travel required.\n\n\n\nSEIU is committed to building a diverse and inclusive workforce. We strongly encourage applications from people of color, women, LGBTQ\\+ individuals, people with disabilities, members of ethnic minorities, foreign\\-born residents, and veterans. SEIU is an equal opportunity employer.",
+  "pay_range": "$nan - $nan/year",
+  "market_lane": "w2_sniper",
+  "status": "scored",
+  "score": {
+    "skills_match": 4,
+    "scope_impact": 2,
+    "pay_alignment": 0,
+    "gut_interest": 0,
+    "total": 6,
+    "skills_rationale": "Exceptional skills alignment with candidate's expertise in Python, SQL, data warehousing, ETL/ELT, machine learning, and statistical modeling. The JD specifically mentions Pandas, NumPy, Scikit-learn, Redshift, Airflow, and DBT - all technologies within the candidate's wheelhouse. The analytics leadership and stakeholder management requirements perfectly match the candidate's extensive experience.",
+    "scope_rationale": "Good scope match as an analytics leadership role overseeing teams, managing stakeholders, and providing strategic guidance - aligning with candidate's director-level experience. However, it's positioned as 'Assistant Director' which may be slightly below the candidate's current Senior Architect level and extensive leadership background across multiple organizations.",
+    "pay_rationale": "The stated salary of $135,609 is significantly below the candidate's W2 target range of $160,000-$220,000, representing a substantial pay cut from current market expectations.",
+    "keyword_gaps": [
+      "Apache Airflow",
+      "DBT",
+      "GitLab-CI",
+      "political analytics"
+    ],
+    "red_flags": [
+      "Extended hours and extensive travel required",
+      "Below target pay range"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "director",
+    "recommended_lane": "w2_sniper",
+    "raw_analysis": "This is a strong technical and leadership match for an analytics director role at a major union, with excellent alignment on Python, SQL, ML, and stakeholder management skills. The role offers meaningful social impact work and remote flexibility. However, the $135K salary is significantly below market rate for someone with the candidate's experience level. The 'Assistant Director' title may also undervalue the candidate's senior architect background, though the actual responsibilities seem appropriately senior."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "Source: indeed | Location: Remote | Posted: 2026-04-09 | Type: nan",
+  "created_at": "2026-04-10T14:44:49.667158",
+  "updated_at": "2026-04-10T14:45:02.499647",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-10T14:45:02.499601"
+    }
+  ]
+}

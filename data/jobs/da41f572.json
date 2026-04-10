@@ -1,0 +1,63 @@
+{
+  "id": "da41f572",
+  "title": "Vice President of Information Technology",
+  "company": "",
+  "url": "",
+  "source": "manual_paste",
+  "intake_source": "manual_paste",
+  "raw_jd": "The Vice President of Information Technology leads the organization\u2019s IT and information security functions. This role ensures that clinical, administrative, and business systems are secure, reliable, compliant, and aligned with company objectives. The VP, IT drives technology strategy, oversees IT operations, and serves as the executive owner of information security, privacy, and technology risk management. The position is also responsible for identifying opportunities to enhance business performance through optimized systems, AI-driven improvements, and cost\u2011effective technology investments.\n\nKey Responsibilities\n\n    Build and maintain an IT organizational structure that supports business needs.\n    Establish departmental goals, policies, and operating procedures.\n    Define and communicate standards for acquiring, implementing, and maintaining IT systems.\n    Partner with executive leadership on technology strategy, cybersecurity, and operational efficiency.\n    Lead a high\u2011performing IT and security team suited for a mid\u2011market environment.\n    Direct information security governance and risk management activities.\n    Develop and maintain enterprise security policies and integrate security across all technology operations.\n    Participate in strategic and operational governance processes.\n    Oversee IT strategic planning, innovation, prioritization, and system deployment.\n    Identify cost\u2011effective technology investments and manage IT operating and capital budgets.\n    Develop business cases and cost/benefit analyses for technology initiatives.\n    Direct disaster recovery and business continuity planning.\n    Assess and recommend improvements to IT organization and processes.\n    Facilitate stakeholder consultation to define requirements for new technologies.\n    Prioritize and manage the project portfolio for major information systems.\n    Review technology contracts and pursue master agreements to optimize scale.\n    Ensure continuous IT service delivery and compliance with all applicable laws and regulations.\n    Stay current on IT industry trends and advise leadership on strategic and financial impacts.\n    Provide security guidance for business initiatives, application development, and IT operations.\n    Oversee information security risk management activities, including but not limited to:\n        defining Company's information security risk posture by leading information security governance, developing and maintaining enterprise security policies, incorporating information security in all facets of information technology, overseeing information security risk management activities, and influencing user behavior to meet the organization's information security needs.\n\nRequired Skills/Preferred Skills\n\n    Broad technical and operational expertise across IT functions.\n    Deep experience in enterprise architecture and technology standardization.\n    Strong project and program management capabilities.\n    Experience managing third\u2011party vendors, including global sourcing models.\n    Excellent communication skills, with the ability to simplify complex technical concepts.\n    Strong analytical, critical\u2011thinking, and problem\u2011solving skills.\n    Proven leadership, people management, and continuous improvement mindset.\n\nRelevant Experience\n\n    Minimum 15 years of senior IT leadership experience in a global, multi\u2011business organization.\n    Experience managing IT operations in a mid\u2011sized, complex organization, ideally in healthcare or medical devices.\n    Strong leadership, influence, and negotiation capabilities in a matrixed environment.\n    Demonstrated ability to drive collaboration, build consensus, and lead complex change.\n    Proven track record of attracting and developing high\u2011performing teams.\n    Direct experience with information security and privacy in regulated environments.\n    Strong knowledge of HIPAA, dental IT systems, and cybersecurity best practices.\n    Ability to balance strategic leadership with hands\u2011on execution.\n\nEDUCATION (Required/Preferred)\n\n    Bachelor\u2019s degree in Information Technology, Information Security, Computer Science, or a related discipline required.\n    MBA or advanced degree preferred\n\nTravel\n\n    (Expected 5% or less of travel time; Domestic/International)\n\nSalary Range: $220,000 - $240,000 USD, based on qualifications and experience.",
+  "pay_range": "",
+  "market_lane": "ignore",
+  "status": "scored",
+  "score": {
+    "skills_match": 3,
+    "scope_impact": 1,
+    "pay_alignment": 2,
+    "gut_interest": 0,
+    "total": 6,
+    "skills_rationale": "Strong alignment with IT leadership, security (CISSP), and technology strategy experience. Candidate has enterprise architecture, team leadership, and cybersecurity background that matches well. Healthcare/regulated environment experience at EPA and VA adds value.",
+    "scope_rationale": "This VP role is significantly more senior than candidate's current architect/analyst positions. Requires 15+ years senior IT leadership managing global organizations - candidate lacks C-level executive experience at this scale.",
+    "pay_rationale": "Salary range $220-240K aligns well with candidate's W2 target of $160-220K, though at the upper end of their range.",
+    "keyword_gaps": [
+      "HIPAA",
+      "dental IT systems",
+      "global sourcing",
+      "MBA"
+    ],
+    "red_flags": [
+      "Significant seniority gap",
+      "Requires 15+ years senior IT leadership"
+    ],
+    "bullshit_flag": false,
+    "bullshit_reason": "",
+    "recommended_resume": "none",
+    "recommended_lane": "ignore",
+    "raw_analysis": "While the candidate has strong technical skills and relevant security/IT experience, this VP role is a significant step up in seniority and scope. The role requires C-level executive experience managing global IT organizations with 15+ years of senior leadership, whereas the candidate has been in architect/analyst roles. The pay is at the top of their range, but the scope mismatch makes this unrealistic despite good technical alignment."
+  },
+  "cover_letters": [],
+  "tailored_resume": "",
+  "tailored_resume_docx": "",
+  "applied_at": "",
+  "follow_up": {
+    "due_at": "",
+    "sent_at": "",
+    "count": 0,
+    "contact_email": "",
+    "contact_name": "",
+    "contact_phone": "",
+    "extracted_emails": [],
+    "extracted_links": [],
+    "notes": ""
+  },
+  "emails": [],
+  "notes": "",
+  "created_at": "2026-04-09T22:20:00.504284",
+  "updated_at": "2026-04-09T22:20:13.563085",
+  "status_history": [
+    {
+      "from": "new",
+      "to": "scored",
+      "at": "2026-04-09T22:20:13.563042"
+    }
+  ]
+}
