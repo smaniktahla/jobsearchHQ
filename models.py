@@ -189,6 +189,11 @@ class AppConfig(BaseModel):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""  # Gmail App Password
+    resume_labels: dict[str, str] = {
+        "director": "Resume 1 — Director",
+        "base": "Resume 2 — Base",
+        "contract": "Resume 3 — Contract",
+    }
     deal_breakers: list[str] = [
         "must relocate",
         "on-site only outside DC metro",
