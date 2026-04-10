@@ -4,13 +4,29 @@
   <img src="logo.png" alt="Job Search HQ" width="200">
 </p>
 
-Self-hosted job search pipeline: multi-board scraping, AI-powered scoring, tailored resume/cover letter generation, email integration, and application tracking.
+Job Search HQ
+
+A lightweight, self-hosted system for capturing, tracking, and managing job applications, built to bring structure and sanity to the job search process.
 
 ![Dashboard](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS-blue) ![Python](https://img.shields.io/badge/python-3.11-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
+**Job searching is fragmented and messy**
+
+Roles live across LinkedIn, company sites, and job boards
+Applications get lost or duplicated
+There’s no clean way to track status, follow-ups, or notes
+
+Most people default to spreadsheets (or chaos).
+
+**Job Search HQ** is a simple, Docker-based app that lets you:
+
+Capture job listings (including bulk LinkedIn intake)
+Automatically detect and skip duplicates
+Store structured job data for tracking
+Build a centralized system for your job search workflow
 ## Features
 
-- **Multi-board job search** — Scrape Indeed, LinkedIn, Google, Glassdoor, ZipRecruiter from a single interface via [python-jobspy](https://github.com/speedyapply/JobSpy). Per-board status tracking, deduplication, parallel search.
+- **Multi-board job search** — Bulk scrape Indeed, LinkedIn, Google, Glassdoor, ZipRecruiter from a single interface via [python-jobspy](https://github.com/speedyapply/JobSpy). Per-board status tracking, deduplication, parallel search.
 - **AI scoring** — Claude API scores each job against your employment history. Skills match (0–4), scope/impact (0–3), pay alignment (0–2), gut interest (0–1). Auto-assigns to W2 Sniper / Contract / Ignore lanes.
 - **Tailored resumes** — Generates a resume customized to each specific job description, output as a downloadable `.docx` in your template format.
 - **Cover letters** — 3 variants per job (direct, consultative, brief) as downloadable `.docx` files.
