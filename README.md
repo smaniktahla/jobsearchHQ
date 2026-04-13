@@ -12,7 +12,7 @@ A lightweight, self-hosted system for capturing, tracking, and managing job appl
 
 **Job searching is fragmented and messy**
 
-* Roles live across LinkedIn, company sites, and job boards
+* Roles live across LinkedIn, company sites, and job boards that are designed to make the job search arduous and painful.
 * Applications get lost or duplicated
 * There’s no clean way to track status, follow-ups, or notes
 
@@ -26,12 +26,13 @@ Most people default to spreadsheets (or chaos).
 
 ## Features
 - **Multi-board job search** — Bulk scrape Indeed, LinkedIn, Google, Glassdoor, ZipRecruiter from a single interface via [python-jobspy](https://github.com/speedyapply/JobSpy). Per-board status tracking, deduplication, parallel search.
-- **AI scoring** — Claude API scores each job against your employment history. Skills match (0–4), scope/impact (0–3), pay alignment (0–2), gut interest (0–1). Auto-assigns to W2 Sniper / Contract / Ignore lanes.
+- **Automatic AI scoring** — Claude API scores each job against your employment history (which you upload via Word Doc). Skills match (0–4), scope/impact (0–3), pay alignment (0–2), gut interest (0–1). Auto-assigns to W2 Sniper / Contract / Ignore lanesm but you can define your own.
 - **Tailored resumes** — Generates a resume customized to each specific job description, output as a downloadable `.docx` in your template format.
 - **Cover letters** — 3 variants per job (direct, consultative, brief) as downloadable `.docx` files.
 - **Email integration** — Send applications with `.docx` attachments via Gmail SMTP. Parse confirmation emails to extract recruiter contact info.
 - **Follow-up tracking** — Auto-schedules follow-ups when you mark "Applied." Snooze, mark done, email digest via cron.
 - **Application tracker** — Pipeline view: New → Scored → Applied → Interview → Offer. Filter by lane, status, follow-up due.
+- **Auto Scheduling Job search** — Let JobSearch run the search for you at a specific time each day, and then take additional automatic steps based on a threshold you set: auto generate resumes and cover letters for everything scored a 7 or higher, for example.  
 
 ## Screenshots
 
