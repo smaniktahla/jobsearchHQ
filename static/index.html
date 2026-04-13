@@ -230,7 +230,75 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   </div>
   <div id="resume-status" class="mb-16"></div>
   <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="form-group"><label>Paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload</button></div>
-  <h2 class="mt-16 mb-16">Automation</h2><div class="card"><div class="card-header">Cron (daily digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
+  <h2 class="mt-16 mb-16">Automation</h2>
+  <div class="card mb-16" id="scheduler-status-card">
+    <div class="card-header">Scheduler Status</div>
+    <div id="scheduler-status" class="mt-8" style="font-size:13px;color:var(--text-dim)">Loading...</div>
+    <div class="flex gap-8 mt-8">
+      <button class="btn btn-ghost btn-sm" onclick="runPipelineNow()">Run Pipeline Now</button>
+      <button class="btn btn-ghost btn-sm" onclick="refreshSchedulerStatus()">Refresh Status</button>
+      <button class="btn btn-ghost btn-sm" onclick="showSchedulerLogs()">View Logs</button>
+    </div>
+    <div id="pipeline-running" class="loading-msg" style="display:none"><span class="spinner"></span> <span id="pipeline-msg">Running pipeline...</span></div>
+  </div>
+
+  <div class="card mb-16">
+    <div class="card-header">Scheduled Daily Search</div>
+    <div class="mt-8">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px">
+        <input type="checkbox" id="cfg-sched-enabled" style="width:auto"> Enable daily automated search
+      </label>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="form-group"><label>Run Time (HH:MM, Eastern)</label><input type="time" id="cfg-sched-time" value="07:00"></div>
+      <div class="form-group"><label>Search Terms (one per line)</label><textarea id="cfg-sched-terms" rows="3" placeholder="senior director data analytics&#10;data architecture manager"></textarea></div>
+      <div class="form-group"><label>Job Boards</label>
+        <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-indeed" checked style="width:auto"> Indeed</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-linkedin" checked style="width:auto"> LinkedIn</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-google" checked style="width:auto"> Google</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-glassdoor" style="width:auto"> Glassdoor</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-zip" style="width:auto"> ZipRecruiter</label>
+        </div>
+      </div>
+      <div class="form-group"><label>Location</label><input type="text" id="cfg-sched-location" value="Washington, DC"></div>
+      <div class="form-group"><label>Results Per Board</label><input type="number" id="cfg-sched-results" value="25" style="width:100px"></div>
+      <div class="form-group"><label>Posted Within (hours)</label><input type="number" id="cfg-sched-hours" value="24" style="width:100px"></div>
+      <div class="form-group">
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-top:20px"><input type="checkbox" id="cfg-sched-remote" checked style="width:auto"> Remote Only</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-16">
+    <div class="card-header">Auto-Processing Pipeline</div>
+    <div class="mt-8" style="display:flex;flex-direction:column;gap:12px">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="cfg-auto-score" style="width:auto"> Automatically score new jobs (uses Claude API credits)
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="cfg-auto-generate" style="width:auto"> Generate resume &amp; cover letters for jobs above threshold
+      </label>
+      <div class="form-group" style="max-width:200px;margin-left:28px">
+        <label>Score Threshold (≥)</label>
+        <input type="number" id="cfg-auto-threshold" value="7" min="1" max="10" style="width:80px">
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Jobs scoring at or above this get auto-generated resume + 3 cover letter variants</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" onclick="saveConfig()">Save All Settings</button>
+
+  <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
+</div>
+
+<!-- Scheduler Logs Modal -->
+<div id="logs-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modal" style="max-width:700px">
+  <h2>Scheduler Run Logs</h2>
+  <div id="logs-content" style="max-height:500px;overflow-y:auto;font-size:12px"></div>
+  <div class="flex gap-8 mt-16"><button class="btn btn-ghost" onclick="document.getElementById('logs-modal').classList.remove('show')">Close</button></div>
+</div>
 </div>
 </div>
 </div>
@@ -403,7 +471,7 @@ async function sendDigest(){try{const r=await api('/api/follow-ups/send-digest',
 
 // Job Detail
 async function showDetail(id){currentJobId=id;const j=await api('/api/jobs/'+id);currentJob=j;showView('detail');
-document.getElementById('detail-title').textContent=j.title||'(Untitled)';document.getElementById('detail-company').textContent=j.company||'';document.getElementById('detail-meta').textContent=[j.pay_range,j.source,j.url].filter(Boolean).join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
+document.getElementById('detail-title').textContent=j.title||'(Untitled)';document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
 // Applied info
 const ai=document.getElementById('detail-applied-info');
 const appliedBtn=document.getElementById('btn-applied');
@@ -459,12 +527,114 @@ async function parseConfirmation(){const txt=document.getElementById('confirm-em
 
 // Settings
 async function loadSettings(){const c=await api('/api/config');document.getElementById('cfg-w2-min').value=c.w2_salary_min;document.getElementById('cfg-w2-max').value=c.w2_salary_max;document.getElementById('cfg-hr-min').value=c.contract_hourly_min;document.getElementById('cfg-hr-max').value=c.contract_hourly_max;document.getElementById('cfg-followup-days').value=c.follow_up_days;document.getElementById('cfg-followup-email').value=c.follow_up_email;document.getElementById('cfg-smtp-user').value=c.smtp_user;document.getElementById('cfg-smtp-pass').value=c.smtp_password;document.getElementById('cfg-smtp-host').value=c.smtp_host||'smtp.gmail.com';document.getElementById('cfg-smtp-port').value=c.smtp_port||587;document.getElementById('cfg-dealbreakers').value=c.deal_breakers.join('\n');document.getElementById('cfg-keywords').value=c.preferred_keywords.join(', ');
+// Automation fields
+document.getElementById('cfg-sched-enabled').checked=!!c.scheduled_search_enabled;
+document.getElementById('cfg-sched-time').value=c.scheduled_search_time||'07:00';
+document.getElementById('cfg-sched-terms').value=(c.scheduled_search_terms||[]).join('\n');
+const schedSites=c.scheduled_search_sites||['indeed','linkedin','google'];
+document.getElementById('cfg-sched-indeed').checked=schedSites.includes('indeed');
+document.getElementById('cfg-sched-linkedin').checked=schedSites.includes('linkedin');
+document.getElementById('cfg-sched-google').checked=schedSites.includes('google');
+document.getElementById('cfg-sched-glassdoor').checked=schedSites.includes('glassdoor');
+document.getElementById('cfg-sched-zip').checked=schedSites.includes('zip_recruiter');
+document.getElementById('cfg-sched-location').value=c.scheduled_search_location||'Washington, DC';
+document.getElementById('cfg-sched-results').value=c.scheduled_search_results||25;
+document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
+document.getElementById('cfg-sched-remote').checked=c.scheduled_search_remote!==false;
+document.getElementById('cfg-auto-score').checked=!!c.auto_score_new_jobs;
+document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
+document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
 // Resume labels
 if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
-const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div class="flex items-center gap-8" style="margin:4px 0"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${resumeLabel(k)}</strong> <span class="text-dim">(${k})</span>: ${v.loaded?v.length+' chars':'Not loaded'}</div>`).join('')}
-async function saveConfig(){await api('/api/config',{method:'PUT',body:{w2_salary_min:+document.getElementById('cfg-w2-min').value||160000,w2_salary_max:+document.getElementById('cfg-w2-max').value||220000,contract_hourly_min:+document.getElementById('cfg-hr-min').value||85,contract_hourly_max:+document.getElementById('cfg-hr-max').value||125,follow_up_days:+document.getElementById('cfg-followup-days').value||14,follow_up_email:document.getElementById('cfg-followup-email').value,smtp_host:document.getElementById('cfg-smtp-host').value||'smtp.gmail.com',smtp_port:+document.getElementById('cfg-smtp-port').value||587,smtp_user:document.getElementById('cfg-smtp-user').value,smtp_password:document.getElementById('cfg-smtp-pass').value,resume_labels:{director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'},deal_breakers:document.getElementById('cfg-dealbreakers').value.split('\n').filter(Boolean),preferred_keywords:document.getElementById('cfg-keywords').value.split(',').map(s=>s.trim()).filter(Boolean)}});resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};alert('Saved')}
+const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div class="flex items-center gap-8" style="margin:4px 0"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${resumeLabel(k)}</strong> <span class="text-dim">(${k})</span>: ${v.loaded?v.length+' chars':'Not loaded'}</div>`).join('');
+refreshSchedulerStatus()}
+async function saveConfig(){
+const schedSites=[];
+if(document.getElementById('cfg-sched-indeed').checked)schedSites.push('indeed');
+if(document.getElementById('cfg-sched-linkedin').checked)schedSites.push('linkedin');
+if(document.getElementById('cfg-sched-google').checked)schedSites.push('google');
+if(document.getElementById('cfg-sched-glassdoor').checked)schedSites.push('glassdoor');
+if(document.getElementById('cfg-sched-zip').checked)schedSites.push('zip_recruiter');
+await api('/api/config',{method:'PUT',body:{w2_salary_min:+document.getElementById('cfg-w2-min').value||160000,w2_salary_max:+document.getElementById('cfg-w2-max').value||220000,contract_hourly_min:+document.getElementById('cfg-hr-min').value||85,contract_hourly_max:+document.getElementById('cfg-hr-max').value||125,follow_up_days:+document.getElementById('cfg-followup-days').value||14,follow_up_email:document.getElementById('cfg-followup-email').value,smtp_host:document.getElementById('cfg-smtp-host').value||'smtp.gmail.com',smtp_port:+document.getElementById('cfg-smtp-port').value||587,smtp_user:document.getElementById('cfg-smtp-user').value,smtp_password:document.getElementById('cfg-smtp-pass').value,resume_labels:{director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'},deal_breakers:document.getElementById('cfg-dealbreakers').value.split('\n').filter(Boolean),preferred_keywords:document.getElementById('cfg-keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
+scheduled_search_enabled:document.getElementById('cfg-sched-enabled').checked,
+scheduled_search_time:document.getElementById('cfg-sched-time').value||'07:00',
+scheduled_search_terms:document.getElementById('cfg-sched-terms').value.split('\n').filter(Boolean),
+scheduled_search_sites:schedSites,
+scheduled_search_location:document.getElementById('cfg-sched-location').value||'Washington, DC',
+scheduled_search_results:+document.getElementById('cfg-sched-results').value||25,
+scheduled_search_hours_old:+document.getElementById('cfg-sched-hours').value||24,
+scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
+auto_score_new_jobs:document.getElementById('cfg-auto-score').checked,
+auto_generate_above_threshold:document.getElementById('cfg-auto-generate').checked,
+auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7}});resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};refreshSchedulerStatus();alert('Saved')}
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
+
+// Scheduler / Automation
+async function refreshSchedulerStatus(){
+try{
+const s=await api('/api/scheduler/status');
+const el=document.getElementById('scheduler-status');
+const parts=[];
+if(s.enabled){
+parts.push(`<span style="color:var(--green)">● Enabled</span>`);
+if(s.next_run)parts.push(`Next run: <strong>${new Date(s.next_run).toLocaleString()}</strong>`);
+else parts.push('Next run: <em>scheduling...</em>');
+}else{
+parts.push(`<span style="color:var(--text-dim)">○ Disabled</span>`);
+}
+const features=[];
+if(s.auto_score)features.push('Auto-Score');
+if(s.auto_generate)features.push(`Auto-Generate (≥${s.score_threshold})`);
+if(features.length)parts.push('Pipeline: '+features.join(' → '));
+parts.push(`Terms: ${(s.search_terms||[]).join(', ')||'none'}`);
+parts.push(`Boards: ${(s.search_sites||[]).join(', ')}`);
+el.innerHTML=parts.join('<br>');
+}catch(e){document.getElementById('scheduler-status').textContent='Failed to load status'}}
+
+async function runPipelineNow(){
+if(!confirm('Run the full search → score → generate pipeline now? This may use significant Claude API credits.'))return;
+const el=document.getElementById('pipeline-running');
+el.style.display='flex';
+document.getElementById('pipeline-msg').textContent='Running pipeline... this may take several minutes';
+try{
+const r=await api('/api/scheduler/run-now',{method:'POST'});
+const newJobs=r.search_results?.reduce((a,s)=>a+s.created,0)||0;
+const scored=r.scored?.length||0;
+const generated=r.generated?.length||0;
+const errors=r.errors?.length||0;
+alert(`Pipeline complete!\n\nNew jobs: ${newJobs}\nScored: ${scored}\nGenerated: ${generated}\nErrors: ${errors}`);
+refreshSchedulerStatus();
+}catch(e){alert('Pipeline failed: '+e.message)}
+finally{el.style.display='none'}}
+
+async function showSchedulerLogs(){
+try{
+const logs=await api('/api/scheduler/logs?count=10');
+const el=document.getElementById('logs-content');
+if(!logs.length){el.innerHTML='<div class="text-dim">No runs yet.</div>';document.getElementById('logs-modal').classList.add('show');return}
+el.innerHTML=logs.map(log=>{
+const newJobs=log.search_results?.reduce((a,s)=>a+s.created,0)||0;
+const scored=log.scored?.length||0;
+const generated=log.generated?.length||0;
+const errors=log.errors?.length||0;
+const started=log.started_at?new Date(log.started_at).toLocaleString():'?';
+const finished=log.finished_at?new Date(log.finished_at).toLocaleString():'running';
+return`<div class="card mb-16" style="padding:12px">
+<div class="flex justify-between"><strong>${started}</strong><span class="text-dim">${finished}</span></div>
+<div class="mt-8" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px">
+<div>New: <strong>${newJobs}</strong></div>
+<div>Scored: <strong>${scored}</strong></div>
+<div>Generated: <strong style="color:var(--green)">${generated}</strong></div>
+<div>Errors: <strong style="color:${errors?'var(--red)':'var(--text-dim)'}">${errors}</strong></div>
+</div>
+${log.search_results?.length?`<div class="mt-8" style="font-size:11px;color:var(--text-dim)">${log.search_results.map(s=>`"${esc(s.term)}": ${s.total_scraped} scraped, ${s.created} new`).join(' · ')}</div>`:''}
+${scored?`<div class="mt-8" style="font-size:11px">${log.scored.map(s=>`${esc(s.company)} — ${esc(s.title)}: <strong>${s.total}/10</strong>`).join('<br>')}</div>`:''}
+${generated?`<div class="mt-8" style="font-size:11px;color:var(--green)">${log.generated.map(g=>`✓ ${esc(g.company)} — ${esc(g.title)} (${g.total}/10, ${g.variant})`).join('<br>')}</div>`:''}
+${errors?`<div class="mt-8" style="font-size:11px;color:var(--red)">${log.errors.map(e=>esc(typeof e==='string'?e:JSON.stringify(e))).join('<br>')}</div>`:''}
+</div>`}).join('');
+document.getElementById('logs-modal').classList.add('show');
+}catch(e){alert('Failed to load logs: '+e.message)}}
 
 // Helpers
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}

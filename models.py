@@ -211,3 +211,19 @@ class AppConfig(BaseModel):
         "Tableau",
         "Power BI",
     ]
+    # --- Scheduled Search ---
+    scheduled_search_enabled: bool = False
+    scheduled_search_time: str = "07:00"  # HH:MM in ET
+    scheduled_search_terms: list[str] = [
+        "senior director data analytics",
+        "data architecture manager",
+    ]
+    scheduled_search_sites: list[str] = ["indeed", "linkedin", "google"]
+    scheduled_search_location: str = "Washington, DC"
+    scheduled_search_results: int = 25
+    scheduled_search_hours_old: int = 24
+    scheduled_search_remote: bool = True
+    # --- Automation Pipeline ---
+    auto_score_new_jobs: bool = False
+    auto_generate_above_threshold: bool = False
+    auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters

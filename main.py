@@ -17,9 +17,24 @@ import email_service
 import docx_builder
 import linkedin_intake
 import jobspy_search
+import scheduler
 from intake import process_intake
 
-app = FastAPI(title="Job Search Command Center", version="2.0")
+app = FastAPI(title="Job Search Command Center", version="2.1")
+
+
+# === Lifecycle ===
+
+@app.on_event("startup")
+def on_startup():
+    storage.ensure_dirs()
+    docx_builder.ensure_dirs()
+    scheduler.start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    scheduler.shutdown_scheduler()
 
 
 # === Helpers ===
@@ -480,6 +495,8 @@ def get_config():
 @app.put("/api/config")
 def update_config(config: AppConfig):
     storage.save_config(config)
+    # Update scheduler when automation settings change
+    scheduler.update_schedule(config)
     return config.model_dump()
 
 
@@ -532,6 +549,30 @@ def dashboard_stats():
     }
 
 
+# === Scheduler / Automation ===
+
+@app.get("/api/scheduler/status")
+def scheduler_status():
+    """Get current scheduler status, next run, and config."""
+    return scheduler.get_schedule_status()
+
+
+@app.post("/api/scheduler/run-now")
+def scheduler_run_now():
+    """Manually trigger the daily search pipeline."""
+    try:
+        result = scheduler.run_pipeline_now()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline failed: {str(e)}")
+
+
+@app.get("/api/scheduler/logs")
+def scheduler_logs(count: int = 10):
+    """Get recent scheduler run logs."""
+    return scheduler.get_recent_logs(count)
+
+
 # === Static & Serve ===
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -543,7 +584,5 @@ def serve_root():
 
 
 if __name__ == "__main__":
-    storage.ensure_dirs()
-    docx_builder.ensure_dirs()
     port = int(os.environ.get("APP_PORT", 8093))
     uvicorn.run(app, host="0.0.0.0", port=port)
