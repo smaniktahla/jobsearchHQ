@@ -43,7 +43,7 @@ Most people default to spreadsheets (or chaos).
 
 <p align="center">
   <img src="docs/screenshot_search.png" alt="Search Boards" width="800"><br>
-  <em>Search Boards — scrape Indeed, LinkedIn, Google and more with per-board status</em>
+  <em>Search Boards — scrape Indeed, LinkedIn, Google and more with per-board status manually or automatically.</em>
 </p>
 
 <p align="center">
