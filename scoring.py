@@ -1,13 +1,138 @@
+"""
+Scoring, resume generation, and cover letter generation for Job Search HQ.
+
+Supports two backends:
+  - "local" (default): Ollama on AI box for scoring & metadata extraction (free)
+  - "api": Anthropic Claude API (paid, Haiku for scoring, Sonnet for generation)
+
+Resume and cover letter generation always use Anthropic API (Sonnet) when
+backend is "api", or Ollama when backend is "local".
+"""
+
 import json
+import logging
 import os
+import httpx
 import anthropic
 from models import Job, ScoreBreakdown, CoverLetter, MarketLane, AppConfig
 import storage
 
+logger = logging.getLogger(__name__)
+
+# --- Anthropic API client ---
 
 def get_client():
     return anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
+
+# Model tiers for Anthropic API
+MODEL_FAST = "claude-haiku-4-5-20251001"    # scoring, metadata extraction
+MODEL_STRONG = "claude-sonnet-4-20250514"   # resumes, cover letters
+
+# Default Ollama settings (overridden by AppConfig)
+DEFAULT_OLLAMA_URL = "http://10.10.10.105:11434"
+DEFAULT_OLLAMA_MODEL = "gemma4:e4b"
+
+
+def _is_local(config: AppConfig, tier: str = "fast") -> bool:
+    """Check if a task tier should use local (Ollama) backend."""
+    if tier == "creative":
+        return getattr(config, "creative_backend", "api") == "local"
+    # fast tier: check fast_backend first, fall back to scoring_backend for compat
+    return getattr(config, "fast_backend", getattr(config, "scoring_backend", "local")) == "local"
+
+
+# --- Ollama helper ---
+
+def ollama_chat(system: str, user_msg: str, config: AppConfig) -> str:
+    """Call Ollama's OpenAI-compatible chat endpoint and return the text response."""
+    url = (config.ollama_url or DEFAULT_OLLAMA_URL).rstrip("/") + "/v1/chat/completions"
+    model = config.ollama_model or DEFAULT_OLLAMA_MODEL
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": user_msg})
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.3,
+        "max_tokens": 2000,
+    }
+
+    try:
+        resp = httpx.post(url, json=payload, timeout=120.0)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
+    except httpx.ConnectError:
+        raise ConnectionError(
+            f"Cannot reach Ollama at {url}. Is Ollama running on the AI box?"
+        )
+    except Exception as e:
+        raise RuntimeError(f"Ollama call failed: {e}")
+
+
+def anthropic_chat(system: str, user_msg: str, model: str, max_tokens: int = 2000) -> str:
+    """Call Anthropic API and return the text response."""
+    client = get_client()
+    message = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": user_msg}],
+    )
+    return message.content[0].text.strip()
+
+
+def clean_json_response(raw: str) -> str:
+    """Extract JSON from an LLM response, handling markdown fencing, thinking tokens, etc."""
+    raw = raw.strip()
+
+    # Strip markdown code fences
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+    if raw.endswith("```"):
+        raw = raw[:-3]
+    if raw.startswith("json"):
+        raw = raw[4:]
+    raw = raw.strip()
+
+    # If it's already valid JSON, return it
+    try:
+        json.loads(raw)
+        return raw
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Try to find a JSON object embedded in the response
+    # Look for the first { and last } to extract the JSON object
+    first_brace = raw.find("{")
+    last_brace = raw.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        candidate = raw[first_brace:last_brace + 1]
+        try:
+            json.loads(candidate)
+            return candidate
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    logger.warning(f"Could not extract JSON from response: {raw[:200]}...")
+    return raw
+
+
+def safe_int(val, default=0) -> int:
+    """Coerce a value to int, handling strings and floats from LLM output."""
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+# === SCORING ===
 
 SCORING_SYSTEM_PROMPT = """You are a job search scoring assistant. You evaluate job descriptions against a candidate's background and return structured scores.
 
@@ -59,11 +184,10 @@ You MUST respond with ONLY valid JSON matching this exact structure (no markdown
 }}"""
 
 
-def score_job(job: Job) -> ScoreBreakdown:
-    """Score a job description against candidate background using Claude API."""
-    client = get_client()
-    config = storage.load_config()
-    full_history = storage.load_resume_text("full_history")
+def score_job(job: Job, user_id: str = None) -> ScoreBreakdown:
+    """Score a job description against candidate background."""
+    config = storage.load_config(user_id)
+    full_history = storage.load_resume_text(user_id, "full_history")
 
     if not full_history:
         full_history = "(No full employment history loaded. Score based on JD quality only.)"
@@ -77,55 +201,124 @@ def score_job(job: Job) -> ScoreBreakdown:
         deal_breakers=", ".join(config.deal_breakers),
     )
 
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
-        system=system,
-        messages=[
-            {"role": "user", "content": f"Score this job description:\n\n{job.raw_jd}"}
-        ],
-    )
+    user_msg = f"Score this job description:\n\n{job.raw_jd}"
 
-    raw = message.content[0].text.strip()
-    # Clean potential markdown fencing
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-    if raw.endswith("```"):
-        raw = raw[:-3]
-    raw = raw.strip()
+    # Local models benefit from a schema reminder at the end of the user message
+    if _is_local(config, "fast"):
+        user_msg += """
+
+IMPORTANT: Respond with ONLY valid JSON using EXACTLY these keys and value types:
+{
+  "skills_match": <integer 0-4>,
+  "scope_impact": <integer 0-3>,
+  "pay_alignment": <integer 0-2>,
+  "skills_rationale": "<string>",
+  "scope_rationale": "<string>",
+  "pay_rationale": "<string>",
+  "keyword_gaps": ["<string>", ...],
+  "red_flags": ["<string>", ...],
+  "bullshit_flag": <true/false>,
+  "bullshit_reason": "<string>",
+  "recommended_resume": "director|base|contract|none",
+  "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
+  "raw_analysis": "<string>"
+}
+No markdown. No explanation. No extra keys. ONLY the JSON object."""
+
+    # Route to backend
+    backend_name = "ollama" if _is_local(config, "fast") else "api"
+    logger.info(f"Scoring job '{job.title}' at '{job.company}' via {backend_name}")
+
+    if _is_local(config, "fast"):
+        raw = ollama_chat(system, user_msg, config)
+    else:
+        raw = anthropic_chat(system, user_msg, MODEL_FAST)
+
+    logger.debug(f"Raw scoring response ({len(raw)} chars): {raw[:300]}...")
+    raw = clean_json_response(raw)
 
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError:
+        logger.info(f"Parsed scoring JSON OK: skills={data.get('skills_match')}, scope={data.get('scope_impact')}, pay={data.get('pay_alignment')}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse scoring JSON: {e}\nRaw: {raw[:500]}")
         return ScoreBreakdown(
             skills_match=0, scope_impact=0, pay_alignment=0,
             raw_analysis=f"Failed to parse scoring response: {raw[:500]}"
         )
 
-    total = data.get("skills_match", 0) + data.get("scope_impact", 0) + data.get("pay_alignment", 0)
-    lane_str = data.get("recommended_lane", "ignore")
-    try:
-        lane = MarketLane(lane_str)
-    except ValueError:
-        lane = MarketLane.IGNORE
+    sm = safe_int(data.get("skills_match"), 0)
+    si = safe_int(data.get("scope_impact"), 0)
+    pa = safe_int(data.get("pay_alignment"), 0)
+    total = min(sm, 4) + min(si, 3) + min(pa, 2)
+
+    lane_str = str(data.get("recommended_lane", "ignore")).lower().strip()
+    # Map common LLM variations to our enum values
+    lane_map = {
+        "w2_sniper": MarketLane.W2_SNIPER,
+        "w2 sniper": MarketLane.W2_SNIPER,
+        "w2": MarketLane.W2_SNIPER,
+        "apply": MarketLane.W2_SNIPER,
+        "strong_apply": MarketLane.W2_SNIPER,
+        "contract": MarketLane.CONTRACT,
+        "contract_to_hire": MarketLane.CONTRACT_TO_HIRE,
+        "c2h": MarketLane.CONTRACT_TO_HIRE,
+        "ignore": MarketLane.IGNORE,
+        "skip": MarketLane.IGNORE,
+        "pass": MarketLane.IGNORE,
+        "none": MarketLane.IGNORE,
+    }
+    lane = lane_map.get(lane_str, MarketLane.IGNORE)
+    # If not in map, try the enum directly
+    if lane_str not in lane_map:
+        try:
+            lane = MarketLane(lane_str)
+        except ValueError:
+            lane = MarketLane.IGNORE
 
     return ScoreBreakdown(
-        skills_match=min(data.get("skills_match", 0), 4),
-        scope_impact=min(data.get("scope_impact", 0), 3),
-        pay_alignment=min(data.get("pay_alignment", 0), 2),
+        skills_match=min(sm, 4),
+        scope_impact=min(si, 3),
+        pay_alignment=min(pa, 2),
         total=total,
-        skills_rationale=data.get("skills_rationale", ""),
-        scope_rationale=data.get("scope_rationale", ""),
-        pay_rationale=data.get("pay_rationale", ""),
+        skills_rationale=str(data.get("skills_rationale", "")),
+        scope_rationale=str(data.get("scope_rationale", "")),
+        pay_rationale=str(data.get("pay_rationale", "")),
         keyword_gaps=data.get("keyword_gaps", []),
         red_flags=data.get("red_flags", []),
-        bullshit_flag=data.get("bullshit_flag", False),
-        bullshit_reason=data.get("bullshit_reason", ""),
-        recommended_resume=data.get("recommended_resume", "none"),
+        bullshit_flag=bool(data.get("bullshit_flag", False)),
+        bullshit_reason=str(data.get("bullshit_reason", "")),
+        recommended_resume=str(data.get("recommended_resume", "none")),
         recommended_lane=lane,
-        raw_analysis=data.get("raw_analysis", ""),
+        raw_analysis=str(data.get("raw_analysis", "")),
     )
 
+
+# === METADATA EXTRACTION ===
+
+def extract_job_metadata(raw_jd: str, user_id: str = None) -> dict:
+    """Extract title, company, pay range from raw JD text."""
+    config = storage.load_config(user_id) if user_id else AppConfig()
+
+    user_msg = f"""Extract the following from this job posting. Return ONLY valid JSON, no markdown:
+{{"title": "job title", "company": "company name", "pay_range": "pay range if stated, empty string if not", "is_contract": true/false, "is_w2": true/false}}
+
+Job posting:
+{raw_jd[:3000]}"""
+
+    if _is_local(config, "fast"):
+        raw = ollama_chat("", user_msg, config)
+    else:
+        raw = anthropic_chat("", user_msg, MODEL_FAST, max_tokens=500)
+
+    raw = clean_json_response(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+
+# === COVER LETTERS ===
 
 COVER_LETTER_SYSTEM = """You are a cover letter writer. Generate a cover letter for a job application.
 
@@ -140,14 +333,14 @@ Write a cover letter in the requested style. Keep it to 3-4 paragraphs. Be speci
 Return ONLY the cover letter text, no preamble or commentary."""
 
 
-def generate_cover_letters(job: Job) -> list[CoverLetter]:
+def generate_cover_letters(job: Job, user_id: str = None) -> list[CoverLetter]:
     """Generate 3 cover letter variants for a scored job."""
-    client = get_client()
+    config = storage.load_config(user_id) if user_id else AppConfig()
 
     resume_variant = job.score.recommended_resume if job.score else "base"
-    resume_text = storage.load_resume_text(resume_variant)
+    resume_text = storage.load_resume_text(user_id, resume_variant)
     if not resume_text:
-        resume_text = storage.load_resume_text("base")
+        resume_text = storage.load_resume_text(user_id, "base")
     if not resume_text:
         resume_text = "(No resume text loaded)"
 
@@ -171,47 +364,23 @@ Overall: {job.score.raw_analysis}"""
 
     letters = []
     for variant, instruction in styles.items():
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1500,
-            system=system,
-            messages=[
-                {"role": "user", "content": f"Job Description:\n{job.raw_jd}\n\nCompany: {job.company}\nTitle: {job.title}\n\nStyle: {instruction}"}
-            ],
-        )
+        user_msg = f"Job Description:\n{job.raw_jd}\n\nCompany: {job.company}\nTitle: {job.title}\n\nStyle: {instruction}"
+
+        if _is_local(config, "creative"):
+            text = ollama_chat(system, user_msg, config)
+        else:
+            text = anthropic_chat(system, user_msg, MODEL_STRONG, max_tokens=1500)
+
         letters.append(CoverLetter(
             job_id=job.id,
             variant=variant,
-            content=message.content[0].text.strip(),
+            content=text,
         ))
 
     return letters
 
 
-def extract_job_metadata(raw_jd: str) -> dict:
-    """Use Claude to extract title, company, pay range from raw JD text."""
-    client = get_client()
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=500,
-        messages=[
-            {"role": "user", "content": f"""Extract the following from this job posting. Return ONLY valid JSON, no markdown:
-{{"title": "job title", "company": "company name", "pay_range": "pay range if stated, empty string if not", "is_contract": true/false, "is_w2": true/false}}
-
-Job posting:
-{raw_jd[:3000]}"""}
-        ],
-    )
-    raw = message.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-    if raw.endswith("```"):
-        raw = raw[:-3]
-    try:
-        return json.loads(raw.strip())
-    except json.JSONDecodeError:
-        return {}
-
+# === TAILORED RESUME ===
 
 TAILORED_RESUME_SYSTEM = """You are a resume tailoring expert. You take a candidate's base resume and full background, then produce a version precisely targeted to a specific job description.
 
@@ -237,20 +406,20 @@ INSTRUCTIONS:
 Output the complete tailored resume as clean text with clear section headers. No markdown formatting, no commentary — just the resume."""
 
 
-def generate_tailored_resume(job: Job) -> str:
+def generate_tailored_resume(job: Job, user_id: str = None) -> str:
     """Generate a resume tailored to a specific job description."""
-    client = get_client()
+    config = storage.load_config(user_id) if user_id else AppConfig()
 
     resume_variant = job.score.recommended_resume if job.score else "base"
-    resume_text = storage.load_resume_text(resume_variant)
+    resume_text = storage.load_resume_text(user_id, resume_variant)
     if not resume_text:
-        resume_text = storage.load_resume_text("base")
+        resume_text = storage.load_resume_text(user_id, "base")
     if not resume_text:
-        resume_text = storage.load_resume_text("full_history")
+        resume_text = storage.load_resume_text(user_id, "full_history")
     if not resume_text:
         raise ValueError("No resume text loaded. Upload at least one variant in Settings.")
 
-    full_history = storage.load_resume_text("full_history")
+    full_history = storage.load_resume_text(user_id, "full_history")
     if not full_history:
         full_history = resume_text
 
@@ -269,13 +438,9 @@ Overall: {job.score.raw_analysis}"""
         score_analysis=score_analysis,
     )
 
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4000,
-        system=system,
-        messages=[
-            {"role": "user", "content": f"Tailor my resume for this job:\n\nCompany: {job.company}\nTitle: {job.title}\n\nJob Description:\n{job.raw_jd}"}
-        ],
-    )
+    user_msg = f"Tailor my resume for this job:\n\nCompany: {job.company}\nTitle: {job.title}\n\nJob Description:\n{job.raw_jd}"
 
-    return message.content[0].text.strip()
+    if _is_local(config, "creative"):
+        return ollama_chat(system, user_msg, config)
+    else:
+        return anthropic_chat(system, user_msg, MODEL_STRONG, max_tokens=4000)

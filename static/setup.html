@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Search HQ — Setup</title>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d27;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--red:#f87171;--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:520px}
+.logo{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+h1{font-size:22px;font-weight:700;margin-bottom:6px}
+.subtitle{font-size:14px;color:var(--text-dim);margin-bottom:32px;line-height:1.5}
+.form-group{margin-bottom:20px}
+label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px}
+input{width:100%;background:#232736;border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;transition:border-color .15s}
+input:focus{outline:none;border-color:var(--accent)}
+.hint{font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.4}
+.btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;margin-top:8px}
+.btn:hover{background:#6ba0f8}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{margin-top:16px;padding:12px 16px;border-radius:6px;font-size:13px;display:none}
+.msg.success{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--green)}
+.msg.error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red)}
+.divider{border:none;border-top:1px solid var(--border);margin:28px 0}
+.docs{font-size:12px;color:var(--text-dim);line-height:1.7}
+.docs a{color:var(--accent);text-decoration:none}
+code{background:#232736;padding:1px 5px;border-radius:3px;font-size:11px;font-family:monospace}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Job Search HQ</div>
+  <h1>First-run Setup</h1>
+  <p class="subtitle">Configure your Authentik OIDC provider to enable login. This only needs to be done once.</p>
+
+  <form id="setup-form">
+    <div class="form-group">
+      <label>Issuer URL</label>
+      <input type="url" id="oidc_issuer" placeholder="http://10.10.10.13:9000/application/o/jobsearch/" required>
+      <div class="hint">Found in Authentik → Applications → Your App → Edit Provider → OpenID Configuration Issuer</div>
+    </div>
+    <div class="form-group">
+      <label>Client ID</label>
+      <input type="text" id="oidc_client_id" placeholder="paste-client-id-here" required>
+    </div>
+    <div class="form-group">
+      <label>Client Secret</label>
+      <input type="password" id="oidc_client_secret" placeholder="paste-client-secret-here" required>
+    </div>
+    <div class="form-group">
+      <label>Redirect URI</label>
+      <input type="url" id="oidc_redirect_uri" placeholder="http://10.10.10.13:8094/auth/callback" required>
+      <div class="hint">Must exactly match the redirect URI configured in Authentik.</div>
+    </div>
+    <button type="submit" class="btn" id="submit-btn">Save &amp; Continue to Login</button>
+  </form>
+
+  <div id="msg" class="msg"></div>
+
+  <hr class="divider">
+  <div class="docs">
+    <strong style="color:var(--text)">Quick Authentik setup:</strong><br><br>
+    1. Open <a href="http://10.10.10.13:9000" target="_blank">Authentik</a> → Admin → Applications → Create<br>
+    2. Name: <code>JobSearch HQ</code> · Slug: <code>jobsearch</code><br>
+    3. Create provider: OAuth2/OpenID → pick <em>Client Credentials + Code</em><br>
+    4. Set Redirect URI: <code>http://10.10.10.13:8094/auth/callback</code><br>
+    5. Copy the Client ID &amp; Secret above, paste the Issuer URL from the provider page<br>
+    6. Create a user, add them to the application's policy<br>
+  </div>
+</div>
+
+<script>
+// Pre-fill from existing config
+fetch('/api/setup').then(r => r.json()).then(cfg => {
+  document.getElementById('oidc_issuer').value = cfg.oidc_issuer || '';
+  document.getElementById('oidc_client_id').value = cfg.oidc_client_id || '';
+  document.getElementById('oidc_client_secret').value = cfg.oidc_client_secret || '';
+  document.getElementById('oidc_redirect_uri').value = cfg.oidc_redirect_uri || 'http://' + location.hostname + ':8094/auth/callback';
+}).catch(() => {
+  document.getElementById('oidc_redirect_uri').value = 'http://' + location.hostname + ':8094/auth/callback';
+});
+
+document.getElementById('setup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const msg = document.getElementById('msg');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  msg.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/setup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        oidc_issuer: document.getElementById('oidc_issuer').value.trim(),
+        oidc_client_id: document.getElementById('oidc_client_id').value.trim(),
+        oidc_client_secret: document.getElementById('oidc_client_secret').value.trim(),
+        oidc_redirect_uri: document.getElementById('oidc_redirect_uri').value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Save failed');
+    if (data.is_complete) {
+      msg.className = 'msg success';
+      msg.textContent = 'Saved! Redirecting to login…';
+      msg.style.display = 'block';
+      setTimeout(() => { window.location.href = '/auth/login'; }, 1200);
+    } else {
+      msg.className = 'msg error';
+      msg.textContent = 'Saved, but config appears incomplete. Check all fields.';
+      msg.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Save & Continue to Login';
+    }
+  } catch (err) {
+    msg.className = 'msg error';
+    msg.textContent = err.message;
+    msg.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Save & Continue to Login';
+  }
+});
+</script>
+</body>
+</html>

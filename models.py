@@ -29,6 +29,13 @@ class IntakeSource(str, Enum):
     API = "api"
 
 
+class User(BaseModel):
+    """Represents an authenticated user derived from OIDC claims."""
+    id: str        # OIDC 'sub' claim — stable, provider-agnostic
+    email: str = ""
+    name: str = ""
+
+
 class ScoreBreakdown(BaseModel):
     skills_match: int = Field(ge=0, le=4, description="0-4: hard skill overlap")
     scope_impact: int = Field(ge=0, le=3, description="0-3: seniority/leadership match")
@@ -69,7 +76,6 @@ class FollowUp(BaseModel):
 
 
 class EmailRecord(BaseModel):
-    """Record of an email sent or received for a job."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     direction: str = "sent"  # "sent" or "received"
     to: str = ""
@@ -81,6 +87,7 @@ class EmailRecord(BaseModel):
 
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    user_id: str = ""          # OIDC sub — set on creation, never changed
     title: str = ""
     company: str = ""
     url: str = ""
@@ -93,7 +100,7 @@ class Job(BaseModel):
     score: Optional[ScoreBreakdown] = None
     cover_letters: list[CoverLetter] = []
     tailored_resume: str = ""
-    tailored_resume_docx: str = ""  # path to generated .docx
+    tailored_resume_docx: str = ""
     applied_at: str = ""
     follow_up: FollowUp = Field(default_factory=FollowUp)
     emails: list[EmailRecord] = []
@@ -167,7 +174,7 @@ class JobUpdate(BaseModel):
     market_lane: Optional[MarketLane] = None
     gut_interest: Optional[int] = None
     notes: Optional[str] = None
-    applied_at: Optional[str] = None  # ISO date string for manual override
+    applied_at: Optional[str] = None
 
 
 class EmailCompose(BaseModel):
@@ -179,16 +186,23 @@ class EmailCompose(BaseModel):
 
 
 class AppConfig(BaseModel):
+    # Scoring targets
     w2_salary_min: int = 160000
     w2_salary_max: int = 220000
     contract_hourly_min: int = 85
     contract_hourly_max: int = 125
     follow_up_days: int = 14
-    follow_up_email: str = "salil.maniktahla@gmail.com"
+    # Author info (used in generated documents)
+    author_name: str = ""
+    author_location: str = ""
+    author_phone: str = ""
+    # Email
+    follow_up_email: str = ""
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str = ""
-    smtp_password: str = ""  # Gmail App Password
+    smtp_password: str = ""
+    # Resume variants
     resume_labels: dict[str, str] = {
         "director": "Resume 1 — Director",
         "base": "Resume 2 — Base",
@@ -227,3 +241,9 @@ class AppConfig(BaseModel):
     auto_score_new_jobs: bool = False
     auto_generate_above_threshold: bool = False
     auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters
+    # --- Scoring Backend ---
+    scoring_backend: str = "local"  # legacy/fallback — used by fast tasks if fast_backend not set
+    fast_backend: str = "local"     # "local" (Ollama) or "api" (Haiku) — scoring, metadata, parsing
+    creative_backend: str = "api"   # "local" (Ollama) or "api" (Sonnet) — resumes, cover letters
+    ollama_url: str = "http://10.10.10.105:11434"
+    ollama_model: str = "gemma4:e4b"

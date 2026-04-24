@@ -1,25 +1,18 @@
-# Data (user-specific, contains job descriptions and personal info)
-data/jobs/
-data/generated/
-data/resumes/
-data/config.json
-
+# User data (contains job descriptions and personal info)
+data/
 # Environment
 .env
 __pycache__/
 *.pyc
 *.pyo
-
 # Archives
 *.tar.gz
-
 # Docker
 *.log
-
+authentik-db/
 # OS
 .DS_Store
 Thumbs.db
-
 # IDE
 .vscode/
 .idea/

@@ -124,7 +124,17 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
     </div>
   </div>
-  <div class="card table-wrap"><table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Lane</th><th>Status</th><th>Applied</th><th>Follow-Up</th><th></th></tr></thead><tbody id="tracker-body"></tbody></table></div>
+  <div class="card table-wrap"><table><thead><tr>
+    <th onclick="sortTracker('company')" style="cursor:pointer;user-select:none">COMPANY <span id="sort-company"></span></th>
+    <th onclick="sortTracker('title')" style="cursor:pointer;user-select:none">TITLE <span id="sort-title"></span></th>
+    <th onclick="sortTracker('score')" style="cursor:pointer;user-select:none">SCORE <span id="sort-score">▲</span></th>
+    <th onclick="sortTracker('lane')" style="cursor:pointer;user-select:none">LANE <span id="sort-lane"></span></th>
+    <th onclick="sortTracker('status')" style="cursor:pointer;user-select:none">STATUS <span id="sort-status"></span></th>
+    <th onclick="sortTracker('added')" style="cursor:pointer;user-select:none">ADDED <span id="sort-added"></span></th>
+    <th>APPLIED</th>
+    <th>FOLLOW-UP</th>
+    <th></th>
+  </tr></thead><tbody id="tracker-body"></tbody></table></div>
 </div>
 
 <!-- Follow-Ups -->
@@ -461,7 +471,45 @@ async function scoreAllSearchResults(){
 }
 
 // Tracker
-async function loadTracker(){let u='/api/jobs';const p=[];const l=document.getElementById('filter-lane')?.value;const s=document.getElementById('filter-status')?.value;if(l)p.push('lane='+l);if(s)p.push('status='+s);if(p.length)u+='?'+p.join('&');const jobs=await api(u);document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="8" class="text-dim">No jobs.</td></tr>'}
+let trackerJobs=[];
+let trackerSort={col:'score',dir:-1}; // default: score descending
+
+async function loadTracker(){
+  let u='/api/jobs';const p=[];
+  const l=document.getElementById('filter-lane')?.value;
+  const s=document.getElementById('filter-status')?.value;
+  if(l)p.push('lane='+l);if(s)p.push('status='+s);
+  if(p.length)u+='?'+p.join('&');
+  trackerJobs=await api(u);
+  renderTracker();
+}
+
+function sortTracker(col){
+  if(trackerSort.col===col){trackerSort.dir*=-1;}
+  else{trackerSort={col,dir:col==='score'?-1:1};}
+  renderTracker();
+}
+
+function renderTracker(){
+  const cols=['company','title','score','lane','status','added'];
+  cols.forEach(c=>{
+    const el=document.getElementById('sort-'+c);
+    if(el)el.textContent=trackerSort.col===c?(trackerSort.dir===1?'▲':'▼'):'';
+  });
+  const jobs=[...trackerJobs].sort((a,b)=>{
+    const d=trackerSort.dir;
+    switch(trackerSort.col){
+      case 'score': return d*((a.score?.total??-1)-(b.score?.total??-1));
+      case 'company': return d*(a.company||'').localeCompare(b.company||'');
+      case 'title': return d*(a.title||'').localeCompare(b.title||'');
+      case 'lane': return d*(a.market_lane||'').localeCompare(b.market_lane||'');
+      case 'status': return d*(a.status||'').localeCompare(b.status||'');
+      case 'added': return d*(a.created_at||'').localeCompare(b.created_at||'');
+      default: return 0;
+    }
+  });
+  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="9" class="text-dim">No jobs.</td></tr>';
+}
 
 // Follow-Ups
 async function loadFollowUps(){const d=await api('/api/follow-ups');updateFollowUpBadges(d.due_now.length);document.getElementById('followups-due').innerHTML=d.due_now.length?d.due_now.map(j=>fuCard(j,true)).join(''):'<div class="card text-dim text-sm">No follow-ups due.</div>';document.getElementById('followups-upcoming').innerHTML=d.upcoming.length?d.upcoming.map(j=>fuCard(j,false)).join(''):'<div class="card text-dim text-sm">None upcoming.</div>'}

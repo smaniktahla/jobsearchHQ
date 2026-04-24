@@ -302,8 +302,9 @@ def generate_resume_docx(tailored_text: str, job_id: str, company: str = "", tit
         i += 1
 
     # Save
-    safe_company = re.sub(r"[^\w\s-]", "", company or "job")[:30].strip()
-    filename = f"Resume_Tailored_{safe_company}_{job_id}.docx"
+    safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
+    safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
+    filename = f"Salil Maniktahla - {safe_title} - {safe_company}.docx"
     filepath = GENERATED_DIR / filename
     doc.save(str(filepath))
 
@@ -400,9 +401,10 @@ def generate_cover_letter_docx(
         run.font.color.rgb = DARK
 
     # Save
-    safe_company = re.sub(r"[^\w\s-]", "", company or "job")[:30].strip()
+    safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
+    safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
     safe_variant = re.sub(r"[^\w]", "", variant)[:15]
-    filename = f"CoverLetter_{safe_variant}_{safe_company}_{job_id}.docx"
+    filename = f"Salil Maniktahla - Cover Letter ({safe_variant}) - {safe_title} - {safe_company}.docx"
     filepath = GENERATED_DIR / filename
     doc.save(str(filepath))
 

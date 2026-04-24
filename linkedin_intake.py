@@ -38,13 +38,9 @@ Extract every distinct job listing you can find. For each job, extract:
 - posted: when it was posted (e.g. "2 days ago") if visible
 - easy_apply: true if "Easy Apply" appears near this listing
 
-The text contains a list of job cards, possibly with some navigation/UI noise mixed in.
-Each job card typically has: Title, Company, Location, Posted time.
-
 Return ONLY a valid JSON array. No markdown, no commentary. Example:
 [
-  {{"title": "Senior Data Engineer", "company": "Acme Corp", "location": "Remote", "posted": "3 days ago", "easy_apply": true}},
-  {{"title": "Director of Analytics", "company": "BigCo", "location": "Washington, DC", "posted": "1 week ago", "easy_apply": false}}
+  {{"title": "Senior Data Engineer", "company": "Acme Corp", "location": "Remote", "posted": "3 days ago", "easy_apply": true}}
 ]
 
 If you cannot find any jobs, return an empty array: []
@@ -54,48 +50,35 @@ Raw page text:
 
 
 def parse_job_list_text(text: str) -> list[dict]:
-    """Use Claude to extract structured job listings from raw LinkedIn page text."""
     if not text or len(text.strip()) < 50:
         return []
 
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
-
-    # Truncate to avoid token limits — 25K chars is plenty for a search results page
-    truncated = text[:25000]
-
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=4000,
-        messages=[
-            {"role": "user", "content": PARSE_PROMPT.format(text=truncated)}
-        ],
+        messages=[{"role": "user", "content": PARSE_PROMPT.format(text=text[:25000])}],
     )
 
     raw = message.content[0].text.strip()
-    # Clean markdown fencing
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
     if raw.endswith("```"):
         raw = raw[:-3]
-    raw = raw.strip()
-
     try:
-        jobs = json.loads(raw)
+        jobs = json.loads(raw.strip())
         if isinstance(jobs, list):
             return jobs
     except json.JSONDecodeError:
         pass
-
     return []
 
 
 def parse_selected_job_description(description: str) -> dict:
-    """Use Claude to extract structured info from a full job description."""
     if not description or len(description.strip()) < 100:
         return {}
 
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
-
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=500,
@@ -128,32 +111,18 @@ Job description:
 
 
 def find_existing_job(all_jobs: list[Job], title: str, company: str, url: str) -> Job | None:
-    """Check if a job already exists by LinkedIn URL or title+company match."""
     for j in all_jobs:
-        # Match by URL (LinkedIn job ID)
         if url and j.url and url.rstrip("/") == j.url.rstrip("/"):
             return j
-        # Match by title + company (fuzzy)
-        if (title.lower() == j.title.lower() and
-                company.lower() == j.company.lower()):
+        if title.lower() == j.title.lower() and company.lower() == j.company.lower():
             return j
     return None
 
 
-def process_linkedin_capture(capture: LinkedInCapture) -> dict:
-    """
-    Process a LinkedIn page capture:
-    1. Parse job list text with Claude
-    2. Match to extracted links for URLs
-    3. Handle the selected/expanded job specially (has full JD)
-    4. Create jobs, optionally auto-score
-    """
-    all_existing = storage.load_all_jobs()
-    created = []
-    skipped = []
-    errors = []
+def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
+    all_existing = storage.load_all_jobs(user_id)
+    created, skipped, errors = [], [], []
 
-    # Build a lookup from link_text/job_id to URL
     link_lookup = {}
     for link in capture.job_links:
         if link.linkedin_job_id:
@@ -161,19 +130,14 @@ def process_linkedin_capture(capture: LinkedInCapture) -> dict:
         if link.link_text:
             link_lookup[link.link_text.lower().strip()] = link.job_url
 
-    # --- Handle the selected/expanded job (has full description) ---
+    # Handle the selected/expanded job (has full description)
     if capture.selected_job_description and len(capture.selected_job_description) > 200:
         meta = parse_selected_job_description(capture.selected_job_description)
-
         title = meta.get("title", "")
         company = meta.get("company", "")
         job_url = ""
-
-        # Try to match URL from links
         if capture.current_job_id:
             job_url = f"https://www.linkedin.com/jobs/view/{capture.current_job_id}/"
-        elif capture.current_job_id in link_lookup:
-            job_url = link_lookup[capture.current_job_id]
 
         existing = find_existing_job(all_existing, title, company, job_url)
         if existing:
@@ -191,27 +155,25 @@ def process_linkedin_capture(capture: LinkedInCapture) -> dict:
                     market_lane=MarketLane.CONTRACT if meta.get("is_contract") else MarketLane.CONTRACT,
                     notes=f"LinkedIn: {capture.search_query} | {capture.search_url}",
                 )
-                storage.save_job(job)
+                storage.save_job(user_id, job)
                 all_existing.append(job)
-
                 score_val = None
                 if capture.auto_score:
                     try:
-                        result = scoring.score_job(job)
+                        result = scoring.score_job(job, user_id)
                         job.score = result
                         job.update_status(JobStatus.SCORED)
                         if result.recommended_lane:
                             job.market_lane = result.recommended_lane
-                        storage.save_job(job)
+                        storage.save_job(user_id, job)
                         score_val = result.total
                     except Exception as e:
                         errors.append({"title": title, "company": company, "error": f"score: {e}"})
-
                 created.append({"id": job.id, "title": title, "company": company, "score": score_val})
             except Exception as e:
                 errors.append({"title": title, "company": company, "error": str(e)})
 
-    # --- Parse the job list text ---
+    # Parse the job list text
     if capture.job_list_text and len(capture.job_list_text) > 100:
         parsed_jobs = parse_job_list_text(capture.job_list_text)
 
@@ -221,16 +183,13 @@ def process_linkedin_capture(capture: LinkedInCapture) -> dict:
             if not title:
                 continue
 
-            # Try to find URL from links
             job_url = ""
             title_lower = title.lower().strip()
             for link in capture.job_links:
-                # Match by link text containing the title
                 if title_lower in link.link_text.lower():
                     job_url = link.job_url
                     break
             if not job_url:
-                # Check link_lookup
                 job_url = link_lookup.get(title_lower, "")
 
             existing = find_existing_job(all_existing, title, company, job_url)
@@ -238,7 +197,6 @@ def process_linkedin_capture(capture: LinkedInCapture) -> dict:
                 skipped.append({"id": existing.id, "title": title, "company": company, "reason": "duplicate"})
                 continue
 
-            # Build a minimal JD from parsed info
             raw_jd = "\n".join(part for part in [
                 f"{title} at {company}",
                 f"Location: {pj.get('location', '')}" if pj.get("location") else "",
@@ -256,23 +214,20 @@ def process_linkedin_capture(capture: LinkedInCapture) -> dict:
                     raw_jd=raw_jd,
                     notes=f"LinkedIn: {capture.search_query}",
                 )
-                storage.save_job(job)
+                storage.save_job(user_id, job)
                 all_existing.append(job)
-
                 score_val = None
                 if capture.auto_score and len(raw_jd) > 200:
-                    # Only auto-score if we have meaningful JD text
                     try:
-                        result = scoring.score_job(job)
+                        result = scoring.score_job(job, user_id)
                         job.score = result
                         job.update_status(JobStatus.SCORED)
                         if result.recommended_lane:
                             job.market_lane = result.recommended_lane
-                        storage.save_job(job)
+                        storage.save_job(user_id, job)
                         score_val = result.total
                     except Exception as e:
                         errors.append({"title": title, "company": company, "error": f"score: {e}"})
-
                 created.append({"id": job.id, "title": title, "company": company, "score": score_val})
             except Exception as e:
                 errors.append({"title": title, "company": company, "error": str(e)})
