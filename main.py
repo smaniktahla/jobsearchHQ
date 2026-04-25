@@ -27,6 +27,7 @@ import jobspy_search
 import linkedin_intake
 import scoring
 import storage
+import company_research
 import scheduler
 from intake import process_intake
 
@@ -523,6 +524,35 @@ def mark_followed_up(job_id: str, user: User = Depends(get_current_user)):
     job.updated_at = datetime.now().isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
+
+
+# ── Company Research ───────────────────────────────────────────────────────────
+
+@app.post("/api/jobs/{job_id}/research")
+def research_job_company(job_id: str, user: User = Depends(get_current_user)):
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.company or job.company.lower() in ("nan", "unknown", ""):
+        raise HTTPException(400, "Job has no company name to research")
+    try:
+        result = company_research.research_company(
+            company=job.company,
+            job_title=job.title,
+            user_id=user.id,
+        )
+        from models import CompanyResearch, Contact
+        job.research = CompanyResearch(
+            contacts=[Contact(**c) for c in result.get("contacts", [])],
+            company_summary=result.get("company_summary", ""),
+            researched_at=datetime.now().isoformat(),
+            searches_run=result.get("searches_run", []),
+        )
+        job.updated_at = datetime.now().isoformat()
+        storage.save_job(user.id, job)
+        return enrich_job(job)
+    except Exception as e:
+        raise HTTPException(500, f"Research failed: {str(e)}")
 
 
 @app.post("/api/follow-ups/send-digest")

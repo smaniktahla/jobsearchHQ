@@ -135,12 +135,14 @@ def add_job_meta(doc, org, dates=""):
     return p
 
 
-def generate_resume_docx(tailored_text: str, job_id: str, company: str = "", title: str = "") -> str:
+def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", company: str = "", title: str = "") -> str:
     """
     Parse tailored resume text and generate a formatted .docx file.
     Returns the path to the generated file.
     """
-    ensure_dirs()
+    import storage as _storage
+    out_dir = _storage.get_generated_dir(user_id) if user_id else GENERATED_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     doc = Document()
 
@@ -305,7 +307,7 @@ def generate_resume_docx(tailored_text: str, job_id: str, company: str = "", tit
     safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
     safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
     filename = f"Salil Maniktahla - {safe_title} - {safe_company}.docx"
-    filepath = GENERATED_DIR / filename
+    filepath = out_dir / filename
     doc.save(str(filepath))
 
     return str(filepath)
@@ -315,14 +317,21 @@ def generate_cover_letter_docx(
     content: str,
     variant: str,
     job_id: str,
+    user_id: str = "",
     company: str = "",
     title: str = "",
+    author_name: str = "Salil Maniktahla",
+    author_location: str = "Springfield, VA",
+    author_phone: str = "571-215-8218",
+    author_email: str = "salil.maniktahla@gmail.com",
 ) -> str:
     """
     Generate a professional cover letter .docx.
     Clean business letter format matching the resume's Calibri style.
     """
-    ensure_dirs()
+    import storage as _storage
+    out_dir = _storage.get_generated_dir(user_id) if user_id else GENERATED_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     doc = Document()
 
@@ -346,7 +355,7 @@ def generate_cover_letter_docx(
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.space_after = Pt(0)
-    run = p.add_run("Salil Maniktahla")
+    run = p.add_run(author_name or "Salil Maniktahla")
     run.bold = True
     run.font.name = "Calibri"
     run.font.size = Pt(14)
@@ -355,7 +364,10 @@ def generate_cover_letter_docx(
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(2)
     p.paragraph_format.space_after = Pt(0)
-    run = p.add_run("Springfield, VA  \u00B7  571-215-8218  \u00B7  salil.maniktahla@gmail.com")
+    _loc = author_location or "Springfield, VA"
+    _phone = author_phone or "571-215-8218"
+    _email = author_email or "salil.maniktahla@gmail.com"
+    run = p.add_run(f"{_loc}  \u00B7  {_phone}  \u00B7  {_email}")
     run.font.name = "Calibri"
     run.font.size = Pt(9)
     run.font.color.rgb = MEDIUM
@@ -405,7 +417,7 @@ def generate_cover_letter_docx(
     safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
     safe_variant = re.sub(r"[^\w]", "", variant)[:15]
     filename = f"Salil Maniktahla - Cover Letter ({safe_variant}) - {safe_title} - {safe_company}.docx"
-    filepath = GENERATED_DIR / filename
+    filepath = out_dir / filename
     doc.save(str(filepath))
 
     return str(filepath)

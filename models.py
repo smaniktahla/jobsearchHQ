@@ -85,6 +85,22 @@ class EmailRecord(BaseModel):
     sent_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class Contact(BaseModel):
+    name: str = ""
+    title: str = ""
+    email: str = ""
+    linkedin_url: str = ""
+    notes: str = ""
+    confidence: str = "medium"  # high | medium | low
+
+
+class CompanyResearch(BaseModel):
+    contacts: list[Contact] = []
+    company_summary: str = ""
+    researched_at: str = ""
+    searches_run: list[str] = []
+
+
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     user_id: str = ""          # OIDC sub — set on creation, never changed
@@ -104,6 +120,7 @@ class Job(BaseModel):
     applied_at: str = ""
     follow_up: FollowUp = Field(default_factory=FollowUp)
     emails: list[EmailRecord] = []
+    research: Optional[CompanyResearch] = None
     notes: str = ""
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())

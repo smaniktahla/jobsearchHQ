@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#232736;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--yellow:#fbbf24;--red:#f87171;--orange:#fb923c;--radius:8px}
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
-.app{display:flex;min-height:100vh}.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto}.main{flex:1;margin-left:220px;padding:24px 32px}
+.app{display:flex;min-height:100vh}.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto;display:flex;flex-direction:column}.main{flex:1;margin-left:220px;padding:24px 32px}
 .logo{padding:0 20px 24px;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text-dim);cursor:pointer;font-size:14px;transition:all .15s}.nav-item:hover,.nav-item.active{color:var(--text);background:var(--surface2)}.nav-item.active{border-left:3px solid var(--accent)}.nav-item svg{width:18px;height:18px;flex-shrink:0}.nav-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:auto}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}.card-header{font-size:13px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
@@ -39,6 +39,10 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="nav-item" data-view="tracker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Tracker<span id="nav-followup-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
+  <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
+    <div id="nav-user-name" style="font-size:11px;color:var(--text-dim);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <a href="/auth/logout" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);text-decoration:none;padding:6px 0" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out</a>
+  </div>
 </nav>
 
 <div class="main">
@@ -159,7 +163,15 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="card mb-16" id="score-section" style="display:none"><div class="card-header">Score Breakdown</div><div id="score-breakdown"></div></div>
 
       <!-- Contact / Follow-up -->
-      <div class="card mb-16 follow-up-card" id="detail-followup-card" style="display:none">
+      <div class="card mb-16" id="research-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="card-header" style="margin:0">Key Contacts</div>
+      <button class="btn btn-ghost btn-sm" id="btn-research" onclick="runResearch()">Research Company</button>
+    </div>
+    <div id="research-status" class="text-sm" style="color:var(--text-dim);margin-bottom:8px;display:none"></div>
+    <div id="research-contacts"><div class="text-sm" style="color:var(--text-dim)">Click &ldquo;Research Company&rdquo; to find key contacts.</div></div>
+  </div>
+  <div class="card mb-16 follow-up-card" id="detail-followup-card" style="display:none">
         <div class="card-header">Follow-Up</div>
         <div id="detail-followup-info" class="text-sm"></div>
         <div id="detail-contact-info"></div>
@@ -348,7 +360,7 @@ function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.r
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
 
-async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
+async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
 
 // Dashboard
 async function loadDashboard(){const[stats,jobs]=await Promise.all([api('/api/stats'),api('/api/jobs')]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';
@@ -520,6 +532,7 @@ async function sendDigest(){try{const r=await api('/api/follow-ups/send-digest',
 // Job Detail
 async function showDetail(id){currentJobId=id;const j=await api('/api/jobs/'+id);currentJob=j;showView('detail');
 document.getElementById('detail-title').textContent=j.title||'(Untitled)';document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
+renderResearch(j.research);
 // Applied info
 const ai=document.getElementById('detail-applied-info');
 const appliedBtn=document.getElementById('btn-applied');
@@ -559,6 +572,75 @@ async function generateCoverLetters(){if(!currentJobId)return;document.getElemen
 function copyTailoredResume(){navigator.clipboard.writeText(document.getElementById('tailored-resume-content').textContent)}
 async function updateJobStatus(){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{status:document.getElementById('detail-status').value}});await showDetail(currentJobId)}
 async function setGut(v){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{gut_interest:v}});await showDetail(currentJobId)}
+
+function renderResearch(research){
+  const el=document.getElementById('research-contacts');
+  const status=document.getElementById('research-status');
+  if(!el)return;
+  if(!research){
+    el.innerHTML='<div class="text-sm" style="color:var(--text-dim)">Click &ldquo;Research Company&rdquo; to find key contacts.</div>';
+    if(status)status.style.display='none';
+    return;
+  }
+  // Show metadata
+  let meta='';
+  if(research.researched_at){
+    const d=new Date(research.researched_at);
+    meta='Last researched: '+d.toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  }
+  if(research.source_url) meta+=(meta?' · ':'')+'Source: <a href="'+esc(research.source_url)+'" target="_blank" style="color:var(--accent)">'+esc(research.source_url.replace('https://',''))+'</a>';
+  if(meta&&status){status.innerHTML=meta;status.style.display='block';}
+  // Company summary
+  el.innerHTML='';
+  if(research.company_summary){
+    el.innerHTML=`<div class="text-sm mb-8" style="color:var(--text-dim);font-style:italic">${esc(research.company_summary)}</div>`;
+  }
+  if(!research.contacts||!research.contacts.length){
+    el.innerHTML+='<div class="text-sm" style="color:var(--text-dim)">No contacts identified. '+
+      (research.source_url?'Page was scraped but no named individuals found.':'Company website could not be found.')+'</div>';
+    if(research.searches_run?.length){
+      el.innerHTML+='<div class="text-sm mt-4" style="color:var(--text-dim)">Searches: '+research.searches_run.map(s=>esc(s)).join(' · ')+'</div>';
+    }
+    return;
+  }
+  research.contacts.forEach(c=>{
+    const confidenceColor=c.confidence==='high'?'var(--green)':c.confidence==='medium'?'var(--yellow)':'var(--text-dim)';
+    let html=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">`;
+    html+=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><strong style="font-size:13px">${esc(c.name)}</strong><br><span class="text-sm" style="color:var(--text-dim)">${esc(c.title)}</span></div><span style="font-size:10px;color:${confidenceColor};text-transform:uppercase;flex-shrink:0;margin-left:8px">${esc(c.confidence)}</span></div>`;
+    if(c.notes)html+=`<div class="text-sm mt-4" style="color:var(--text-dim)">${esc(c.notes)}</div>`;
+    html+=`<div class="flex gap-8 mt-8" style="flex-wrap:wrap">`;
+    if(c.email)html+=`<a href="mailto:${esc(c.email)}" class="btn btn-ghost btn-sm">✉ ${esc(c.email)}</a>`;
+    if(c.linkedin_url){const liUrl=c.linkedin_url.startsWith('http')?c.linkedin_url:'https://'+c.linkedin_url;html+=`<a href="${esc(liUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">in LinkedIn</a>`;}
+    const searchUrl=c.linkedin_search_url||`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(c.name)}`;
+    html+=`<a href="${esc(searchUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">🔍 Search LinkedIn</a>`;
+    html+=`</div></div>`;
+    el.innerHTML+=html;
+  });
+}
+
+async function runResearch(){
+  const btn=document.getElementById('btn-research');
+  const status=document.getElementById('research-status');
+  if(!currentJobId)return;
+  btn.disabled=true;
+  btn.textContent='Researching...';
+  status.textContent='Searching Google + extracting contacts via Claude...';
+  status.style.display='block';
+  status.style.color='var(--text-dim)';
+  try{
+    const job=await api('/api/jobs/'+currentJobId+'/research',{method:'POST'});
+    renderResearch(job.research);
+    status.style.color='var(--green)';
+    const count=job.research?.contacts?.length||0;
+    status.textContent=`✓ Found ${count} contact${count===1?'':'s'}`;
+  }catch(e){
+    status.style.color='var(--red)';
+    status.textContent='Research failed: '+e.message;
+  }finally{
+    btn.disabled=false;
+    btn.textContent='Re-Research';
+  }
+}
 async function markFollowedUp(){if(!currentJobId)return;await api('/api/jobs/'+currentJobId+'/mark-followed-up',{method:'POST'});await showDetail(currentJobId)}
 async function snoozeFollowUp(d){if(!currentJobId)return;await api('/api/jobs/'+currentJobId+'/snooze-follow-up?days='+d,{method:'POST'});await showDetail(currentJobId)}
 async function setContactEmail(email){if(!currentJobId)return;await api('/api/jobs/'+currentJobId+'/set-contact?email='+encodeURIComponent(email),{method:'POST'});await showDetail(currentJobId)}
@@ -700,6 +782,7 @@ function hideLoading(){document.getElementById('action-loading').style.display='
 
 // Init — load config for resume labels, then dashboard
 api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels}).catch(()=>{}).finally(()=>loadDashboard());
+api('/api/auth/me').then(u=>{const el=document.getElementById('nav-user-name');if(el&&u.name)el.textContent=u.name||(u.email||'');}).catch(()=>{});
 </script>
 </body>
 </html>
