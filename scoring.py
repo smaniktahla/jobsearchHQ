@@ -27,7 +27,7 @@ def get_client():
 
 # Model tiers for Anthropic API
 MODEL_FAST = "claude-haiku-4-5-20251001"    # scoring, metadata extraction
-MODEL_STRONG = "claude-sonnet-4-20250514"   # resumes, cover letters
+MODEL_STRONG = "claude-sonnet-4-5"   # resumes, cover letters
 
 # Default Ollama settings (overridden by AppConfig)
 DEFAULT_OLLAMA_URL = "http://10.10.10.105:11434"

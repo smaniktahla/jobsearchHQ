@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -17,6 +18,7 @@ from auth import (
     logout_handler,
     save_system_config,
 )
+from pydantic import BaseModel
 from models import (
     AppConfig, EmailCompose, EmailRecord, IntakeSource, Job,
     JobCreate, JobStatus, JobUpdate, MarketLane, User,
@@ -553,6 +555,35 @@ def research_job_company(job_id: str, user: User = Depends(get_current_user)):
         return enrich_job(job)
     except Exception as e:
         raise HTTPException(500, f"Research failed: {str(e)}")
+
+
+class ContactMessageRequest(BaseModel):
+    contact_name: str
+    contact_title: str
+
+
+@app.post("/api/jobs/{job_id}/contact-message")
+def generate_contact_message(
+    job_id: str,
+    req: ContactMessageRequest,
+    user: User = Depends(get_current_user),
+):
+    """Generate a 300-char LinkedIn connection message for a specific contact."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    config = storage.load_config(user.id)
+    try:
+        message = scoring.generate_linkedin_message(
+            job=job,
+            contact_name=req.contact_name,
+            contact_title=req.contact_title,
+            author_name=config.author_name or "Salil",
+            user_id=user.id,
+        )
+        return {"message": message}
+    except Exception as e:
+        raise HTTPException(500, f"Message generation failed: {str(e)}")
 
 
 @app.post("/api/follow-ups/send-digest")

@@ -603,7 +603,7 @@ function renderResearch(research){
     }
     return;
   }
-  research.contacts.forEach(c=>{
+  research.contacts.forEach((c,idx)=>{
     const confidenceColor=c.confidence==='high'?'var(--green)':c.confidence==='medium'?'var(--yellow)':'var(--text-dim)';
     let html=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">`;
     html+=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><strong style="font-size:13px">${esc(c.name)}</strong><br><span class="text-sm" style="color:var(--text-dim)">${esc(c.title)}</span></div><span style="font-size:10px;color:${confidenceColor};text-transform:uppercase;flex-shrink:0;margin-left:8px">${esc(c.confidence)}</span></div>`;
@@ -613,9 +613,39 @@ function renderResearch(research){
     if(c.linkedin_url){const liUrl=c.linkedin_url.startsWith('http')?c.linkedin_url:'https://'+c.linkedin_url;html+=`<a href="${esc(liUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">in LinkedIn</a>`;}
     const searchUrl=c.linkedin_search_url||`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(c.name)}`;
     html+=`<a href="${esc(searchUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">🔍 Search LinkedIn</a>`;
+    html+=`<button class="btn btn-ghost btn-sm" id="msg-btn-${idx}" onclick="copyContactMessage('${esc(c.name).replace(/'/g,"\\'")}','${esc(c.title).replace(/'/g,"\\'")}',${idx})">✉ Copy Message</button>`;
+    html+=`<span id="msg-status-${idx}" class="text-sm" style="color:var(--green);display:none">✓ Copied!</span>`;
     html+=`</div></div>`;
     el.innerHTML+=html;
   });
+}
+
+async function copyContactMessage(contactName, contactTitle, idx){
+  const btn=document.getElementById('msg-btn-'+idx);
+  const status=document.getElementById('msg-status-'+idx);
+  if(!btn||!currentJobId)return;
+  btn.disabled=true;
+  btn.textContent='Generating...';
+  try{
+    const r=await api('/api/jobs/'+currentJobId+'/contact-message',{
+      method:'POST',
+      body:{contact_name:contactName,contact_title:contactTitle}
+    });
+    const msg=r.message||'';
+    await navigator.clipboard.writeText(msg);
+    btn.textContent='✉ Copy Message';
+    btn.disabled=false;
+    status.style.display='inline';
+    status.textContent=`✓ Copied! (${msg.length} chars)`;
+    setTimeout(()=>{status.style.display='none';},4000);
+  }catch(e){
+    btn.textContent='✉ Copy Message';
+    btn.disabled=false;
+    status.style.display='inline';
+    status.style.color='var(--red)';
+    status.textContent='Failed: '+e.message;
+    setTimeout(()=>{status.style.display='none';status.style.color='var(--green)';},4000);
+  }
 }
 
 async function runResearch(){
