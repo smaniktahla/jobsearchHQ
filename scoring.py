@@ -174,13 +174,13 @@ You MUST respond with ONLY valid JSON matching this exact structure (no markdown
   "skills_rationale": "string - 2-3 sentences explaining skills score",
   "scope_rationale": "string - 2-3 sentences explaining scope score",
   "pay_rationale": "string - 1-2 sentences explaining pay score",
+  "raw_analysis": "string - 3-5 sentence overall assessment",
+  "recommended_resume": "director|base|contract|none",
+  "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
   "keyword_gaps": ["skill1", "skill2"],
   "red_flags": ["flag1"],
   "bullshit_flag": false,
-  "bullshit_reason": "",
-  "recommended_resume": "director|base|contract|none",
-  "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
-  "raw_analysis": "string - 3-5 sentence overall assessment"
+  "bullshit_reason": ""
 }}"""
 
 
@@ -215,13 +215,13 @@ IMPORTANT: Respond with ONLY valid JSON using EXACTLY these keys and value types
   "skills_rationale": "<string>",
   "scope_rationale": "<string>",
   "pay_rationale": "<string>",
+  "raw_analysis": "<string>",
+  "recommended_resume": "director|base|contract|none",
+  "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
   "keyword_gaps": ["<string>", ...],
   "red_flags": ["<string>", ...],
   "bullshit_flag": <true/false>,
-  "bullshit_reason": "<string>",
-  "recommended_resume": "director|base|contract|none",
-  "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
-  "raw_analysis": "<string>"
+  "bullshit_reason": "<string>"
 }
 No markdown. No explanation. No extra keys. ONLY the JSON object."""
 
@@ -306,10 +306,7 @@ def extract_job_metadata(raw_jd: str, user_id: str = None) -> dict:
 Job posting:
 {raw_jd[:3000]}"""
 
-    if _is_local(config, "fast"):
-        raw = ollama_chat("", user_msg, config)
-    else:
-        raw = anthropic_chat("", user_msg, MODEL_FAST, max_tokens=500)
+    raw = ai_router.chat("", user_msg, "fast", config, max_tokens=500)
 
     raw = clean_json_response(raw)
     try:
@@ -366,10 +363,7 @@ Overall: {job.score.raw_analysis}"""
     for variant, instruction in styles.items():
         user_msg = f"Job Description:\n{job.raw_jd}\n\nCompany: {job.company}\nTitle: {job.title}\n\nStyle: {instruction}"
 
-        if _is_local(config, "creative"):
-            text = ollama_chat(system, user_msg, config)
-        else:
-            text = anthropic_chat(system, user_msg, MODEL_STRONG, max_tokens=1500)
+        text = ai_router.chat(system, user_msg, "strong", config, max_tokens=1500)
 
         letters.append(CoverLetter(
             job_id=job.id,
@@ -440,7 +434,87 @@ Overall: {job.score.raw_analysis}"""
 
     user_msg = f"Tailor my resume for this job:\n\nCompany: {job.company}\nTitle: {job.title}\n\nJob Description:\n{job.raw_jd}"
 
-    if _is_local(config, "creative"):
-        return ollama_chat(system, user_msg, config)
+    return ai_router.chat(system, user_msg, "strong", config, max_tokens=4000)
+
+
+# ── LinkedIn message generation ────────────────────────────────────────────────
+
+def generate_linkedin_message(
+    job,
+    contact_name: str,
+    contact_title: str,
+    author_name: str,
+    user_id: str = "",
+) -> str:
+    """
+    Generate a tight 300-character LinkedIn connection request message.
+    Tone varies by contact type:
+    - HR/People → mention applying, warm, optional tool mention
+    - Data/Analytics/Tech → peer angle, tool mention as conversation starter
+    - C-suite large co → ultra-brief, no tool mention
+    - Other → professional, optional tool mention
+    """
+    import storage as _storage
+    config = _storage.load_config(user_id) if user_id else None
+
+    title_lower = contact_title.lower()
+    is_hr = any(t in title_lower for t in [
+        "hr", "human resources", "people", "talent", "recruiting", "chro", "chief people"
+    ])
+    is_data = any(t in title_lower for t in [
+        "data", "analytics", "bi ", "intelligence", "cdo", "cto", "technology", "digital"
+    ])
+    is_csuite = any(t in title_lower for t in [
+        "chief executive", "ceo", "president", "co-founder", "founder"
+    ])
+
+    if is_hr:
+        tone = (
+            "HR/People leader. Mention you applied for the role and wanted to connect directly. "
+            "Warm and professional. Optionally mention you found their name via an AI job search "
+            "tool you built — frame as resourcefulness."
+        )
+    elif is_data:
+        tone = (
+            "Data/analytics/tech peer or potential boss. Collegial, peer-to-peer tone. "
+            "Definitely mention you built an AI job search tool that identified them as a key "
+            "contact — this demonstrates exactly the skills relevant to the role. Make it a "
+            "conversation starter."
+        )
+    elif is_csuite:
+        tone = (
+            "C-suite executive. Very brief, respectful of their time. "
+            "One sentence on who you are, one on the role. Skip the tool mention."
+        )
     else:
-        return anthropic_chat(system, user_msg, MODEL_STRONG, max_tokens=4000)
+        tone = (
+            "Professional and direct. Mention the role and your background briefly. "
+            "Optionally mention the AI tool if it fits naturally."
+        )
+
+    first_name = contact_name.split()[0].replace("Dr.", "").strip()
+    author_first = author_name.split()[0] if author_name else "Salil"
+
+    system = (
+        "You generate LinkedIn connection request messages. "
+        "HARD LIMIT: 300 characters total including spaces. Count carefully. "
+        "Return ONLY the message text — no quotes, no preamble, no explanation. "
+        f"Sign off with just '{author_first}'."
+    )
+
+    user_msg = (
+        f"Write a LinkedIn connection request from {author_name} to "
+        f"{contact_name} ({contact_title}) at {job.company}.\n\n"
+        f"Role being applied for: {job.title}\n"
+        f"Sender background: Senior data & analytics leader, 30 years experience, "
+        f"currently leading federal ERP analytics modernization.\n\n"
+        f"Tone: {tone}\n\n"
+        f"Open with their first name '{first_name}'. "
+        f"Sign off with '{author_first}'. STRICT 300 CHARACTER LIMIT."
+    )
+
+    if config:
+        return ai_router.chat(system, user_msg, "strong", config, max_tokens=200)
+    else:
+        # Fallback to direct Anthropic if no config
+        return anthropic_chat(system, user_msg, MODEL_STRONG, max_tokens=200)

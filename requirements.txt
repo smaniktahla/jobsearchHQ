@@ -9,3 +9,5 @@ python-docx==1.1.2
 python-jobspy==1.1.82
 APScheduler==3.10.4
 googlesearch-python==1.2.5
+google-generativeai==0.8.5
+openai==1.75.0

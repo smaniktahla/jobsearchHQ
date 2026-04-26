@@ -30,6 +30,7 @@ import linkedin_intake
 import scoring
 import storage
 import company_research
+import ai_router
 import scheduler
 from intake import process_intake
 
@@ -289,7 +290,9 @@ def score_job(job_id: str, user: User = Depends(get_current_user)):
         if result.recommended_lane:
             job.market_lane = result.recommended_lane
         storage.save_job(user.id, job)
-        return enrich_job(job)
+        enriched = enrich_job(job)
+        enriched["scored_with"] = ai_router.get_last_model("fast")
+        return enriched
     except Exception as e:
         raise HTTPException(500, f"Scoring failed: {str(e)}")
 

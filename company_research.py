@@ -13,13 +13,13 @@ import logging
 import re
 import time
 
-import anthropic
+import ai_router
 import requests
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-haiku-4-5-20251001"
+# Model handled by ai_router
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -34,42 +34,14 @@ SCRAPE_PATHS = [
 ]
 FETCH_TIMEOUT = 8
 
-_client = None
-
-
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic()
-    return _client
-
-
 # ── Claude web search helper ───────────────────────────────────────────────────
 
 def _claude_search(prompt: str, max_tokens: int = 1000) -> str:
     """
-    Run a Claude web search and return the final text response.
-    web_search is a server_tool_use — Claude searches internally and the
-    answer appears in the LAST text block (after "I'll search..." preambles).
+    Run a Claude web search. Always uses Anthropic (web_search is Claude-only).
+    Returns the last text block — first block is the "I'll search..." preamble.
     """
-    client = _get_client()
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=max_tokens,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
-        messages=[{"role": "user", "content": prompt}],
-    )
-    # Collect ALL text blocks — the last one is the actual answer
-    text_blocks = [
-        block.text.strip()
-        for block in response.content
-        if block.type == "text" and block.text.strip()
-    ]
-    if not text_blocks:
-        return ""
-    # Return the last text block (post-search answer)
-    # Skip preambles like "I'll search for..." which are never the last block
-    return text_blocks[-1]
+    return ai_router.web_search_chat(prompt, max_tokens=max_tokens)
 
 
 # ── Step 1: Find domain ────────────────────────────────────────────────────────

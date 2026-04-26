@@ -123,7 +123,8 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 <!-- Tracker -->
 <div id="view-tracker" class="view">
   <div class="flex justify-between items-center mb-16"><h1>Job Tracker</h1>
-    <div class="flex gap-8">
+    <div class="flex gap-8 items-center">
+      <input type="text" id="tracker-search" placeholder="Search company or title..." oninput="renderTracker()" style="width:220px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
     </div>
@@ -307,6 +308,63 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Jobs scoring at or above this get auto-generated resume + 3 cover letter variants</div>
       </div>
     </div>
+  </div>
+
+  <h2 class="mt-16 mb-8">AI Provider</h2>
+  <div class="card mb-16">
+    <div class="card-header">Provider &amp; API Keys</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Set providers independently — e.g. Gemini (free) for scoring, Anthropic for resumes. If API key is left blank, the system key is used.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
+      <div class="form-group">
+        <label>Fast Provider <span style="color:var(--text-dim);font-weight:normal">(scoring, research)</span></label>
+        <select id="cfg-fast-provider" onchange="updateProviderUI()">
+          <option value="anthropic">Anthropic (Claude Haiku)</option>
+          <option value="gemini">Google Gemini — 1,500 free req/day</option>
+          <option value="openai">OpenAI (GPT-4o mini)</option>
+          <option value="ollama">Local Ollama</option>
+        </select>
+        <div id="fast-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+      </div>
+      <div class="form-group">
+        <label>Strong Provider <span style="color:var(--text-dim);font-weight:normal">(resumes, cover letters)</span></label>
+        <select id="cfg-strong-provider" onchange="updateProviderUI()">
+          <option value="anthropic">Anthropic (Claude Sonnet)</option>
+          <option value="gemini">Google Gemini Flash</option>
+          <option value="openai">OpenAI (GPT-4o)</option>
+          <option value="ollama">Local Ollama</option>
+        </select>
+        <div id="strong-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+      </div>
+      <div class="form-group" id="anthropic-key-group">
+        <label>Anthropic API Key</label>
+        <input type="password" id="cfg-anthropic-key" placeholder="sk-ant-... (blank = use system key)">
+      </div>
+      <div class="form-group" id="gemini-key-group" style="display:none">
+        <label>Gemini API Key</label>
+        <input type="password" id="cfg-gemini-key" placeholder="AIza... get free key at aistudio.google.com">
+      </div>
+      <div class="form-group" id="openai-key-group" style="display:none">
+        <label>OpenAI API Key</label>
+        <input type="password" id="cfg-openai-key" placeholder="sk-... get key at platform.openai.com">
+      </div>
+      <div class="form-group" id="ollama-url-group" style="display:none">
+        <label>Ollama URL</label>
+        <input type="text" id="cfg-ollama-url" placeholder="http://10.10.10.105:11434">
+      </div>
+      <div class="form-group" id="ollama-model-group" style="display:none">
+        <label>Ollama Model</label>
+        <input type="text" id="cfg-ollama-model" placeholder="gemma4:e4b">
+      </div>
+      <div class="form-group">
+        <label>Fast Model override</label>
+        <input type="text" id="cfg-fast-model" placeholder="leave blank for provider default">
+      </div>
+      <div class="form-group">
+        <label>Strong Model override</label>
+        <input type="text" id="cfg-strong-model" placeholder="leave blank for provider default">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
   </div>
 
   <button class="btn btn-primary" onclick="saveConfig()">Save All Settings</button>
@@ -508,7 +566,9 @@ function renderTracker(){
     const el=document.getElementById('sort-'+c);
     if(el)el.textContent=trackerSort.col===c?(trackerSort.dir===1?'▲':'▼'):'';
   });
-  const jobs=[...trackerJobs].sort((a,b)=>{
+  const q=(document.getElementById('tracker-search')?.value||'').toLowerCase();
+  const filtered=q?trackerJobs.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)):trackerJobs;
+  const jobs=[...filtered].sort((a,b)=>{
     const d=trackerSort.dir;
     switch(trackerSort.col){
       case 'score': return d*((a.score?.total??-1)-(b.score?.total??-1));
@@ -566,7 +626,32 @@ async function markApplied(){
   }catch(e){alert(e.message)}
   finally{hideLoading()}
 }
-async function scoreCurrentJob(){if(!currentJobId)return;document.getElementById('btn-score').disabled=true;showLoading('Scoring...');try{await api('/api/jobs/'+currentJobId+'/score',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-score').disabled=false;hideLoading()}}
+async function scoreCurrentJob(){
+  if(!currentJobId)return;
+  const btn=document.getElementById('btn-score');
+  btn.disabled=true;
+  // Show which model is scoring
+  let modelLabel='';
+  try{
+    const cfg=await api('/api/config');
+    const fp=cfg.fast_provider||'anthropic';
+    const fmOverride=cfg.fast_model||'';
+    const defaults={anthropic:'haiku',gemini:'gemini-2.5-flash-lite',openai:'gpt-4o-mini',ollama:cfg.ollama_model||'ollama'};
+    modelLabel=fmOverride||(fp==='anthropic'?'claude-haiku':defaults[fp]||fp);
+  }catch(e){}
+  showLoading('Scoring with '+modelLabel+'...');
+  try{
+    const result=await api('/api/jobs/'+currentJobId+'/score',{method:'POST'});
+    const actual=result.scored_with||'';
+    if(actual){
+      const parts=actual.split('/');
+      btn.textContent='✓ '+parts[parts.length-1];
+      setTimeout(()=>{btn.textContent='Score This Job';},3000);
+    }
+    await showDetail(currentJobId);
+  }catch(e){alert(e.message);}
+  finally{btn.disabled=false;hideLoading();}
+}
 async function generateTailoredResume(){if(!currentJobId)return;document.getElementById('btn-resume').disabled=true;showLoading('Generating tailored resume + .docx...');try{await api('/api/jobs/'+currentJobId+'/tailored-resume',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-resume').disabled=false;hideLoading()}}
 async function generateCoverLetters(){if(!currentJobId)return;document.getElementById('btn-cover').disabled=true;showLoading('Generating cover letters...');try{await api('/api/jobs/'+currentJobId+'/cover-letters',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-cover').disabled=false;hideLoading()}}
 function copyTailoredResume(){navigator.clipboard.writeText(document.getElementById('tailored-resume-content').textContent)}
@@ -702,12 +787,40 @@ document.getElementById('cfg-sched-results').value=c.scheduled_search_results||2
 document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
 document.getElementById('cfg-sched-remote').checked=c.scheduled_search_remote!==false;
 document.getElementById('cfg-auto-score').checked=!!c.auto_score_new_jobs;
+document.getElementById('cfg-fast-provider').value=c.fast_provider||'anthropic';
+document.getElementById('cfg-strong-provider').value=c.strong_provider||'anthropic';
+document.getElementById('cfg-anthropic-key').value=c.anthropic_api_key||'';
+document.getElementById('cfg-gemini-key').value=c.gemini_api_key||'';
+document.getElementById('cfg-openai-key').value=c.openai_api_key||'';
+document.getElementById('cfg-fast-model').value=c.fast_model||'';
+document.getElementById('cfg-strong-model').value=c.strong_model||'';
+document.getElementById('cfg-ollama-url').value=c.ollama_url||'http://10.10.10.105:11434';
+document.getElementById('cfg-ollama-model').value=c.ollama_model||'gemma4:e4b';
+updateProviderUI();
 document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
 document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
 // Resume labels
 if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
 const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div class="flex items-center gap-8" style="margin:4px 0"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${resumeLabel(k)}</strong> <span class="text-dim">(${k})</span>: ${v.loaded?v.length+' chars':'Not loaded'}</div>`).join('');
 refreshSchedulerStatus()}
+
+const PROVIDER_FAST_DEFAULTS = {anthropic:'claude-haiku-4-5-20251001',gemini:'gemini-2.0-flash',openai:'gpt-4o-mini',ollama:'your ollama model'};
+const PROVIDER_STRONG_DEFAULTS = {anthropic:'claude-sonnet-4-5',gemini:'gemini-2.0-flash',openai:'gpt-4o',ollama:'your ollama model'};
+
+function updateProviderUI(){
+  const fp=document.getElementById('cfg-fast-provider')?.value||'anthropic';
+  const sp=document.getElementById('cfg-strong-provider')?.value||'anthropic';
+  const providers=new Set([fp,sp]);
+  document.getElementById('anthropic-key-group').style.display=providers.has('anthropic')?'':'none';
+  document.getElementById('gemini-key-group').style.display=providers.has('gemini')?'':'none';
+  document.getElementById('openai-key-group').style.display=providers.has('openai')?'':'none';
+  document.getElementById('ollama-url-group').style.display=providers.has('ollama')?'':'none';
+  document.getElementById('ollama-model-group').style.display=providers.has('ollama')?'':'none';
+  const fh=document.getElementById('fast-model-hint');
+  const sh=document.getElementById('strong-model-hint');
+  if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
+  if(sh)sh.textContent='Default: '+(PROVIDER_STRONG_DEFAULTS[sp]||'');
+}
 async function saveConfig(){
 const schedSites=[];
 if(document.getElementById('cfg-sched-indeed').checked)schedSites.push('indeed');
@@ -726,7 +839,16 @@ scheduled_search_hours_old:+document.getElementById('cfg-sched-hours').value||24
 scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
 auto_score_new_jobs:document.getElementById('cfg-auto-score').checked,
 auto_generate_above_threshold:document.getElementById('cfg-auto-generate').checked,
-auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7}});resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};refreshSchedulerStatus();alert('Saved')}
+auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7,
+fast_provider:document.getElementById('cfg-fast-provider').value||'anthropic',
+strong_provider:document.getElementById('cfg-strong-provider').value||'anthropic',
+anthropic_api_key:document.getElementById('cfg-anthropic-key').value||'',
+gemini_api_key:document.getElementById('cfg-gemini-key').value||'',
+openai_api_key:document.getElementById('cfg-openai-key').value||'',
+fast_model:document.getElementById('cfg-fast-model').value||'',
+strong_model:document.getElementById('cfg-strong-model').value||'',
+ollama_url:document.getElementById('cfg-ollama-url').value||'http://10.10.10.105:11434',
+ollama_model:document.getElementById('cfg-ollama-model').value||'gemma4:e4b'}});resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};refreshSchedulerStatus();alert('Saved')}
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 

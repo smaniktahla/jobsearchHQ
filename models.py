@@ -258,9 +258,16 @@ class AppConfig(BaseModel):
     auto_score_new_jobs: bool = False
     auto_generate_above_threshold: bool = False
     auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters
-    # --- Scoring Backend ---
-    scoring_backend: str = "local"  # legacy/fallback — used by fast tasks if fast_backend not set
-    fast_backend: str = "local"     # "local" (Ollama) or "api" (Haiku) — scoring, metadata, parsing
-    creative_backend: str = "api"   # "local" (Ollama) or "api" (Sonnet) — resumes, cover letters
+    # --- AI Provider ---
+    # fast_provider: scoring, metadata, research (cheap/free tasks)
+    # strong_provider: resumes, cover letters, LinkedIn messages (quality tasks)
+    # Set them independently — e.g. Gemini for fast (free), Anthropic for strong (quality)
+    fast_provider: str = "anthropic"    # "anthropic" | "gemini" | "openai" | "ollama"
+    strong_provider: str = "anthropic"  # "anthropic" | "gemini" | "openai" | "ollama"
+    anthropic_api_key: str = ""         # falls back to ANTHROPIC_API_KEY env var
+    gemini_api_key: str = ""            # falls back to GEMINI_API_KEY env var
+    openai_api_key: str = ""            # falls back to OPENAI_API_KEY env var
+    fast_model: str = ""                # override default fast model
+    strong_model: str = ""              # override default strong model
     ollama_url: str = "http://10.10.10.105:11434"
     ollama_model: str = "gemma4:e4b"
