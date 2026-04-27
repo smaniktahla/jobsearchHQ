@@ -700,6 +700,7 @@ function renderResearch(research){
     html+=`<a href="${esc(searchUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">🔍 Search LinkedIn</a>`;
     html+=`<button class="btn btn-ghost btn-sm" id="msg-btn-${idx}" onclick="copyContactMessage('${esc(c.name).replace(/'/g,"\\'")}','${esc(c.title).replace(/'/g,"\\'")}',${idx})">✉ Copy Message</button>`;
     html+=`<span id="msg-status-${idx}" class="text-sm" style="color:var(--green);display:none">✓ Copied!</span>`;
+    html+=`<div id="msg-preview-${idx}" style="display:none;margin-top:8px;padding:10px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text);white-space:pre-wrap;border:1px solid var(--border)"></div>`;
     html+=`</div></div>`;
     el.innerHTML+=html;
   });
@@ -708,28 +709,37 @@ function renderResearch(research){
 async function copyContactMessage(contactName, contactTitle, idx){
   const btn=document.getElementById('msg-btn-'+idx);
   const status=document.getElementById('msg-status-'+idx);
+  const preview=document.getElementById('msg-preview-'+idx);
   if(!btn||!currentJobId)return;
   btn.disabled=true;
   btn.textContent='Generating...';
+  if(preview)preview.style.display='none';
   try{
     const r=await api('/api/jobs/'+currentJobId+'/contact-message',{
       method:'POST',
       body:{contact_name:contactName,contact_title:contactTitle}
     });
     const msg=r.message||'';
-    await navigator.clipboard.writeText(msg);
-    btn.textContent='✉ Copy Message';
+    // Show preview
+    if(preview){
+      preview.textContent=msg;
+      preview.style.display='block';
+    }
+    // Copy button
+    btn.textContent='📋 Copy';
     btn.disabled=false;
-    status.style.display='inline';
-    status.textContent=`✓ Copied! (${msg.length} chars)`;
-    setTimeout(()=>{status.style.display='none';},4000);
+    btn.onclick=async()=>{
+      await navigator.clipboard.writeText(msg);
+      if(status){status.style.display='inline';status.style.color='var(--green)';status.textContent=`✓ Copied! (${msg.length} chars)`;}
+      setTimeout(()=>{if(status)status.style.display='none';},3000);
+    };
+    if(status){status.style.display='none';}
   }catch(e){
     btn.textContent='✉ Copy Message';
     btn.disabled=false;
-    status.style.display='inline';
-    status.style.color='var(--red)';
-    status.textContent='Failed: '+e.message;
-    setTimeout(()=>{status.style.display='none';status.style.color='var(--green)';},4000);
+    btn.onclick=()=>copyContactMessage(contactName,contactTitle,idx);
+    if(status){status.style.display='inline';status.style.color='var(--red)';status.textContent='Failed: '+e.message;}
+    setTimeout(()=>{if(status){status.style.display='none';status.style.color='var(--green)';}},4000);
   }
 }
 

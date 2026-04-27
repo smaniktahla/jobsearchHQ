@@ -16,6 +16,7 @@ import httpx
 import anthropic
 from models import Job, ScoreBreakdown, CoverLetter, MarketLane, AppConfig
 import storage
+import ai_router
 
 logger = logging.getLogger(__name__)
 
@@ -454,8 +455,7 @@ def generate_linkedin_message(
     - C-suite large co → ultra-brief, no tool mention
     - Other → professional, optional tool mention
     """
-    import storage as _storage
-    config = _storage.load_config(user_id) if user_id else None
+    config = storage.load_config(user_id) if user_id else None
 
     title_lower = contact_title.lower()
     is_hr = any(t in title_lower for t in [
