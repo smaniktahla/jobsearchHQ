@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Search HQ — Setup</title>
 <style>
-:root{--bg:#0f1117;--surface:#1a1d27;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--red:#f87171;--radius:8px}
+:root{--bg:#0f1117;--surface:#1a1d27;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--radius:8px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:520px}
 .logo{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
 h1{font-size:22px;font-weight:700;margin-bottom:6px}
-.subtitle{font-size:14px;color:var(--text-dim);margin-bottom:32px;line-height:1.5}
+.subtitle{font-size:14px;color:var(--text-dim);margin-bottom:20px;line-height:1.5}
 .form-group{margin-bottom:20px}
 label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px}
 input{width:100%;background:#232736;border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;transition:border-color .15s}
@@ -27,6 +27,13 @@ input:focus{outline:none;border-color:var(--accent)}
 .docs{font-size:12px;color:var(--text-dim);line-height:1.7}
 .docs a{color:var(--accent);text-decoration:none}
 code{background:#232736;padding:1px 5px;border-radius:3px;font-size:11px;font-family:monospace}
+/* Admin callout */
+.admin-callout{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.28);border-radius:8px;padding:14px 16px;margin-bottom:24px;display:flex;gap:12px;align-items:flex-start}
+.admin-callout-icon{font-size:18px;flex-shrink:0;line-height:1}
+.admin-callout-body{font-size:12px;line-height:1.65;color:var(--text-dim)}
+.admin-callout-body strong{color:var(--yellow)}
+.admin-callout-body ul{margin:6px 0 0 14px}
+.admin-callout-body li{margin-bottom:3px}
 </style>
 </head>
 <body>
@@ -34,6 +41,21 @@ code{background:#232736;padding:1px 5px;border-radius:3px;font-size:11px;font-fa
   <div class="logo">Job Search HQ</div>
   <h1>First-run Setup</h1>
   <p class="subtitle">Configure your Authentik OIDC provider to enable login. This only needs to be done once.</p>
+
+  <div class="admin-callout">
+    <div class="admin-callout-icon">⚠️</div>
+    <div class="admin-callout-body">
+      <strong>Your admin account is set on first login.</strong>
+      The first user to log in after saving this config will automatically become the app admin —
+      the account used to manage global settings. Before clicking Save:
+      <ul>
+        <li>Create your Authentik user first (step 6 in the guide below).</li>
+        <li><strong>Make note of the username and password you set</strong> — you'll use them every time you log in.</li>
+        <li>Keep this account private; it has full admin access to the app.</li>
+      </ul>
+      <div style="margin-top:8px">To reassign admin later, edit <code>admin_user_id</code> in <code>/app/data/system_config.json</code> and restart the container.</div>
+    </div>
+  </div>
 
   <form id="setup-form">
     <div class="form-group">
@@ -56,9 +78,7 @@ code{background:#232736;padding:1px 5px;border-radius:3px;font-size:11px;font-fa
     </div>
     <button type="submit" class="btn" id="submit-btn">Save &amp; Continue to Login</button>
   </form>
-
   <div id="msg" class="msg"></div>
-
   <hr class="divider">
   <div class="docs">
     <strong style="color:var(--text)">Quick Authentik setup:</strong><br><br>
@@ -70,7 +90,6 @@ code{background:#232736;padding:1px 5px;border-radius:3px;font-size:11px;font-fa
     6. Create a user, add them to the application's policy<br>
   </div>
 </div>
-
 <script>
 // Pre-fill from existing config
 fetch('/api/setup').then(r => r.json()).then(cfg => {
@@ -81,7 +100,6 @@ fetch('/api/setup').then(r => r.json()).then(cfg => {
 }).catch(() => {
   document.getElementById('oidc_redirect_uri').value = 'http://' + location.hostname + ':8094/auth/callback';
 });
-
 document.getElementById('setup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('submit-btn');
@@ -89,7 +107,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   btn.textContent = 'Saving…';
   msg.style.display = 'none';
-
   try {
     const res = await fetch('/api/setup', {
       method: 'POST',

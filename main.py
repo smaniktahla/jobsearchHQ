@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from auth import (
     get_current_user,
     invalidate_discovery_cache,
+    is_admin,
     is_setup_complete,
     load_system_config,
     login_handler,
@@ -85,7 +86,13 @@ async def auth_me(request: Request):
     session = get_session_from_cookie(request)
     if not session:
         raise HTTPException(401, detail="not_authenticated")
-    return {"id": session["user_id"], "email": session["email"], "name": session["name"]}
+    user_id = session["user_id"]
+    return {
+        "id": user_id,
+        "email": session["email"],
+        "name": session["name"],
+        "is_admin": is_admin(user_id),
+    }
 
 
 @app.get("/setup")

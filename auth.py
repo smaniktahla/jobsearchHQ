@@ -1,9 +1,14 @@
 """
 OIDC authentication for JobSearchHQ.
+
 Provider-agnostic — works with Authentik, Auth0, Keycloak, or any OIDC provider.
 Config lives in /app/data/system_config.json, managed via the /setup UI.
 Session: HTTP-only HMAC-signed cookie (Python stdlib only, no extra deps).
+
+Admin: the first OIDC user to log in is automatically designated admin.
+Admin user ID is stored in system_config.json under 'admin_user_id'.
 """
+
 import hashlib
 import hmac
 import json
@@ -15,11 +20,11 @@ from typing import Optional
 import httpx
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
-
 from models import User
 
 DATA_DIR = Path("/app/data")
 SYSTEM_CONFIG_PATH = DATA_DIR / "system_config.json"
+
 COOKIE_NAME = "jshq_session"
 COOKIE_MAX_AGE = 86400 * 30  # 30 days
 
@@ -63,6 +68,26 @@ def get_session_secret() -> str:
         cfg["session_secret"] = secret
         save_system_config(cfg)
     return secret
+
+
+# ── Admin user helpers ─────────────────────────────────────────────────────────
+
+def get_admin_user_id() -> Optional[str]:
+    """Return the designated admin OIDC sub, or None if not yet set."""
+    return load_system_config().get("admin_user_id")
+
+
+def set_admin_user_id(user_id: str) -> None:
+    """Persist the admin OIDC sub to system_config.json."""
+    cfg = load_system_config()
+    cfg["admin_user_id"] = user_id
+    save_system_config(cfg)
+
+
+def is_admin(user_id: str) -> bool:
+    """Return True if this user is the designated admin."""
+    admin_id = get_admin_user_id()
+    return bool(admin_id and admin_id == user_id)
 
 
 # ── Cookie helpers ─────────────────────────────────────────────────────────────
@@ -131,8 +156,8 @@ async def get_discovery() -> dict:
             f"{issuer}/.well-known/openid-configuration", timeout=10
         )
         r.raise_for_status()
-    _discovery_cache["data"] = r.json()
-    _discovery_cache["at"] = now
+        _discovery_cache["data"] = r.json()
+        _discovery_cache["at"] = now
     return _discovery_cache["data"]
 
 
@@ -226,6 +251,10 @@ async def callback_handler(request: Request):
 
     if not user_id:
         raise HTTPException(400, "Could not extract user identity from OIDC provider")
+
+    # ── Auto-designate admin: first user to log in becomes the admin ──────────
+    if not get_admin_user_id():
+        set_admin_user_id(user_id)
 
     response = RedirectResponse("/", status_code=302)
     response.delete_cookie("oidc_state")
