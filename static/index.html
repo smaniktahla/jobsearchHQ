@@ -138,7 +138,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <th onclick="sortTracker('added')" style="cursor:pointer;user-select:none">ADDED <span id="sort-added"></span></th>
     <th>APPLIED</th>
     <th>FOLLOW-UP</th>
-    <th>READY</th>
+    <th onclick="sortTracker('ready')" style="cursor:pointer;user-select:none">READY <span id="sort-ready"></span></th>
     <th></th>
   </tr></thead><tbody id="tracker-body"></tbody></table></div>
 </div>
@@ -280,7 +280,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <button class="btn btn-ghost btn-sm" onclick="saveConfig()">Save Names</button>
   </div>
   <div id="resume-status" class="mb-16"></div>
-  <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="form-group"><label>Paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload</button><span id="resume-upload-status" class="text-sm" style="margin-left:12px"></span></div>
+  <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="form-group"><label>Paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload</button></div>
   <h2 class="mt-16 mb-16">Automation</h2>
   <div class="card mb-16" id="scheduler-status-card">
     <div class="card-header">Scheduler Status</div>
@@ -578,7 +578,7 @@ function sortTracker(col){
   renderTracker();
 }
 function renderTracker(){
-  const cols=['company','title','score','lane','status','added'];
+  const cols=['company','title','score','lane','status','added','ready'];
   cols.forEach(c=>{
     const el=document.getElementById('sort-'+c);
     if(el)el.textContent=trackerSort.col===c?(trackerSort.dir===1?'▲':'▼'):'';
@@ -594,6 +594,7 @@ function renderTracker(){
       case 'lane': return d*(a.market_lane||'').localeCompare(b.market_lane||'');
       case 'status': return d*(a.status||'').localeCompare(b.status||'');
       case 'added': return d*(a.created_at||'').localeCompare(b.created_at||'');
+      case 'ready': return d*((a.ready_to_apply?1:0)-(b.ready_to_apply?1:0));
       default: return 0;
     }
   });
@@ -892,26 +893,7 @@ async function saveConfig(){
   refreshSchedulerStatus();alert('Saved')
 }
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
-async function uploadResume(){
-  const v=document.getElementById('resume-variant').value;
-  const c=document.getElementById('resume-text').value.trim();
-  const statusEl=document.getElementById('resume-upload-status');
-  const btn=document.querySelector('[onclick="uploadResume()"]');
-  if(!c){statusEl.innerHTML='<span style="color:var(--red)">Paste resume text first.</span>';return;}
-  statusEl.innerHTML='<span style="color:var(--text-dim)"><span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px;vertical-align:middle"></span>Uploading…</span>';
-  if(btn){btn.disabled=true;}
-  try{
-    const res=await api('/api/resumes/'+v,{method:'PUT',body:{content:c}});
-    document.getElementById('resume-text').value='';
-    const label=document.querySelector('#resume-variant option[value="'+v+'"]')?.textContent||v;
-    statusEl.innerHTML='<span style="color:var(--green)">✓ Saved <strong>'+esc(label)+'</strong> ('+res.length.toLocaleString()+' chars)</span>';
-    loadSettings();
-  }catch(e){
-    statusEl.innerHTML='<span style="color:var(--red)">✗ Upload failed: '+esc(e.message)+'</span>';
-  }finally{
-    if(btn){btn.disabled=false;}
-  }
-}
+async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 // Scheduler / Automation
 async function refreshSchedulerStatus(){
   try{

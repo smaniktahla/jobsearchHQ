@@ -172,10 +172,10 @@ You MUST respond with ONLY valid JSON matching this exact structure (no markdown
   "skills_match": 0,
   "scope_impact": 0,
   "pay_alignment": 0,
-  "skills_rationale": "string - 2-3 sentences explaining skills score",
-  "scope_rationale": "string - 2-3 sentences explaining scope score",
-  "pay_rationale": "string - 1-2 sentences explaining pay score",
-  "raw_analysis": "string - 3-5 sentence overall assessment",
+  "skills_rationale": "string - 1-2 sentences explaining skills score",
+  "scope_rationale": "string - 1-2 sentences explaining scope score",
+  "pay_rationale": "string - 1 sentence explaining pay score",
+  "raw_analysis": "string - 2-3 sentence overall assessment",
   "recommended_resume": "director|base|contract|none",
   "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
   "keyword_gaps": ["skill1", "skill2"],
@@ -233,7 +233,7 @@ No markdown. No explanation. No extra keys. ONLY the JSON object."""
     if _is_local(config, "fast"):
         raw = ollama_chat(system, user_msg, config)
     else:
-        raw = anthropic_chat(system, user_msg, MODEL_FAST)
+        raw = ai_router.chat(system, user_msg, "fast", config, max_tokens=3000)
 
     logger.debug(f"Raw scoring response ({len(raw)} chars): {raw[:300]}...")
     raw = clean_json_response(raw)
@@ -242,10 +242,10 @@ No markdown. No explanation. No extra keys. ONLY the JSON object."""
         data = json.loads(raw)
         logger.info(f"Parsed scoring JSON OK: skills={data.get('skills_match')}, scope={data.get('scope_impact')}, pay={data.get('pay_alignment')}")
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse scoring JSON: {e}\nRaw: {raw[:500]}")
+        logger.error(f"Failed to parse scoring JSON: {e}\nRaw: {raw[:1500]}")
         return ScoreBreakdown(
             skills_match=0, scope_impact=0, pay_alignment=0,
-            raw_analysis=f"Failed to parse scoring response: {raw[:500]}"
+            raw_analysis=f"Failed to parse scoring response: {raw[:1500]}"
         )
 
     sm = safe_int(data.get("skills_match"), 0)
