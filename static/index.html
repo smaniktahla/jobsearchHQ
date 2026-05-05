@@ -123,9 +123,10 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 <div id="view-tracker" class="view">
   <div class="flex justify-between items-center mb-16"><h1>Job Tracker</h1>
     <div class="flex gap-8 items-center">
+      <button class="btn btn-ghost btn-sm" id="btn-score-unscored" onclick="scoreAllUnscored()">Score All Unscored</button>
       <input type="text" id="tracker-search" placeholder="Search company or title..." oninput="renderTracker()" style="width:220px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
-      <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
+      <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="ready_to_apply">Ready to Apply</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
     </div>
   </div>
   <div class="card table-wrap"><table><thead><tr>
@@ -137,6 +138,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <th onclick="sortTracker('added')" style="cursor:pointer;user-select:none">ADDED <span id="sort-added"></span></th>
     <th>APPLIED</th>
     <th>FOLLOW-UP</th>
+    <th>READY</th>
     <th></th>
   </tr></thead><tbody id="tracker-body"></tbody></table></div>
 </div>
@@ -246,6 +248,22 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
   </div>
 
+  <!-- Applicant Profile -->
+  <div class="card mb-16">
+    <div class="card-header">Applicant Profile</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Used in generated resumes, cover letters, and application packages.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
+      <div class="form-group"><label>Full Name</label><input type="text" id="prof-name" placeholder="Your Name"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="prof-email" placeholder="you@example.com"></div>
+      <div class="form-group"><label>Phone</label><input type="tel" id="prof-phone" placeholder="(555) 555-5555"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="prof-location" placeholder="Washington, DC"></div>
+    </div>
+    <div class="flex items-center gap-8 mt-8">
+      <button class="btn btn-ghost btn-sm" onclick="saveProfile()">Save Profile</button>
+      <span id="prof-save-status" class="text-sm"></span>
+    </div>
+  </div>
+
   <div class="card mb-16"><div class="card-header">Pay Targets</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>W2 Salary Min ($)</label><input type="number" id="cfg-w2-min"></div><div class="form-group"><label>W2 Salary Max ($)</label><input type="number" id="cfg-w2-max"></div><div class="form-group"><label>Contract Hourly Min ($)</label><input type="number" id="cfg-hr-min"></div><div class="form-group"><label>Contract Hourly Max ($)</label><input type="number" id="cfg-hr-max"></div></div></div>
   <div class="card mb-16"><div class="card-header">Email / Follow-Up</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>Follow-Up After (days)</label><input type="number" id="cfg-followup-days"></div><div class="form-group"><label>Notification Email</label><input type="email" id="cfg-followup-email"></div><div class="form-group"><label>Your Gmail Email (login username)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div><div class="form-group"><label>Gmail App Password</label><input type="password" id="cfg-smtp-pass" placeholder="16-character app password"></div><div class="form-group"><label>SMTP Host</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>SMTP Port</label><input type="number" id="cfg-smtp-port" placeholder="587"></div></div><button class="btn btn-ghost btn-sm mt-8" onclick="sendTestEmail()">Send Test Email</button><span id="test-email-status" class="text-sm" style="margin-left:8px"></span></div>
   <div class="card mb-16"><div class="card-header">Deal Breakers</div><div class="form-group mt-8"><label>One per line</label><textarea id="cfg-dealbreakers" rows="4"></textarea></div></div>
@@ -262,7 +280,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <button class="btn btn-ghost btn-sm" onclick="saveConfig()">Save Names</button>
   </div>
   <div id="resume-status" class="mb-16"></div>
-  <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="form-group"><label>Paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload</button></div>
+  <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="form-group"><label>Paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload</button><span id="resume-upload-status" class="text-sm" style="margin-left:12px"></span></div>
   <h2 class="mt-16 mb-16">Automation</h2>
   <div class="card mb-16" id="scheduler-status-card">
     <div class="card-header">Scheduler Status</div>
@@ -421,7 +439,7 @@ async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Conte
 // Dashboard
 async function loadDashboard(){const[stats,jobs]=await Promise.all([api('/api/stats'),api('/api/jobs')]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';
 document.getElementById('funnel').innerHTML=['new','scored','applied','interview','offer'].map(s=>`<div class="funnel-step"><div class="count">${stats.by_status[s]||0}</div><div class="label">${s}</div></div>`).join('');
-document.getElementById('stats-row').innerHTML=`<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.avg_score}</div><div class="stat-label">Avg Score</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.score_distribution.high_8_10}</div><div class="stat-label">High (8-10)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${stats.score_distribution.mid_5_7}</div><div class="stat-label">Mid (5-7)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--orange)">${stats.follow_ups_due}</div><div class="stat-label">Follow-Ups</div></div>`;
+document.getElementById('stats-row').innerHTML=`<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.avg_score}</div><div class="stat-label">Avg Score</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.score_distribution.high_8_10}</div><div class="stat-label">High (8-10)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${stats.score_distribution.mid_5_7}</div><div class="stat-label">Mid (5-7)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--accent)">${stats.ready_to_apply||0}</div><div class="stat-label">Ready to Apply</div></div><div class="stat-card"><div class="stat-value" style="color:var(--orange)">${stats.follow_ups_due}</div><div class="stat-label">Follow-Ups</div></div>`;
 const r=jobs.slice(0,8);document.getElementById('recent-jobs').innerHTML=r.length?`<table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Status</th><th>Follow-Up</th></tr></thead><tbody>${r.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${followUpBadge(j)}</td></tr>`).join('')}</tbody></table>`:'<p class="text-dim text-sm" style="padding:12px">No jobs yet.</p>'}
 function updateFollowUpBadges(c){['nav-followup-badge','nav-followup-badge2'].forEach(id=>{const el=document.getElementById(id);if(c>0){el.style.display='inline';el.textContent=c}else el.style.display='none'})}
 // Add Job
@@ -522,6 +540,24 @@ async function scoreAllSearchResults(){
   }catch(e){alert('Batch scoring failed: '+e.message)}
   finally{document.getElementById('btn-score-all').disabled=false}
 }
+// Score All Unscored (tracker)
+async function scoreAllUnscored(){
+  const btn=document.getElementById('btn-score-unscored');
+  if(btn){btn.disabled=true;btn.textContent='Scoring...';}
+  try{
+    const res=await api('/api/jobs/score-all',{method:'POST'});
+    const results=res.results||[];
+    const scored=results.filter(r=>r.status==='scored').length;
+    const errors=results.filter(r=>r.status==='error').length;
+    const skipped=(res.total||0)-scored-errors;
+    let msg=`Scored ${scored} job${scored===1?'':'s'}.`;
+    if(errors)msg+=` ${errors} error${errors===1?'':'s'}.`;
+    if(skipped>0)msg+=` ${skipped} skipped.`;
+    alert(msg);
+    loadTracker();
+  }catch(e){alert('Failed: '+e.message)}
+  finally{if(btn){btn.disabled=false;btn.textContent='Score All Unscored';}}
+}
 // Tracker
 let trackerJobs=[];
 let trackerSort={col:'score',dir:-1};
@@ -529,7 +565,9 @@ async function loadTracker(){
   let u='/api/jobs';const p=[];
   const l=document.getElementById('filter-lane')?.value;
   const s=document.getElementById('filter-status')?.value;
-  if(l)p.push('lane='+l);if(s)p.push('status='+s);
+  if(l)p.push('lane='+l);
+  if(s==='ready_to_apply')p.push('ready_to_apply=true');
+  else if(s)p.push('status='+s);
   if(p.length)u+='?'+p.join('&');
   trackerJobs=await api(u);
   renderTracker();
@@ -559,7 +597,7 @@ function renderTracker(){
       default: return 0;
     }
   });
-  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="9" class="text-dim">No jobs.</td></tr>';
+  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="10" class="text-dim">No jobs.</td></tr>';
 }
 // Follow-Ups
 async function loadFollowUps(){const d=await api('/api/follow-ups');updateFollowUpBadges(d.due_now.length);document.getElementById('followups-due').innerHTML=d.due_now.length?d.due_now.map(j=>fuCard(j,true)).join(''):'<div class="card text-dim text-sm">No follow-ups due.</div>';document.getElementById('followups-upcoming').innerHTML=d.upcoming.length?d.upcoming.map(j=>fuCard(j,false)).join(''):'<div class="card text-dim text-sm">None upcoming.</div>'}
@@ -735,6 +773,24 @@ async function sendEmail(){const data={to:document.getElementById('email-to').va
 // Confirmation Parser
 function openConfirmationParser(){document.getElementById('confirm-email-text').value='';document.getElementById('confirm-result').style.display='none';document.getElementById('confirm-modal').classList.add('show')}
 async function parseConfirmation(){const txt=document.getElementById('confirm-email-text').value;if(!txt.trim())return alert('Paste email text');document.getElementById('confirm-loading').style.display='flex';try{const r=await api('/api/jobs/'+currentJobId+'/parse-confirmation?raw_email='+encodeURIComponent(txt),{method:'POST'});const p=r.parsed;let h=`<div class="card"><div class="card-header">Extracted Info</div>`;if(p.contact_email)h+=`<div>Best Contact: <strong>${esc(p.contact_email)}</strong></div>`;if(p.contact_name)h+=`<div>Name: ${esc(p.contact_name)}</div>`;if(p.contact_phone)h+=`<div>Phone: ${esc(p.contact_phone)}</div>`;if(p.portal_url)h+=`<div>Portal: <a href="${esc(p.portal_url)}" target="_blank" style="color:var(--accent)">${esc(p.portal_url)}</a></div>`;if(p.next_steps)h+=`<div>Next Steps: <em>${esc(p.next_steps)}</em></div>`;if(p.all_emails?.length)h+=`<div class="mt-8"><strong>All Emails Found:</strong><div class="flex gap-8 mt-8" style="flex-wrap:wrap">${p.all_emails.map(e=>`<button class="btn btn-ghost btn-sm" onclick="setContactEmail('${esc(e)}')" title="Set as contact email">${esc(e)}</button>`).join('')}</div></div>`;if(p.all_urls?.length)h+=`<div class="mt-8"><strong>All Links Found:</strong><ul style="margin:4px 0 0 16px">${p.all_urls.map(u=>`<li class="text-sm"><a href="${u.startsWith('http')?esc(u):'https://'+esc(u)}" target="_blank" style="color:var(--accent)">${esc(u)}</a></li>`).join('')}</ul></div>`;if(p.is_rejection)h+=`<div class="mt-8" style="color:var(--red)">⚠ This looks like a rejection.</div>`;if(p.is_interview_request)h+=`<div class="mt-8" style="color:var(--green)">✓ Interview request detected!</div>`;h+='</div>';document.getElementById('confirm-result').innerHTML=h;document.getElementById('confirm-result').style.display='block';setTimeout(()=>{document.getElementById('confirm-modal').classList.remove('show');showDetail(currentJobId)},3000)}catch(e){alert(e.message)}finally{document.getElementById('confirm-loading').style.display='none'}}
+// Profile
+async function loadProfile(){
+  try{
+    const p=await api('/api/profile');
+    document.getElementById('prof-name').value=p.name||'';
+    document.getElementById('prof-email').value=p.email||'';
+    document.getElementById('prof-phone').value=p.phone||'';
+    document.getElementById('prof-location').value=p.location||'';
+  }catch(e){}
+}
+async function saveProfile(){
+  const s=document.getElementById('prof-save-status');
+  if(s){s.textContent='Saving...';s.style.color='var(--text-dim)';}
+  try{
+    await api('/api/profile',{method:'PUT',body:{name:document.getElementById('prof-name').value,email:document.getElementById('prof-email').value,phone:document.getElementById('prof-phone').value,location:document.getElementById('prof-location').value}});
+    if(s){s.textContent='✓ Saved';s.style.color='var(--green)';setTimeout(()=>{s.textContent=''},2000);}
+  }catch(e){if(s){s.textContent='✕ '+e.message;s.style.color='var(--red)';}}
+}
 // Settings
 async function loadSettings(){
   const c=await api('/api/config');
@@ -756,6 +812,7 @@ async function loadSettings(){
     if(noteEl) noteEl.style.display=u.is_admin?'block':'none';
   }
 
+  loadProfile();
   document.getElementById('cfg-w2-min').value=c.w2_salary_min;document.getElementById('cfg-w2-max').value=c.w2_salary_max;document.getElementById('cfg-hr-min').value=c.contract_hourly_min;document.getElementById('cfg-hr-max').value=c.contract_hourly_max;document.getElementById('cfg-followup-days').value=c.follow_up_days;document.getElementById('cfg-followup-email').value=c.follow_up_email;document.getElementById('cfg-smtp-user').value=c.smtp_user;document.getElementById('cfg-smtp-pass').value=c.smtp_password;document.getElementById('cfg-smtp-host').value=c.smtp_host||'smtp.gmail.com';document.getElementById('cfg-smtp-port').value=c.smtp_port||587;document.getElementById('cfg-dealbreakers').value=c.deal_breakers.join('\n');document.getElementById('cfg-keywords').value=c.preferred_keywords.join(', ');
   document.getElementById('cfg-sched-enabled').checked=!!c.scheduled_search_enabled;
   document.getElementById('cfg-sched-time').value=c.scheduled_search_time||'07:00';
@@ -835,7 +892,26 @@ async function saveConfig(){
   refreshSchedulerStatus();alert('Saved')
 }
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
-async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
+async function uploadResume(){
+  const v=document.getElementById('resume-variant').value;
+  const c=document.getElementById('resume-text').value.trim();
+  const statusEl=document.getElementById('resume-upload-status');
+  const btn=document.querySelector('[onclick="uploadResume()"]');
+  if(!c){statusEl.innerHTML='<span style="color:var(--red)">Paste resume text first.</span>';return;}
+  statusEl.innerHTML='<span style="color:var(--text-dim)"><span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px;vertical-align:middle"></span>Uploading…</span>';
+  if(btn){btn.disabled=true;}
+  try{
+    const res=await api('/api/resumes/'+v,{method:'PUT',body:{content:c}});
+    document.getElementById('resume-text').value='';
+    const label=document.querySelector('#resume-variant option[value="'+v+'"]')?.textContent||v;
+    statusEl.innerHTML='<span style="color:var(--green)">✓ Saved <strong>'+esc(label)+'</strong> ('+res.length.toLocaleString()+' chars)</span>';
+    loadSettings();
+  }catch(e){
+    statusEl.innerHTML='<span style="color:var(--red)">✗ Upload failed: '+esc(e.message)+'</span>';
+  }finally{
+    if(btn){btn.disabled=false;}
+  }
+}
 // Scheduler / Automation
 async function refreshSchedulerStatus(){
   try{
