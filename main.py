@@ -9,6 +9,9 @@ from fastapi.staticfiles import StaticFiles
 
 from auth import (
     get_current_user,
+    get_admin_user_id,
+    get_agent_api_key,
+    verify_agent_api_key,
     invalidate_discovery_cache,
     is_admin,
     is_setup_complete,
@@ -20,8 +23,9 @@ from auth import (
 )
 from pydantic import BaseModel
 from models import (
-    AppConfig, EmailCompose, EmailRecord, IntakeSource, Job,
-    JobCreate, JobStatus, JobUpdate, MarketLane, User,
+    AppConfig, ApplicationResult, EmailCompose, EmailRecord,
+    IntakeSource, Job, JobCreate, JobStatus, JobUpdate,
+    MarketLane, ProfileUpdate, User,
 )
 import docx_builder
 import email_service
@@ -34,7 +38,7 @@ import ai_router
 import scheduler
 from intake import process_intake
 
-app = FastAPI(title="Job Search HQ", version="2.1")
+app = FastAPI(title="Job Search HQ", version="2.2")
 
 
 # ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -57,6 +61,7 @@ def enrich_job(job: Job) -> dict:
     d = job.model_dump()
     d["follow_up_due"] = job.follow_up_due
     d["days_since_applied"] = job.days_since_applied
+    d["ready_to_apply"] = job.ready_to_apply
     return d
 
 
@@ -130,12 +135,46 @@ async def save_setup_config(request: Request):
     return {"ok": True, "is_complete": is_setup_complete()}
 
 
+# ── Agent endpoints (API key auth — for job-agent automation) ─────────────────
+
+@app.get("/api/agent/ready-queue")
+def agent_ready_queue(request: Request):
+    """
+    Returns ready-to-apply jobs for the admin user.
+    Requires X-API-Key header. Key is auto-generated and stored in system_config.json.
+    """
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    if not admin_id:
+        raise HTTPException(503, "No admin user configured")
+    jobs = storage.load_all_jobs(admin_id)
+    queue = [enrich_job(j) for j in jobs if j.ready_to_apply]
+    queue.sort(key=lambda j: (j.get("score") or {}).get("total", 0), reverse=True)
+    return {"count": len(queue), "jobs": queue}
+
+
+@app.get("/api/agent/key")
+def get_agent_key(user: User = Depends(get_current_user)):
+    """
+    Returns the current agent API key. Requires OIDC session (admin only).
+    Use this to retrieve the key to configure job-agent.
+    """
+    if not is_admin(user.id):
+        raise HTTPException(403, "Admin only")
+    return {"agent_api_key": get_agent_api_key()}
+
+
 # ── Job CRUD ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/jobs")
 def list_jobs(
     status: str | None = None,
     lane: str | None = None,
+    min_score: int | None = None,
+    has_docs: bool | None = None,
+    ready_to_apply: bool | None = None,
     user: User = Depends(get_current_user),
 ):
     jobs = storage.load_all_jobs(user.id)
@@ -143,7 +182,24 @@ def list_jobs(
         jobs = [j for j in jobs if j.status == status]
     if lane:
         jobs = [j for j in jobs if j.market_lane == lane]
+    if min_score is not None:
+        jobs = [j for j in jobs if j.score and j.score.total >= min_score]
+    if has_docs is not None:
+        jobs = [j for j in jobs if bool(j.tailored_resume_docx) == has_docs]
+    if ready_to_apply is not None:
+        jobs = [j for j in jobs if j.ready_to_apply == ready_to_apply]
     return [enrich_job(j) for j in jobs]
+
+
+# ── Apply Queue (must be before /{job_id} to avoid route collision) ───────────
+
+@app.get("/api/jobs/apply-queue")
+def get_apply_queue(user: User = Depends(get_current_user)):
+    """Pre-filtered list of jobs that are ready_to_apply, sorted by score desc."""
+    jobs = storage.load_all_jobs(user.id)
+    queue = [enrich_job(j) for j in jobs if j.ready_to_apply]
+    queue.sort(key=lambda j: (j.get("score") or {}).get("total", 0), reverse=True)
+    return {"count": len(queue), "jobs": queue}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -220,6 +276,36 @@ def search_jobs(
         raise HTTPException(500, f"Search failed: {str(e)}")
 
 
+# ── Batch scoring (before /{job_id} routes) ───────────────────────────────────
+
+@app.post("/api/jobs/score-all")
+def score_all_jobs(user: User = Depends(get_current_user)):
+    """Score every job with status=new that has a description. No job_ids needed."""
+    jobs = storage.load_all_jobs(user.id)
+    to_score = [
+        j for j in jobs
+        if j.raw_jd.strip() and len(j.raw_jd) >= 200
+        and (j.status == JobStatus.NEW or (j.score is not None and j.score.total == 0))
+    ]
+    results = []
+    for job in to_score:
+        try:
+            score_result = scoring.score_job(job, user.id)
+            job.score = score_result
+            job.update_status(JobStatus.SCORED)
+            if score_result.recommended_lane:
+                job.market_lane = score_result.recommended_lane
+            storage.save_job(user.id, job)
+            results.append({
+                "id": job.id, "status": "scored",
+                "total": score_result.total,
+                "title": job.title, "company": job.company,
+            })
+        except Exception as e:
+            results.append({"id": job.id, "status": "error", "error": str(e)})
+    return {"total": len(to_score), "results": results}
+
+
 @app.post("/api/jobs/score-batch")
 def score_batch(job_ids: list[str] = [], user: User = Depends(get_current_user)):
     results = []
@@ -238,6 +324,33 @@ def score_batch(job_ids: list[str] = [], user: User = Depends(get_current_user))
             results.append({"id": jid, "status": "scored", "total": score_result.total})
         except Exception as e:
             results.append({"id": jid, "status": "error", "error": str(e)})
+    return {"results": results}
+
+
+# ── Batch apply (before /{job_id} routes) ─────────────────────────────────────
+
+@app.post("/api/jobs/apply-batch")
+async def apply_batch(
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Mark multiple jobs as applied in one call."""
+    body = await request.json()
+    job_ids = body.get("job_ids", [])
+    applied_at = body.get("applied_at", "")
+
+    if not isinstance(job_ids, list):
+        raise HTTPException(400, "job_ids must be a list")
+
+    results = []
+    for jid in job_ids:
+        job = storage.load_job(user.id, jid)
+        if not job:
+            results.append({"id": jid, "status": "not_found"})
+            continue
+        job.update_status(JobStatus.APPLIED, applied_date=applied_at)
+        storage.save_job(user.id, job)
+        results.append({"id": jid, "status": "applied", "company": job.company, "title": job.title})
     return {"results": results}
 
 
@@ -395,6 +508,138 @@ def download_cover_letter(job_id: str, letter_id: str, user: User = Depends(get_
     )
 
 
+# ── Generate Docs (resume + cover letters in one call) ────────────────────────
+
+@app.post("/api/jobs/{job_id}/generate-docs")
+def generate_docs(job_id: str, user: User = Depends(get_current_user)):
+    """Generate tailored resume + all 3 cover letter variants in a single call."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.score:
+        raise HTTPException(400, "Job must be scored first")
+    config = storage.load_config(user.id)
+    errors = []
+
+    # Resume
+    try:
+        resume_text = scoring.generate_tailored_resume(job, user.id)
+        job.tailored_resume = resume_text
+        docx_path = docx_builder.generate_resume_docx(
+            resume_text, job.id, user.id, job.company, job.title
+        )
+        job.tailored_resume_docx = docx_path
+    except Exception as e:
+        errors.append(f"Resume: {str(e)}")
+
+    # Cover letters
+    try:
+        letters = scoring.generate_cover_letters(job, user.id)
+        for letter in letters:
+            docx_path = docx_builder.generate_cover_letter_docx(
+                content=letter.content,
+                variant=letter.variant,
+                job_id=job.id,
+                user_id=user.id,
+                company=job.company,
+                title=job.title,
+                author_name=config.author_name,
+                author_location=config.author_location,
+                author_phone=config.author_phone,
+                author_email=config.smtp_user or config.follow_up_email,
+            )
+            letter.docx_path = docx_path
+        job.cover_letters = letters
+    except Exception as e:
+        errors.append(f"Cover letters: {str(e)}")
+
+    job.updated_at = datetime.now().isoformat()
+    storage.save_job(user.id, job)
+    result = enrich_job(job)
+    result["errors"] = errors
+    return result
+
+
+# ── Lightweight status check ──────────────────────────────────────────────────
+
+@app.get("/api/jobs/{job_id}/status")
+def get_job_status(job_id: str, user: User = Depends(get_current_user)):
+    """Lightweight status snapshot — no full JD/resume text, fast to call."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return {
+        "id": job.id,
+        "title": job.title,
+        "company": job.company,
+        "status": job.status,
+        "market_lane": job.market_lane,
+        "score": job.score.total if job.score else None,
+        "has_resume": bool(job.tailored_resume_docx),
+        "has_cover_letters": len(job.cover_letters) > 0,
+        "ready_to_apply": job.ready_to_apply,
+        "applied_at": job.applied_at,
+        "follow_up_due": job.follow_up_due,
+        "url": job.url,
+    }
+
+
+# ── Application package (full payload for browser automation) ─────────────────
+
+@app.get("/api/jobs/{job_id}/application-package")
+def get_application_package(job_id: str, user: User = Depends(get_current_user)):
+    """Everything Claude needs to fill out an application form in one payload."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    config = storage.load_config(user.id)
+    return {
+        "job": enrich_job(job),
+        "profile": {
+            "name": config.author_name,
+            "email": config.author_email or config.smtp_user or config.follow_up_email,
+            "phone": config.author_phone,
+            "location": config.author_location,
+        },
+        "resume_download_url": f"/api/jobs/{job_id}/download-resume" if job.tailored_resume_docx else None,
+        "resume_text": job.tailored_resume,
+        "cover_letter_direct": next(
+            (cl.content for cl in job.cover_letters if cl.variant == "direct"), None
+        ),
+        "cover_letter_brief": next(
+            (cl.content for cl in job.cover_letters if cl.variant == "brief"), None
+        ),
+        "ready_to_apply": job.ready_to_apply,
+    }
+
+
+# ── Application result write-back ─────────────────────────────────────────────
+
+@app.post("/api/jobs/{job_id}/application-result")
+def record_application_result(
+    job_id: str,
+    result: ApplicationResult,
+    user: User = Depends(get_current_user),
+):
+    """Called by Claude after attempting to submit an application."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.update_status(result.status, applied_date=result.applied_at)
+    if result.notes:
+        job.notes = (job.notes + "\n" + result.notes).strip() if job.notes else result.notes
+    if result.portal_url:
+        portal_note = f"Portal: {result.portal_url}"
+        job.follow_up.notes = (
+            job.follow_up.notes + "\n" + portal_note
+        ).strip() if job.follow_up.notes else portal_note
+    if result.error:
+        job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
+    job.updated_at = datetime.now().isoformat()
+    storage.save_job(user.id, job)
+    return enrich_job(job)
+
+
 # ── Email ─────────────────────────────────────────────────────────────────────
 
 @app.post("/api/jobs/{job_id}/send-email")
@@ -529,7 +774,6 @@ def mark_followed_up(job_id: str, user: User = Depends(get_current_user)):
     if not job:
         raise HTTPException(404, "Job not found")
     config = storage.load_config(user.id)
-    job.follow_up.sent_at = datetime.now().isoformat()
     job.follow_up.count += 1
     job.follow_up.due_at = (datetime.now() + timedelta(days=config.follow_up_days)).isoformat()
     job.updated_at = datetime.now().isoformat()
@@ -606,7 +850,7 @@ def send_follow_up_digest(user: User = Depends(get_current_user)):
         raise HTTPException(500, f"Email send failed: {str(e)}")
 
 
-# ── Config & Resumes ──────────────────────────────────────────────────────────
+# ── Config, Profile & Resumes ─────────────────────────────────────────────────
 
 @app.post("/api/test-email")
 def test_email(user: User = Depends(get_current_user)):
@@ -635,6 +879,34 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
     return config.model_dump()
+
+
+@app.get("/api/profile")
+def get_profile(user: User = Depends(get_current_user)):
+    """Applicant profile — name, email, phone, location used in application packages."""
+    config = storage.load_config(user.id)
+    return {
+        "name": config.author_name,
+        "email": config.author_email or config.smtp_user or config.follow_up_email,
+        "phone": config.author_phone,
+        "location": config.author_location,
+    }
+
+
+@app.put("/api/profile")
+def update_profile(data: ProfileUpdate, user: User = Depends(get_current_user)):
+    config = storage.load_config(user.id)
+    if data.name: config.author_name = data.name
+    if data.email: config.author_email = data.email
+    if data.phone: config.author_phone = data.phone
+    if data.location: config.author_location = data.location
+    storage.save_config(user.id, config)
+    return {
+        "name": config.author_name,
+        "email": config.author_email or config.smtp_user,
+        "phone": config.author_phone,
+        "location": config.author_location,
+    }
 
 
 @app.get("/api/resumes")
@@ -676,6 +948,7 @@ def get_resume_text(variant: str, user: User = Depends(get_current_user)):
 def dashboard_stats(user: User = Depends(get_current_user)):
     jobs = storage.load_all_jobs(user.id)
     by_status, by_lane, scores, follow_ups_due = {}, {}, [], 0
+    ready_count = 0
     for j in jobs:
         by_status[j.status] = by_status.get(j.status, 0) + 1
         by_lane[j.market_lane] = by_lane.get(j.market_lane, 0) + 1
@@ -683,11 +956,14 @@ def dashboard_stats(user: User = Depends(get_current_user)):
             scores.append(j.score.total)
         if j.follow_up_due:
             follow_ups_due += 1
+        if j.ready_to_apply:
+            ready_count += 1
     return {
         "total": len(jobs),
         "by_status": by_status,
         "by_lane": by_lane,
         "follow_ups_due": follow_ups_due,
+        "ready_to_apply": ready_count,
         "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
         "score_distribution": {
             "high_8_10": len([s for s in scores if s >= 8]),

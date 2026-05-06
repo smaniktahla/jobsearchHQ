@@ -90,6 +90,24 @@ def is_admin(user_id: str) -> bool:
     return bool(admin_id and admin_id == user_id)
 
 
+# ── Agent API key ──────────────────────────────────────────────────────────────
+
+def get_agent_api_key() -> str:
+    """Return the agent API key, generating and persisting one if absent."""
+    cfg = load_system_config()
+    key = cfg.get("agent_api_key")
+    if not key:
+        key = secrets.token_hex(32)
+        cfg["agent_api_key"] = key
+        save_system_config(cfg)
+    return key
+
+
+def verify_agent_api_key(key: str) -> bool:
+    """Constant-time comparison to prevent timing attacks."""
+    return hmac.compare_digest(key, get_agent_api_key())
+
+
 # ── Cookie helpers ─────────────────────────────────────────────────────────────
 
 def _sign(value: str, secret: str) -> str:

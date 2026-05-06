@@ -171,6 +171,30 @@ class Job(BaseModel):
         except (ValueError, TypeError):
             return None
 
+    @property
+    def ready_to_apply(self) -> bool:
+        """True when the job has a score, generated docs, and hasn't been actioned yet."""
+        return (
+            self.score is not None
+            and self.score.total >= 5
+            and self.market_lane != MarketLane.IGNORE
+            and bool(self.tailored_resume_docx)
+            and bool(self.cover_letters)
+            and self.status not in (
+                JobStatus.APPLIED, JobStatus.INTERVIEW,
+                JobStatus.OFFER, JobStatus.REJECTED, JobStatus.PASSED
+            )
+        )
+
+
+class ApplicationResult(BaseModel):
+    """Written back by Claude after attempting to submit an application."""
+    status: JobStatus = JobStatus.APPLIED
+    notes: str = ""
+    portal_url: str = ""
+    applied_at: str = ""
+    error: str = ""
+
 
 class JobCreate(BaseModel):
     title: str = ""
@@ -194,6 +218,13 @@ class JobUpdate(BaseModel):
     applied_at: Optional[str] = None
 
 
+class ProfileUpdate(BaseModel):
+    name: str = ""
+    email: str = ""
+    phone: str = ""
+    location: str = ""
+
+
 class EmailCompose(BaseModel):
     to: str
     subject: str
@@ -209,10 +240,11 @@ class AppConfig(BaseModel):
     contract_hourly_min: int = 85
     contract_hourly_max: int = 125
     follow_up_days: int = 14
-    # Author info (used in generated documents)
+    # Author / applicant profile (used in generated documents and application packages)
     author_name: str = ""
     author_location: str = ""
     author_phone: str = ""
+    author_email: str = ""   # convenience alias; smtp_user is the canonical send address
     # Email
     follow_up_email: str = ""
     smtp_host: str = "smtp.gmail.com"

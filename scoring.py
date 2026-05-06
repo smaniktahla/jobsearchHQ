@@ -204,8 +204,8 @@ def score_job(job: Job, user_id: str = None) -> ScoreBreakdown:
 
     user_msg = f"Score this job description:\n\n{job.raw_jd}"
 
-    # Local models benefit from a schema reminder at the end of the user message
-    if _is_local(config, "fast"):
+    # Ollama benefits from a schema reminder at the end of the user message
+    if getattr(config, "fast_provider", "") == "ollama":
         user_msg += """
 
 IMPORTANT: Respond with ONLY valid JSON using EXACTLY these keys and value types:
@@ -226,14 +226,10 @@ IMPORTANT: Respond with ONLY valid JSON using EXACTLY these keys and value types
 }
 No markdown. No explanation. No extra keys. ONLY the JSON object."""
 
-    # Route to backend
-    backend_name = "ollama" if _is_local(config, "fast") else "api"
-    logger.info(f"Scoring job '{job.title}' at '{job.company}' via {backend_name}")
-
-    if _is_local(config, "fast"):
-        raw = ollama_chat(system, user_msg, config)
-    else:
-        raw = ai_router.chat(system, user_msg, "fast", config, max_tokens=3000)
+    # Always route through ai_router — handles anthropic/gemini/openai/ollama
+    provider = getattr(config, "fast_provider", "unknown")
+    logger.info(f"Scoring job '{job.title}' at '{job.company}' via {provider}")
+    raw = ai_router.chat(system, user_msg, "fast", config, max_tokens=5000)
 
     logger.debug(f"Raw scoring response ({len(raw)} chars): {raw[:300]}...")
     raw = clean_json_response(raw)
