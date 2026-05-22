@@ -31,6 +31,43 @@ COOKIE_MAX_AGE = 86400 * 30  # 30 days
 _discovery_cache: dict = {"data": None, "at": 0.0}
 CACHE_TTL = 3600  # seconds
 
+# Server-side OAuth state store — avoids relying on oidc_state cookie surviving
+# reverse-proxy hops. Keyed by state value, value is expiry timestamp.
+_pending_states: dict = {}
+_STATE_TTL = 600  # 10 minutes
+
+# In-memory ID token store for RP-initiated logout (id_token_hint).
+# Keyed by user_id (OIDC sub). Lost on restart, which is fine.
+_id_tokens: dict = {}
+
+
+def store_id_token(user_id: str, id_token: str) -> None:
+    _id_tokens[user_id] = id_token
+
+
+def get_id_token(user_id: str) -> Optional[str]:
+    return _id_tokens.get(user_id)
+
+
+def _store_state(state: str) -> None:
+    _pending_states[state] = time.time() + _STATE_TTL
+    expired = [k for k, v in list(_pending_states.items()) if v < time.time()]
+    for k in expired:
+        del _pending_states[k]
+
+
+def _consume_state(state: str) -> bool:
+    """Return True and remove state if valid and unexpired."""
+    expires = _pending_states.get(state)
+    if not expires or time.time() > expires:
+        return False
+    del _pending_states[state]
+    return True
+
+
+def _is_https(request: Request) -> bool:
+    return request.headers.get("x-forwarded-proto", "").lower() == "https"
+
 
 # ── System config ──────────────────────────────────────────────────────────────
 
@@ -125,7 +162,7 @@ def _unsign(signed: str, secret: str) -> Optional[str]:
     return value
 
 
-def set_session_cookie(response, user_id: str, email: str, name: str) -> None:
+def set_session_cookie(response, user_id: str, email: str, name: str, secure: bool = False) -> None:
     secret = get_session_secret()
     safe_name = name.replace("|", " ").replace("\n", " ").strip()
     safe_email = email.replace("|", "").replace("\n", "").strip()
@@ -136,7 +173,7 @@ def set_session_cookie(response, user_id: str, email: str, name: str) -> None:
         max_age=COOKIE_MAX_AGE,
         httponly=True,
         samesite="lax",
-        secure=False,  # Set True when running behind HTTPS
+        secure=secure,
     )
 
 
@@ -155,8 +192,8 @@ def get_session_from_cookie(request: Request) -> Optional[dict]:
         return None
 
 
-def clear_session_cookie(response) -> None:
-    response.delete_cookie(COOKIE_NAME, httponly=True, samesite="lax")
+def clear_session_cookie(response, secure: bool = False) -> None:
+    response.delete_cookie(COOKIE_NAME, httponly=True, samesite="lax", secure=secure)
 
 
 # ── OIDC discovery (cached) ────────────────────────────────────────────────────
@@ -169,13 +206,16 @@ async def get_discovery() -> dict:
     issuer = cfg.get("oidc_issuer", "").rstrip("/")
     if not issuer:
         raise HTTPException(503, "OIDC not configured")
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"{issuer}/.well-known/openid-configuration", timeout=10
-        )
-        r.raise_for_status()
-        _discovery_cache["data"] = r.json()
-        _discovery_cache["at"] = now
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"{issuer}/.well-known/openid-configuration", timeout=10
+            )
+            r.raise_for_status()
+            _discovery_cache["data"] = r.json()
+            _discovery_cache["at"] = now
+    except httpx.HTTPError as exc:
+        raise HTTPException(503, f"Identity provider unreachable — try again in a moment ({exc})") from exc
     return _discovery_cache["data"]
 
 
@@ -215,19 +255,18 @@ async def login_handler(request: Request):
         f"&scope=openid+profile+email"
         f"&state={state}"
     )
+    _store_state(state)
     response = RedirectResponse(discovery["authorization_endpoint"] + params)
-    response.set_cookie("oidc_state", state, httponly=True, max_age=600, samesite="lax")
     return response
 
 
 async def callback_handler(request: Request):
     code = request.query_params.get("code")
     state = request.query_params.get("state")
-    stored_state = request.cookies.get("oidc_state")
 
     if not code:
         raise HTTPException(400, "Missing authorization code")
-    if not state or state != stored_state:
+    if not state or not _consume_state(state):
         raise HTTPException(400, "Invalid state — possible CSRF")
 
     cfg = load_system_config()
@@ -249,6 +288,7 @@ async def callback_handler(request: Request):
         )
         token_resp.raise_for_status()
         tokens = token_resp.json()
+        print(f"[CALLBACK] token exchange OK, token_endpoint={discovery['token_endpoint']!r}", flush=True)
 
         # Fetch canonical user info from userinfo endpoint
         userinfo_resp = await client.get(
@@ -258,6 +298,8 @@ async def callback_handler(request: Request):
         )
         userinfo_resp.raise_for_status()
         userinfo = userinfo_resp.json()
+
+    print(f"[OIDC] claims={list(userinfo.keys())} sub={userinfo.get('sub')!r} email={userinfo.get('email')!r} name={userinfo.get('name')!r} preferred_username={userinfo.get('preferred_username')!r}", flush=True)
 
     user_id = userinfo.get("sub", "")
     email = userinfo.get("email", "")
@@ -270,17 +312,39 @@ async def callback_handler(request: Request):
     if not user_id:
         raise HTTPException(400, "Could not extract user identity from OIDC provider")
 
+    # Store ID token so logout can pass id_token_hint to Authentik's end-session endpoint
+    if tokens.get("id_token"):
+        store_id_token(user_id, tokens["id_token"])
+
     # ── Auto-designate admin: first user to log in becomes the admin ──────────
     if not get_admin_user_id():
         set_admin_user_id(user_id)
 
+    secure = _is_https(request)
+    print(f"[CALLBACK] setting cookie: user_id={user_id!r} email={email!r} name={name!r} secure={secure}", flush=True)
     response = RedirectResponse("/", status_code=302)
-    response.delete_cookie("oidc_state")
-    set_session_cookie(response, user_id, email, name)
+    set_session_cookie(response, user_id, email, name, secure=secure)
     return response
 
 
 async def logout_handler(request: Request):
-    response = RedirectResponse("/", status_code=302)
-    clear_session_cookie(response)
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    # Default: show login overlay locally (no Authentik cooperation needed)
+    redirect_target = "/?logged_out=1"
+    try:
+        discovery = await get_discovery()
+        end_session = discovery.get("end_session_endpoint")
+        if end_session:
+            cfg = load_system_config()
+            base_url = cfg.get("oidc_redirect_uri", "").rsplit("/auth/callback", 1)[0]
+            from urllib.parse import urlencode
+            params = urlencode({"post_logout_redirect_uri": base_url + "/"})
+            redirect_target = f"{end_session}?{params}"
+            _log.info("Logout: RP-initiated to %s", end_session)
+    except Exception as exc:
+        _log.warning("Logout: RP-initiated logout failed (%s), falling back to local overlay", exc)
+    response = RedirectResponse(redirect_target, status_code=302)
+    clear_session_cookie(response, secure=True)
+    clear_session_cookie(response, secure=False)
     return response

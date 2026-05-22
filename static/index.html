@@ -81,6 +81,13 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
           <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-zip" style="width:auto"> ZipRecruiter</label>
         </div>
       </div>
+      <div class="form-group">
+        <label>Company Career Sites</label>
+        <textarea id="company-sites" rows="3" placeholder="MITRE | https://careers.mitre.org/us/en/search-results&#10;https://company.example/careers"></textarea>
+        <div class="flex gap-8 mt-8">
+          <button class="btn btn-ghost btn-sm" type="button" onclick="addCompanySiteFromJobUrl()">Add From Apply URL</button>
+        </div>
+      </div>
       <div class="form-group"><label>Results Per Board</label><input type="number" id="search-results" value="25" style="width:100px"></div>
       <div class="form-group"><label>Posted Within (hours)</label><input type="number" id="search-hours" value="72" style="width:100px"></div>
       <div class="form-group"><label>Distance (miles)</label><input type="number" id="search-distance" value="50" style="width:100px"></div>
@@ -184,6 +191,8 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div class="card-header">Actions</div>
         <div class="flex gap-8 mt-8" style="flex-wrap:wrap">
           <button class="btn btn-primary" id="btn-score" onclick="scoreCurrentJob()">Score This Job</button>
+          <button class="btn btn-ghost" id="btn-refresh-url" onclick="refreshCurrentJobFromUrl()">Refresh From URL</button>
+          <button class="btn btn-ghost btn-sm" id="btn-debug-url" onclick="debugCurrentJobUrl()">Debug URL</button>
           <button class="btn btn-success" id="btn-applied" onclick="markApplied()">✓ Mark Applied</button>
           <input type="date" id="applied-date" style="width:150px;font-size:12px" title="Applied date (defaults to today)">
           <button class="btn btn-ghost" id="btn-resume" onclick="generateTailoredResume()" disabled>Tailored Resume (.docx)</button>
@@ -302,15 +311,16 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="form-group"><label>Run Time (HH:MM, Eastern)</label><input type="time" id="cfg-sched-time" value="07:00"></div>
       <div class="form-group"><label>Search Terms (one per line)</label><textarea id="cfg-sched-terms" rows="3" placeholder="senior director data analytics&#10;data architecture manager"></textarea></div>
-      <div class="form-group"><label>Job Boards</label>
-        <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-indeed" checked style="width:auto"> Indeed</label>
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-linkedin" checked style="width:auto"> LinkedIn</label>
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-google" checked style="width:auto"> Google</label>
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-glassdoor" style="width:auto"> Glassdoor</label>
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-zip" style="width:auto"> ZipRecruiter</label>
+        <div class="form-group"><label>Job Boards</label>
+          <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-indeed" checked style="width:auto"> Indeed</label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-linkedin" checked style="width:auto"> LinkedIn</label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-google" checked style="width:auto"> Google</label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-glassdoor" style="width:auto"> Glassdoor</label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-zip" style="width:auto"> ZipRecruiter</label>
+          </div>
         </div>
-      </div>
+        <div class="form-group"><label>Company Career Sites (one per line)</label><textarea id="cfg-sched-company-sites" rows="3" placeholder="MITRE | https://careers.mitre.org/us/en/search-results"></textarea></div>
       <div class="form-group"><label>Location</label><input type="text" id="cfg-sched-location" value="Washington, DC"></div>
       <div class="form-group"><label>Results Per Board</label><input type="number" id="cfg-sched-results" value="25" style="width:100px"></div>
       <div class="form-group"><label>Posted Within (hours)</label><input type="number" id="cfg-sched-hours" value="24" style="width:100px"></div>
@@ -447,7 +457,35 @@ async function submitJob(){const t=document.querySelector('.tab.active').dataset
 // Search Boards
 let lastSearchResults=[];
 function initSearch(){}
-const BOARD_LABELS={indeed:'Indeed',linkedin:'LinkedIn',google:'Google',glassdoor:'Glassdoor',zip_recruiter:'ZipRecruiter'};
+const BOARD_LABELS={indeed:'Indeed',linkedin:'LinkedIn',google:'Google',glassdoor:'Glassdoor',zip_recruiter:'ZipRecruiter',company_site:'Company Sites'};
+function parseCompanySites(value){
+  return value.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
+    const parts=line.split('|').map(p=>p.trim());
+    if(parts.length>=2)return{company:parts[0],url:parts.slice(1).join('|')};
+    return{company:'',url:line};
+  }).filter(site=>site.url);
+}
+function addCompanySiteFromJobUrl(){
+  const input=document.getElementById('jd-url');
+  const raw=input?.value?.trim()||prompt('Paste a company career or apply URL');
+  if(!raw)return;
+  let url=raw, company='';
+  try{
+    const u=new URL(raw);
+    const host=u.hostname.replace(/^www\./,'');
+    company=host.split('.').filter(p=>!['careers','jobs'].includes(p))[0]||host;
+    const parts=u.pathname.split('/').filter(Boolean);
+    if(host.includes('careers.')&&parts.length>=2){
+      url=`${u.origin}/${parts[0]}/${parts[1]}/search-results`;
+    }else{
+      url=`${u.origin}/careers`;
+    }
+  }catch(e){}
+  const el=document.getElementById('company-sites');
+  const label=company?company.charAt(0).toUpperCase()+company.slice(1):'';
+  const line=label?`${label} | ${url}`:url;
+  el.value=[el.value.trim(),line].filter(Boolean).join('\n');
+}
 function updateBoardStatus(statuses){
   const el=document.getElementById('board-status');
   el.style.display='block';
@@ -485,7 +523,8 @@ async function runSearch(){
   if(document.getElementById('site-google').checked)sites.push('google');
   if(document.getElementById('site-glassdoor').checked)sites.push('glassdoor');
   if(document.getElementById('site-zip').checked)sites.push('zip_recruiter');
-  if(!sites.length)return alert('Select at least one job board');
+  const companySites=parseCompanySites(document.getElementById('company-sites').value);
+  if(!sites.length&&!companySites.length)return alert('Select at least one job board or company site');
   const term=document.getElementById('search-term').value.trim();
   if(!term)return alert('Enter a search term');
   document.getElementById('btn-search').disabled=true;
@@ -493,6 +532,7 @@ async function runSearch(){
   document.getElementById('search-results-section').style.display='none';
   const statuses={};
   sites.forEach(s=>statuses[s]={status:'queued',created:0,skipped:0,time:''});
+  if(companySites.length)statuses.company_site={status:'queued',created:0,skipped:0,time:''};
   updateBoardStatus(statuses);
   const baseParams={
     search_term:term,
@@ -524,6 +564,26 @@ async function runSearch(){
     }
     updateBoardStatus(statuses);
   });
+  if(companySites.length){
+    promises.push((async()=>{
+      statuses.company_site.status='searching';
+      updateBoardStatus(statuses);
+      const start=Date.now();
+      try{
+        const res=await api('/api/search',{method:'POST',body:{...baseParams,sites:[],company_sites:companySites}});
+        const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
+        const created=res.created||[];
+        const skipped=res.skipped||[];
+        statuses.company_site={status:'done',created:created.length,skipped:skipped.length,time:elapsed};
+        lastSearchResults.push(...created);
+        renderSearchResults();
+      }catch(e){
+        const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
+        statuses.company_site={status:'error',created:0,skipped:0,time:elapsed};
+      }
+      updateBoardStatus(statuses);
+    })());
+  }
   await Promise.all(promises);
   document.getElementById('btn-search').disabled=false;
 }
@@ -663,6 +723,38 @@ async function generateTailoredResume(){if(!currentJobId)return;document.getElem
 async function generateCoverLetters(){if(!currentJobId)return;document.getElementById('btn-cover').disabled=true;showLoading('Generating cover letters...');try{await api('/api/jobs/'+currentJobId+'/cover-letters',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-cover').disabled=false;hideLoading()}}
 function copyTailoredResume(){navigator.clipboard.writeText(document.getElementById('tailored-resume-content').textContent)}
 async function updateJobStatus(){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{status:document.getElementById('detail-status').value}});await showDetail(currentJobId)}
+async function refreshCurrentJobFromUrl(){
+  if(!currentJobId)return;
+  const btn=document.getElementById('btn-refresh-url');
+  btn.disabled=true;
+  showLoading('Refreshing job description from URL...');
+  try{
+    await api('/api/jobs/'+currentJobId+'/refresh-from-url',{method:'POST'});
+    await showDetail(currentJobId);
+  }catch(e){alert('Refresh failed: '+e.message)}
+  finally{btn.disabled=false;hideLoading()}
+}
+async function debugCurrentJobUrl(){
+  if(!currentJob?.url)return alert('This job has no URL');
+  showLoading('Checking server-side URL extraction...');
+  try{
+    const r=await api('/api/intake/debug-url?url='+encodeURIComponent(currentJob.url));
+    const lines=[
+      `Selected: ${r.selected.title||'(no title)'}`,
+      `Method: ${r.selected.extraction_method||'(none)'}`,
+      `Real JD: ${r.selected.has_real_job_description?'yes':'no'}`,
+      `JD chars: ${r.selected.raw_jd_length}`,
+      '',
+      'Attempts:',
+      ...(r.attempts||[]).map(a=>`- ${a.status_code||'err'} len=${a.html_length} jsonld=${a.has_jsonld} jobposting=${a.has_jobposting} unavailable=${a.has_unavailable} accepted=${a.accepted} jd=${a.raw_jd_length}${a.error?' error='+a.error:''}`),
+      '',
+      'Preview:',
+      r.selected.preview||''
+    ];
+    alert(lines.join('\n'));
+  }catch(e){alert('Debug failed: '+e.message)}
+  finally{hideLoading()}
+}
 async function setGut(v){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{gut_interest:v}});await showDetail(currentJobId)}
 function renderResearch(research){
   const el=document.getElementById('research-contacts');
@@ -824,6 +916,7 @@ async function loadSettings(){
   document.getElementById('cfg-sched-google').checked=schedSites.includes('google');
   document.getElementById('cfg-sched-glassdoor').checked=schedSites.includes('glassdoor');
   document.getElementById('cfg-sched-zip').checked=schedSites.includes('zip_recruiter');
+  document.getElementById('cfg-sched-company-sites').value=(c.scheduled_company_sites||[]).map(s=>(s.company?`${s.company} | `:'')+s.url).join('\n');
   document.getElementById('cfg-sched-location').value=c.scheduled_search_location||'Washington, DC';
   document.getElementById('cfg-sched-results').value=c.scheduled_search_results||25;
   document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
@@ -868,11 +961,13 @@ async function saveConfig(){
   if(document.getElementById('cfg-sched-google').checked)schedSites.push('google');
   if(document.getElementById('cfg-sched-glassdoor').checked)schedSites.push('glassdoor');
   if(document.getElementById('cfg-sched-zip').checked)schedSites.push('zip_recruiter');
+  const schedCompanySites=parseCompanySites(document.getElementById('cfg-sched-company-sites').value);
   await api('/api/config',{method:'PUT',body:{w2_salary_min:+document.getElementById('cfg-w2-min').value||160000,w2_salary_max:+document.getElementById('cfg-w2-max').value||220000,contract_hourly_min:+document.getElementById('cfg-hr-min').value||85,contract_hourly_max:+document.getElementById('cfg-hr-max').value||125,follow_up_days:+document.getElementById('cfg-followup-days').value||14,follow_up_email:document.getElementById('cfg-followup-email').value,smtp_host:document.getElementById('cfg-smtp-host').value||'smtp.gmail.com',smtp_port:+document.getElementById('cfg-smtp-port').value||587,smtp_user:document.getElementById('cfg-smtp-user').value,smtp_password:document.getElementById('cfg-smtp-pass').value,resume_labels:{director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'},deal_breakers:document.getElementById('cfg-dealbreakers').value.split('\n').filter(Boolean),preferred_keywords:document.getElementById('cfg-keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
   scheduled_search_enabled:document.getElementById('cfg-sched-enabled').checked,
   scheduled_search_time:document.getElementById('cfg-sched-time').value||'07:00',
   scheduled_search_terms:document.getElementById('cfg-sched-terms').value.split('\n').filter(Boolean),
   scheduled_search_sites:schedSites,
+  scheduled_company_sites:schedCompanySites,
   scheduled_search_location:document.getElementById('cfg-sched-location').value||'Washington, DC',
   scheduled_search_results:+document.getElementById('cfg-sched-results').value||25,
   scheduled_search_hours_old:+document.getElementById('cfg-sched-hours').value||24,

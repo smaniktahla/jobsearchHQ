@@ -34,6 +34,7 @@ import linkedin_intake
 import scoring
 import storage
 import company_research
+import company_site_search
 import ai_router
 import scheduler
 from intake import process_intake
@@ -381,6 +382,63 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
             job.score.skills_match + job.score.scope_impact
             + job.score.pay_alignment + job.score.gut_interest
         )
+    job.updated_at = datetime.now().isoformat()
+    storage.save_job(user.id, job)
+    return enrich_job(job)
+
+
+@app.get("/api/intake/debug-url")
+def debug_url_intake(url: str, user: User = Depends(get_current_user)):
+    """Show what the server/container can extract from a job URL."""
+    if not url.strip():
+        raise HTTPException(400, "No URL provided")
+    try:
+        job, attempts = company_site_search._fetch_best_job_page_with_diagnostics(
+            url,
+            company_site_search._company_from_host(url),
+        )
+        return {
+            "url": url,
+            "selected": {
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "pay_range": job.pay_range,
+                "raw_jd_length": len(job.raw_jd),
+                "has_real_job_description": company_site_search._has_real_job_description(job.raw_jd),
+                "extraction_method": job.extraction_method,
+                "preview": job.raw_jd[:800],
+            },
+            "attempts": [a.__dict__ for a in attempts],
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Debug scrape failed: {str(e)}")
+
+
+@app.post("/api/jobs/{job_id}/refresh-from-url")
+def refresh_job_from_url(job_id: str, user: User = Depends(get_current_user)):
+    """Re-scrape a saved job URL and replace stale placeholder JD text."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.url.strip():
+        raise HTTPException(400, "Job has no URL to refresh")
+
+    parsed = process_intake("url_scrape", job.url)
+    raw_jd = parsed.get("raw_jd", "").strip()
+    if not raw_jd:
+        raise HTTPException(502, "URL refresh returned no job description")
+
+    job.raw_jd = raw_jd
+    if parsed.get("title"):
+        job.title = parsed["title"]
+    if parsed.get("company"):
+        job.company = parsed["company"]
+    if parsed.get("pay_range"):
+        job.pay_range = parsed["pay_range"]
+    if parsed.get("url"):
+        job.url = parsed["url"]
+    job.source = parsed.get("source", job.source) or job.source
     job.updated_at = datetime.now().isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)

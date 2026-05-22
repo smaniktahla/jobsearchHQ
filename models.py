@@ -282,6 +282,7 @@ class AppConfig(BaseModel):
         "data architecture manager",
     ]
     scheduled_search_sites: list[str] = ["indeed", "linkedin", "google"]
+    scheduled_company_sites: list[dict[str, str]] = []
     scheduled_search_location: str = "Washington, DC"
     scheduled_search_results: int = 25
     scheduled_search_hours_old: int = 24

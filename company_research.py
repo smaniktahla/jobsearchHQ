@@ -5,13 +5,15 @@ Flow:
 1. Claude web search → find official domain
 2. Claude web search → find leadership/key contacts (primary, works from any IP)
 3. Direct site scrape → bonus enrichment if accessible (plain HTML sites only)
-4. Build LinkedIn search URLs for each contact
+4. Google email search → per-contact Claude web search for actual email address (parallel)
+5. Build LinkedIn search URLs + Google email search URLs for each contact
 """
 
 import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import ai_router
 import requests
@@ -155,15 +157,94 @@ def _enrich_from_scrape(contacts: list[dict], page_text: str) -> list[dict]:
     return contacts
 
 
+# ── Step 4: Google email search (per-contact, parallel) ───────────────────────
+
+def _google_email_search(name: str, company: str) -> str | None:
+    """
+    Use Claude web search to find a contact's email address via Google.
+    Mirrors the manual technique: search '{name}' '{company}' 'email address'.
+    Returns the email string if found, or None.
+    """
+    logger.info(f"Google email search: {name} @ {company}")
+    try:
+        result = _claude_search(
+            f'Search Google for the professional email address of "{name}" at "{company}". '
+            f'Try queries like: "{name}" "{company}" email, site:linkedin.com "{name}" "{company}", '
+            f'"{name}" contact email. '
+            f'If you find a real professional email address for this specific person, '
+            f'return ONLY the email address (e.g. jsmith@company.com). '
+            f'If you cannot find one with confidence, return exactly: NONE',
+            max_tokens=100
+        )
+        result = result.strip()
+        # Extract email from result
+        match = re.search(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', result)
+        if match:
+            email = match.group().lower()
+            # Filter out generic/placeholder emails
+            skip = ['noreply', 'example.com', 'info@', 'support@', 'contact@',
+                    'hello@', 'admin@', 'test@', 'none@']
+            if not any(g in email for g in skip):
+                logger.info(f"Found email for {name}: {email}")
+                return email
+    except Exception as e:
+        logger.error(f"Google email search failed for {name} @ {company}: {e}")
+    return None
+
+
+def _build_google_email_url(name: str, company: str) -> str:
+    """Build a Google search URL for finding a contact's email manually."""
+    query = requests.utils.quote(f'"{name}" "{company}" email address')
+    return f"https://www.google.com/search?q={query}"
+
+
+def _enrich_contacts_with_emails(contacts: list[dict], company: str) -> list[dict]:
+    """
+    Run Google email searches in parallel for all contacts.
+    Adds 'email' (if found) and 'google_email_search_url' (always) to each contact.
+    """
+    if not contacts:
+        return contacts
+
+    def _search_one(idx_contact):
+        idx, c = idx_contact
+        name = c.get("name", "")
+        if not name:
+            return idx, c
+        # Always add the fallback Google search URL
+        c["google_email_search_url"] = _build_google_email_url(name, company)
+        # Only run the live search if we don't already have an email
+        if not c.get("email"):
+            found = _google_email_search(name, company)
+            if found:
+                c["email"] = found
+        return idx, c
+
+    # Run up to 4 searches in parallel (respects rate limits while being fast)
+    results = [None] * len(contacts)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_search_one, (i, c)): i for i, c in enumerate(contacts)}
+        for future in as_completed(futures):
+            try:
+                idx, enriched = future.result()
+                results[idx] = enriched
+            except Exception as e:
+                logger.error(f"Email enrichment future failed: {e}")
+                results[futures[future]] = contacts[futures[future]]
+
+    return results
+
+
 # ── Main entry point ───────────────────────────────────────────────────────────
 
 def research_company(company: str, job_title: str = "", user_id: str = "") -> dict:
     """
     Research a company to find key contacts.
-    Primary: Claude web search. Bonus: direct site scrape for enrichment.
+    Primary: Claude web search. Bonus: direct site scrape + Google email search.
     """
     logger.info(f"=== Researching: {company} ===")
     result = {
+        "company_name": company,
         "contacts": [],
         "company_summary": "",
         "source_url": "",
@@ -210,9 +291,19 @@ def research_company(company: str, job_title: str = "", user_id: str = "") -> di
             "linkedin_search_url": (
                 f"https://www.linkedin.com/search/results/people/?keywords={li_query}"
             ),
+            "google_email_search_url": "",  # populated in step 5
             "notes": c.get("notes", ""),
             "confidence": c.get("confidence", "medium"),
         })
+
+    # Step 5: Google email search (parallel, non-blocking per contact)
+    if contacts:
+        contacts = _enrich_contacts_with_emails(contacts, company)
+        found_emails = sum(1 for c in contacts if c.get("email"))
+        result["searches_run"].append(
+            f"Google email search: {found_emails}/{len(contacts)} emails found"
+        )
+        logger.info(f"Email search: {found_emails}/{len(contacts)} found")
 
     result["contacts"] = contacts
     logger.info(

@@ -7,6 +7,7 @@ import logging
 from pydantic import BaseModel
 from jobspy import scrape_jobs
 
+import company_site_search
 from models import Job, JobStatus, MarketLane, IntakeSource
 import storage
 import scoring
@@ -18,6 +19,7 @@ class JobSearchRequest(BaseModel):
     search_term: str
     location: str = "Washington DC-Baltimore Area"
     sites: list[str] = ["indeed", "linkedin", "google"]
+    company_sites: list[company_site_search.CompanySiteRequest] = []
     results_wanted: int = 25
     hours_old: int = 72
     is_remote: bool = True
@@ -49,8 +51,28 @@ def find_existing(all_jobs: list[Job], title: str, company: str, url: str) -> Jo
 
 
 def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
+    jobspy_sites = [s for s in req.sites if s != "company_site"]
+    result = JobSearchResult()
+
+    if req.company_sites:
+        company_result = company_site_search.search_company_sites(
+            sites=req.company_sites,
+            search_term=req.search_term,
+            user_id=user_id,
+            results_wanted=req.results_wanted,
+            auto_score=req.auto_score,
+            skip_existing=req.skip_existing,
+        )
+        result.created.extend(company_result.get("created", []))
+        result.skipped.extend(company_result.get("skipped", []))
+        result.errors.extend(company_result.get("errors", []))
+        result.total_scraped += company_result.get("total_scraped", 0)
+
+    if not jobspy_sites:
+        return result
+
     kwargs = {
-        "site_name": req.sites,
+        "site_name": jobspy_sites,
         "search_term": req.search_term,
         "location": req.location,
         "results_wanted": req.results_wanted,
@@ -62,28 +84,29 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
         "description_format": "markdown",
     }
 
-    if "google" in req.sites:
+    if "google" in jobspy_sites:
         remote_str = " remote" if req.is_remote else ""
         kwargs["google_search_term"] = f"{req.search_term}{remote_str} jobs near {req.location}"
 
     if req.job_type:
         kwargs["job_type"] = req.job_type
 
-    logger.info(f"JobSpy search: sites={req.sites}, term='{req.search_term}', location='{req.location}'")
+    logger.info(f"JobSpy search: sites={jobspy_sites}, term='{req.search_term}', location='{req.location}'")
     try:
         df = scrape_jobs(**kwargs)
     except Exception as e:
         logger.error(f"JobSpy scrape failed: {e}", exc_info=True)
-        return JobSearchResult(errors=[{"error": f"Scrape failed: {str(e)}"}])
+        result.errors.append({"error": f"Scrape failed: {str(e)}"})
+        return result
 
     if df is None or df.empty:
-        return JobSearchResult(total_scraped=0)
+        return result
 
     if "site" in df.columns:
         logger.info(f"JobSpy results by site: {df['site'].value_counts().to_dict()}")
     logger.info(f"JobSpy total results: {len(df)}")
 
-    result = JobSearchResult(total_scraped=len(df))
+    result.total_scraped += len(df)
     all_existing = storage.load_all_jobs(user_id) if req.skip_existing else []
 
     for _, row in df.iterrows():
@@ -190,6 +213,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
                 "location": location_str,
                 "pay_range": pay_range,
                 "source": site,
+                "job_url": job_url,
                 "has_description": len(raw_jd) > 200,
                 "score": score_val,
             })

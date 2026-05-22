@@ -14,6 +14,8 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 
+import company_site_search
+
 
 class IntakeHandler(ABC):
     """Base class for all intake handlers."""
@@ -46,11 +48,24 @@ class URLScrapeHandler(IntakeHandler):
     def parse(self, raw_input: str) -> dict:
         url = raw_input.strip()
         try:
+            parsed_job = company_site_search._fetch_best_job_page(
+                url,
+                company_site_search._company_from_host(url),
+            )
+            if parsed_job and parsed_job.raw_jd and company_site_search._has_real_job_description(parsed_job.raw_jd):
+                return {
+                    "raw_jd": parsed_job.raw_jd,
+                    "title": parsed_job.title,
+                    "company": parsed_job.company,
+                    "source": "url_scrape",
+                    "url": parsed_job.url or url,
+                    "pay_range": parsed_job.pay_range,
+                }
+
             resp = httpx.get(url, follow_redirects=True, timeout=15,
-                             headers={"User-Agent": "Mozilla/5.0"})
+                             headers=company_site_search._headers())
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
-
             # Remove script/style
             for tag in soup(["script", "style", "nav", "footer", "header"]):
                 tag.decompose()
@@ -61,6 +76,13 @@ class URLScrapeHandler(IntakeHandler):
 
             title_tag = soup.find("title")
             title = title_tag.get_text(strip=True) if title_tag else ""
+
+            if _is_unavailable_placeholder(text):
+                raise RuntimeError(
+                    "The career site returned an unavailable-job placeholder to the scraper, "
+                    "with no extractable JobPosting data. Try Search Boards company-site search, "
+                    "or use the scraper diagnostics endpoint to inspect what the container received."
+                )
 
             return {
                 "raw_jd": text,
@@ -123,3 +145,12 @@ def process_intake(source: str, raw_input: str) -> dict:
     """Process input through the appropriate handler."""
     handler = INTAKE_HANDLERS.get(source, INTAKE_HANDLERS["manual_paste"])
     return handler.parse(raw_input)
+
+
+def _is_unavailable_placeholder(text: str) -> bool:
+    lowered = text.lower()
+    unavailable = (
+        "job you are trying to apply for is no longer available" in lowered
+        or "job you are trying to apply for is no longer available" in lowered.replace("…", "...")
+    )
+    return unavailable and len(text.strip()) < 2500
