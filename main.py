@@ -1137,13 +1137,21 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
 
 @app.get("/api/profile")
 def get_profile(user: User = Depends(get_current_user)):
-    """Applicant profile — name, email, phone, location used in application packages."""
     config = storage.load_config(user.id)
     return {
         "name": config.author_name,
         "email": config.author_email or config.smtp_user or config.follow_up_email,
         "phone": config.author_phone,
         "location": config.author_location,
+        "address": config.author_address,
+        "city": config.author_city,
+        "state": config.author_state,
+        "zip": config.author_zip,
+        "linkedin": config.author_linkedin,
+        "website": config.author_website,
+        "work_experience": [w.model_dump() for w in config.work_experience],
+        "education": config.education.model_dump(),
+        "certifications": config.certifications,
     }
 
 
@@ -1154,13 +1162,17 @@ def update_profile(data: ProfileUpdate, user: User = Depends(get_current_user)):
     if data.email: config.author_email = data.email
     if data.phone: config.author_phone = data.phone
     if data.location: config.author_location = data.location
+    if data.address is not None: config.author_address = data.address
+    if data.city is not None: config.author_city = data.city
+    if data.state is not None: config.author_state = data.state
+    if data.zip is not None: config.author_zip = data.zip
+    if data.linkedin is not None: config.author_linkedin = data.linkedin
+    if data.website is not None: config.author_website = data.website
+    if data.work_experience is not None: config.work_experience = data.work_experience
+    if data.education is not None: config.education = data.education
+    if data.certifications is not None: config.certifications = data.certifications
     storage.save_config(user.id, config)
-    return {
-        "name": config.author_name,
-        "email": config.author_email or config.smtp_user,
-        "phone": config.author_phone,
-        "location": config.author_location,
-    }
+    return get_profile(user)
 
 
 @app.get("/api/resumes")

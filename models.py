@@ -246,11 +246,39 @@ class JobUpdate(BaseModel):
     applied_at: Optional[str] = None
 
 
+class WorkExperience(BaseModel):
+    title: str = ""
+    company: str = ""
+    company_short: str = ""
+    location: str = ""
+    start: str = ""        # YYYY-MM
+    end: str | None = None # YYYY-MM or null if current
+    current: bool = False
+    description: str = ""
+
+class Education(BaseModel):
+    school: str = ""
+    degree: str = ""
+    degree_value: str = ""
+    major: str = ""
+    major_value: str = ""
+    completed: bool = True
+    grad_year: str = ""
+
 class ProfileUpdate(BaseModel):
     name: str = ""
     email: str = ""
     phone: str = ""
     location: str = ""
+    address: str = ""
+    city: str = ""
+    state: str = ""
+    zip: str = ""
+    linkedin: str = ""
+    website: str = ""
+    work_experience: list[WorkExperience] | None = None
+    education: Education | None = None
+    certifications: list[str] | None = None
 
 
 class EmailCompose(BaseModel):
@@ -273,6 +301,15 @@ class AppConfig(BaseModel):
     author_location: str = ""
     author_phone: str = ""
     author_email: str = ""   # convenience alias; smtp_user is the canonical send address
+    author_address: str = ""
+    author_city: str = ""
+    author_state: str = ""
+    author_zip: str = ""
+    author_linkedin: str = ""
+    author_website: str = ""
+    work_experience: list[WorkExperience] = []
+    education: Education = Education()
+    certifications: list[str] = []
     # Email
     follow_up_email: str = ""
     smtp_host: str = "smtp.gmail.com"

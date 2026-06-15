@@ -38,6 +38,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="nav-item" data-view="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search Boards</div>
   <div class="nav-item" data-view="tracker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Tracker<span id="nav-followup-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
+  <div class="nav-item" data-view="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
   <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
   <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;overflow:hidden">
@@ -245,6 +246,61 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
   </div>
 </div>
+<!-- Profile -->
+<div id="view-profile" class="view">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <h1>My Profile</h1>
+    <button class="btn btn-primary" onclick="saveProfile()">Save All</button>
+  </div>
+
+  <!-- Personal Info -->
+  <div class="card mb-16">
+    <div class="card-header">Personal Information</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div><label class="label">Full Name</label><input class="input" id="prof-name" placeholder="Full Name"></div>
+      <div><label class="label">Email</label><input class="input" id="prof-email" type="email" placeholder="email@example.com"></div>
+      <div><label class="label">Phone</label><input class="input" id="prof-phone" placeholder="555-555-5555"></div>
+      <div><label class="label">LinkedIn URL</label><input class="input" id="prof-linkedin" placeholder="https://linkedin.com/in/..."></div>
+      <div><label class="label">Address</label><input class="input" id="prof-address" placeholder="Street address"></div>
+      <div><label class="label">City</label><input class="input" id="prof-city" placeholder="City"></div>
+      <div><label class="label">State</label><input class="input" id="prof-state" placeholder="VA"></div>
+      <div><label class="label">ZIP</label><input class="input" id="prof-zip" placeholder="22150"></div>
+    </div>
+  </div>
+
+  <!-- Work Experience -->
+  <div class="card mb-16">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+      Work Experience
+      <button class="btn btn-ghost btn-sm" onclick="addWorkEntry()">+ Add</button>
+    </div>
+    <div id="prof-work-list" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Education -->
+  <div class="card mb-16">
+    <div class="card-header">Education</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div style="grid-column:1/-1"><label class="label">School / University</label><input class="input" id="edu-school" placeholder="University Name"></div>
+      <div><label class="label">Degree</label><input class="input" id="edu-degree" placeholder="Bachelor's Degree"></div>
+      <div><label class="label">Field of Study</label><input class="input" id="edu-major" placeholder="Computer Science"></div>
+      <div><label class="label">Graduation Year</label><input class="input" id="edu-gradyear" placeholder="1995"></div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:20px"><input type="checkbox" id="edu-completed"><label for="edu-completed" style="font-size:13px">Completed</label></div>
+    </div>
+  </div>
+
+  <!-- Certifications -->
+  <div class="card mb-16">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+      Certifications
+      <button class="btn btn-ghost btn-sm" onclick="addCert()">+ Add</button>
+    </div>
+    <div id="prof-cert-list" style="margin-top:12px"></div>
+  </div>
+
+  <button class="btn btn-primary" onclick="saveProfile()">Save All</button>
+</div>
+
 <!-- Settings -->
 <div id="view-settings" class="view">
   <h1 class="mb-16">Settings</h1>
@@ -484,7 +540,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 const API='';let currentJobId=null,allJobs=[],currentJob=null;
 let resumeLabels={director:'Resume 1 — Director',base:'Resume 2 — Base',contract:'Resume 3 — Contract'};
 function resumeLabel(key){return resumeLabels[key]||key||'none'}
-function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch()}
+function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile()}
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
 async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
@@ -1013,6 +1069,99 @@ async function saveProfile(){
     if(s){s.textContent='✓ Saved';s.style.color='var(--green)';setTimeout(()=>{s.textContent=''},2000);}
   }catch(e){if(s){s.textContent='✕ '+e.message;s.style.color='var(--red)';}}
 }
+// Profile
+let _profileData = {};
+async function loadProfile(){
+  try{
+    const p = await api('/api/profile');
+    _profileData = p;
+    document.getElementById('prof-name').value = p.name||'';
+    document.getElementById('prof-email').value = p.email||'';
+    document.getElementById('prof-phone').value = p.phone||'';
+    document.getElementById('prof-linkedin').value = p.linkedin||'';
+    document.getElementById('prof-address').value = p.address||'';
+    document.getElementById('prof-city').value = p.city||'';
+    document.getElementById('prof-state').value = p.state||'';
+    document.getElementById('prof-zip').value = p.zip||'';
+    document.getElementById('edu-school').value = p.education?.school||'';
+    document.getElementById('edu-degree').value = p.education?.degree||'';
+    document.getElementById('edu-major').value = p.education?.major||'';
+    document.getElementById('edu-gradyear').value = p.education?.grad_year||'';
+    document.getElementById('edu-completed').checked = p.education?.completed!==false;
+    renderWorkList(p.work_experience||[]);
+    renderCertList(p.certifications||[]);
+  }catch(e){console.error(e);}
+}
+
+function renderWorkList(jobs){
+  const el=document.getElementById('prof-work-list');
+  el.innerHTML=jobs.map((j,i)=>`
+    <div class="card mb-8" style="background:var(--surface2);padding:12px" data-wi="${i}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:13px">${esc(j.title||'New Role')} @ ${esc(j.company_short||j.company||'')}</strong>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeWorkEntry(${i})">Remove</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label class="label">Job Title</label><input class="input input-sm" value="${esc(j.title)}" onchange="updateWork(${i},'title',this.value)"></div>
+        <div><label class="label">Company (full)</label><input class="input input-sm" value="${esc(j.company)}" onchange="updateWork(${i},'company',this.value)"></div>
+        <div><label class="label">Company (short)</label><input class="input input-sm" value="${esc(j.company_short)}" onchange="updateWork(${i},'company_short',this.value)"></div>
+        <div><label class="label">Location</label><input class="input input-sm" value="${esc(j.location)}" onchange="updateWork(${i},'location',this.value)"></div>
+        <div><label class="label">Start (YYYY-MM)</label><input class="input input-sm" value="${esc(j.start)}" onchange="updateWork(${i},'start',this.value)"></div>
+        <div><label class="label">End (YYYY-MM or blank)</label><input class="input input-sm" value="${esc(j.end||'')}" onchange="updateWork(${i},'end',this.value||null)"></div>
+        <div style="display:flex;align-items:center;gap:6px;padding-top:18px"><input type="checkbox" ${j.current?'checked':''} onchange="updateWork(${i},'current',this.checked)"><label style="font-size:12px">Currently work here</label></div>
+      </div>
+      <div style="margin-top:8px"><label class="label">Role Description</label><textarea class="input" rows="4" style="font-size:12px;resize:vertical" onchange="updateWork(${i},'description',this.value)">${esc(j.description)}</textarea></div>
+    </div>`).join('');
+}
+
+function renderCertList(certs){
+  const el=document.getElementById('prof-cert-list');
+  el.innerHTML=certs.map((c,i)=>`
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <input class="input input-sm" style="flex:1" value="${esc(c)}" onchange="updateCert(${i},this.value)">
+      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeCert(${i})">✕</button>
+    </div>`).join('');
+}
+
+function updateWork(i,field,val){_profileData.work_experience[i][field]=val;}
+function updateCert(i,val){_profileData.certifications[i]=val;}
+function addWorkEntry(){
+  _profileData.work_experience=_profileData.work_experience||[];
+  _profileData.work_experience.push({title:'',company:'',company_short:'',location:'',start:'',end:null,current:false,description:''});
+  renderWorkList(_profileData.work_experience);
+}
+function removeWorkEntry(i){_profileData.work_experience.splice(i,1);renderWorkList(_profileData.work_experience);}
+function addCert(){_profileData.certifications=_profileData.certifications||[];_profileData.certifications.push('');renderCertList(_profileData.certifications);}
+function removeCert(i){_profileData.certifications.splice(i,1);renderCertList(_profileData.certifications);}
+
+async function saveProfile(){
+  const payload={
+    name:document.getElementById('prof-name').value,
+    email:document.getElementById('prof-email').value,
+    phone:document.getElementById('prof-phone').value,
+    linkedin:document.getElementById('prof-linkedin').value,
+    address:document.getElementById('prof-address').value,
+    city:document.getElementById('prof-city').value,
+    state:document.getElementById('prof-state').value,
+    zip:document.getElementById('prof-zip').value,
+    education:{
+      school:document.getElementById('edu-school').value,
+      degree:document.getElementById('edu-degree').value,
+      major:document.getElementById('edu-major').value,
+      grad_year:document.getElementById('edu-gradyear').value,
+      completed:document.getElementById('edu-completed').checked,
+      degree_value:'', major_value:'',
+    },
+    work_experience:_profileData.work_experience||[],
+    certifications:_profileData.certifications||[],
+  };
+  try{
+    await api('/api/profile',{method:'PUT',body:payload});
+    const btn=event.target; btn.textContent='Saved ✓'; btn.style.background='var(--green)';
+    setTimeout(()=>{btn.textContent='Save All';btn.style.background='';},2000);
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
 // Settings
 async function loadSettings(){
   const c=await api('/api/config');
