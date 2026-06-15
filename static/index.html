@@ -797,7 +797,7 @@ async function scoreCurrentJob(){
     const cfg=await api('/api/config');
     const fp=cfg.fast_provider||'anthropic';
     const fmOverride=cfg.fast_model||'';
-    const defaults={anthropic:'haiku',gemini:'gemini-2.5-flash-lite',openai:'gpt-4o-mini',ollama:cfg.ollama_model||'ollama'};
+    const defaults={anthropic:'haiku',gemini:'gemini-2.0-flash',openai:'gpt-4o-mini',ollama:cfg.ollama_model||'ollama'};
     modelLabel=fmOverride||(fp==='anthropic'?'claude-haiku':defaults[fp]||fp);
   }catch(e){}
   showLoading('Scoring with '+modelLabel+'...');

@@ -39,8 +39,8 @@ PROVIDER_DEFAULTS = {
         "strong": "claude-sonnet-4-5",
     },
     "gemini": {
-        "fast":   "gemini-2.5-flash-lite",  # 15 RPM, 1000 RPD free tier
-        "strong": "gemini-2.5-flash",        # 10 RPM, 500 RPD free tier
+        "fast":   "gemini-2.0-flash",  # 15 RPM, 1500 RPD free tier
+        "strong": "gemini-2.5-flash",  # 10 RPM, 500 RPD free tier
     },
     "openai": {
         "fast":   "gpt-4o-mini",
