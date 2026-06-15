@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -282,6 +283,14 @@ def search_jobs(
 @app.post("/api/jobs/score-all")
 def score_all_jobs(user: User = Depends(get_current_user)):
     """Score every job with status=new that has a description. No job_ids needed."""
+    import logging
+    logger = logging.getLogger(__name__)
+    config = storage.load_config(user.id)
+    # Rate limiting: Gemini free tier is 15 RPM; Anthropic/OpenAI are generous.
+    # Add a delay between calls only for rate-limited free-tier providers.
+    free_tier_providers = {"gemini"}
+    inter_call_delay = 5.0 if config.fast_provider in free_tier_providers else 0.0
+
     jobs = storage.load_all_jobs(user.id)
     to_score = [
         j for j in jobs
@@ -289,7 +298,9 @@ def score_all_jobs(user: User = Depends(get_current_user)):
         and (j.status == JobStatus.NEW or (j.score is not None and j.score.total == 0))
     ]
     results = []
-    for job in to_score:
+    for i, job in enumerate(to_score):
+        if i > 0 and inter_call_delay:
+            time.sleep(inter_call_delay)
         try:
             score_result = scoring.score_job(job, user.id)
             job.score = score_result
@@ -303,6 +314,7 @@ def score_all_jobs(user: User = Depends(get_current_user)):
                 "title": job.title, "company": job.company,
             })
         except Exception as e:
+            logger.error(f"score_all: failed job {job.id} ({job.company}): {e}")
             results.append({"id": job.id, "status": "error", "error": str(e)})
     return {"total": len(to_score), "results": results}
 

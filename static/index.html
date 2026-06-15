@@ -633,7 +633,7 @@ async function scoreAllSearchResults(){
 // Score All Unscored (tracker)
 async function scoreAllUnscored(){
   const btn=document.getElementById('btn-score-unscored');
-  if(btn){btn.disabled=true;btn.textContent='Scoring...';}
+  if(btn){btn.disabled=true;btn.textContent='Scoring... (may take several minutes for large queues)';}
   try{
     const res=await api('/api/jobs/score-all',{method:'POST'});
     const results=res.results||[];
@@ -641,8 +641,11 @@ async function scoreAllUnscored(){
     const errors=results.filter(r=>r.status==='error').length;
     const skipped=(res.total||0)-scored-errors;
     let msg=`Scored ${scored} job${scored===1?'':'s'}.`;
-    if(errors)msg+=` ${errors} error${errors===1?'':'s'}.`;
-    if(skipped>0)msg+=` ${skipped} skipped.`;
+    if(errors){
+      const sample=results.filter(r=>r.status==='error').slice(0,3).map(r=>r.error).join('\n');
+      msg+=` ${errors} error${errors===1?'':'s'}.\n\nFirst error(s):\n${sample}`;
+    }
+    if(skipped>0)msg+=`\n${skipped} skipped (no description).`;
     alert(msg);
     loadTracker();
   }catch(e){alert('Failed: '+e.message)}
