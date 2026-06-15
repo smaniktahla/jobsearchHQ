@@ -645,6 +645,38 @@ async function scoreAllSearchResults(){
 
 let _scorePollInterval=null;
 
+function resumeScoringPoll(){
+  const btn=document.getElementById('btn-score-unscored');
+  const cancelBtn=document.getElementById('btn-score-cancel');
+  const bar=document.getElementById('scoring-progress-bar');
+  const label=document.getElementById('scoring-progress-label');
+  const pct=document.getElementById('scoring-progress-pct');
+  const fill=document.getElementById('scoring-progress-fill');
+  const errEl=document.getElementById('scoring-progress-errors');
+  btn.disabled=true;
+  cancelBtn.style.display='';
+  bar.style.display='block';
+  _scorePollInterval=setInterval(async()=>{
+    const s=await api('/api/jobs/score-all/status');
+    const total=s.total||1;
+    const progress=Math.round((s.done/total)*100);
+    fill.style.width=progress+'%';
+    pct.textContent=progress+'%';
+    if(s.running){
+      label.textContent=`Scoring job ${s.done+1} of ${total} — ${s.current} — ${total-s.done} remaining`;
+    }
+    if(s.errors>0){errEl.style.display='block';errEl.textContent=`${s.errors} error${s.errors===1?'':'s'} so far — last: ${s.error_msgs[s.error_msgs.length-1]}`;}
+    if(!s.running){
+      clearInterval(_scorePollInterval);_scorePollInterval=null;
+      fill.style.width='100%';pct.textContent='100%';
+      label.textContent=`Done: ${s.scored} scored, ${s.errors} error${s.errors===1?'':'s'}`;
+      cancelBtn.style.display='none';btn.disabled=false;
+      setTimeout(()=>{bar.style.display='none';},4000);
+      loadTracker();
+    }
+  },2000);
+}
+
 async function scoreAllUnscored(){
   const btn=document.getElementById('btn-score-unscored');
   const cancelBtn=document.getElementById('btn-score-cancel');
@@ -715,6 +747,11 @@ async function loadTracker(){
   if(p.length)u+='?'+p.join('&');
   trackerJobs=await api(u);
   renderTracker();
+  // Auto-resume progress display if scoring is already running server-side
+  if(!_scorePollInterval){
+    const s=await api('/api/jobs/score-all/status');
+    if(s.running)resumeScoringPoll();
+  }
 }
 function sortTracker(col){
   if(trackerSort.col===col){trackerSort.dir*=-1;}
