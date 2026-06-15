@@ -996,6 +996,12 @@ def get_config(user: User = Depends(get_current_user)):
 
 @app.put("/api/config")
 def update_config(config: AppConfig, user: User = Depends(get_current_user)):
+    # Preserve profile fields from existing config if not provided in payload
+    existing = storage.load_config(user.id)
+    if not config.author_name:    config.author_name    = existing.author_name
+    if not config.author_email:   config.author_email   = existing.author_email
+    if not config.author_phone:   config.author_phone   = existing.author_phone
+    if not config.author_location: config.author_location = existing.author_location
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
     return config.model_dump()

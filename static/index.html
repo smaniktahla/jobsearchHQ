@@ -1025,8 +1025,10 @@ async function saveConfig(){
   ollama_model:document.getElementById('cfg-ollama-model').value||document.getElementById('cfg-strong-ollama-model').value||'gemma4',
   fast_model:document.getElementById('cfg-fast-model').value||'',
   strong_model:document.getElementById('cfg-strong-model').value||'',
-  ollama_url:document.getElementById('cfg-ollama-url').value||'http://10.10.10.105:11434',
-  ollama_model:document.getElementById('cfg-ollama-model').value||'gemma4:e4b'}});
+  author_name:document.getElementById('prof-name').value||'',
+  author_email:document.getElementById('prof-email').value||'',
+  author_phone:document.getElementById('prof-phone').value||'',
+  author_location:document.getElementById('prof-location').value||''}});
   resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};
   refreshSchedulerStatus();alert('Saved')
 }
