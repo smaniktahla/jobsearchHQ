@@ -273,7 +273,7 @@ No markdown. No explanation. No extra keys. ONLY the JSON object."""
         except ValueError:
             lane = MarketLane.IGNORE
 
-    return ScoreBreakdown(
+    score = ScoreBreakdown(
         skills_match=min(sm, 4),
         scope_impact=min(si, 3),
         pay_alignment=min(pa, 2),
@@ -289,6 +289,35 @@ No markdown. No explanation. No extra keys. ONLY the JSON object."""
         recommended_lane=lane,
         raw_analysis=str(data.get("raw_analysis", "")),
     )
+    _apply_deal_breaker_override(score, job.raw_jd, config.deal_breakers)
+    return score
+
+
+def _apply_deal_breaker_override(score: ScoreBreakdown, raw_jd: str, deal_breakers: list[str]) -> None:
+    """If any deal breaker appears in the JD text or red flags, cap score at 2 and set lane to IGNORE."""
+    jd_lower = raw_jd.lower()
+    red_flags_lower = " ".join(score.red_flags).lower()
+    triggered = []
+    import re
+    def _normalize(s):
+        # Normalize slashes, dashes, and extra whitespace so "TS/SCI" matches "ts/sci with polygraph"
+        return re.sub(r'\s+', ' ', re.sub(r'[\-/]', ' ', s.lower())).strip()
+    jd_norm = _normalize(jd_lower)
+    flags_norm = _normalize(red_flags_lower)
+    for breaker in deal_breakers:
+        b = _normalize(breaker)
+        if b in jd_norm or b in flags_norm:
+            triggered.append(breaker)
+    if triggered:
+        score.skills_match = min(score.skills_match, 1)
+        score.scope_impact = min(score.scope_impact, 1)
+        score.pay_alignment = min(score.pay_alignment, 0)
+        score.total = score.skills_match + score.scope_impact + score.pay_alignment
+        score.recommended_lane = MarketLane.IGNORE
+        score.recommended_resume = "none"
+        note = f"⛔ Deal breaker(s) detected: {', '.join(triggered)}. Score overridden to {score.total}/10."
+        score.raw_analysis = note + " " + score.raw_analysis
+        logger.info(note)
 
 
 # === METADATA EXTRACTION ===
