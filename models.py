@@ -101,6 +101,27 @@ class CompanyResearch(BaseModel):
     searches_run: list[str] = []
 
 
+class AgentEventType(str, Enum):
+    SCORE      = "score"
+    DISPATCH   = "dispatch"
+    ESCALATE   = "escalate"
+    RESOLVE    = "resolve"
+    SUBMIT     = "submit"
+    ERROR      = "error"
+
+
+class AgentEvent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    event_type: AgentEventType
+    at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    notes: str = ""
+    ats: str = ""
+    script: str = ""
+    claude_tokens_in: int = 0
+    claude_tokens_out: int = 0
+    success: Optional[bool] = None
+
+
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     user_id: str = ""          # OIDC sub — set on creation, never changed
@@ -189,22 +210,6 @@ class Job(BaseModel):
         )
 
 
-class AgentEventType(str, Enum):
-    SCORE      = "score"       # Hermes/Gemma4 scored the job
-    DISPATCH   = "dispatch"    # dispatch.js launched a fill script
-    ESCALATE   = "escalate"    # fill script failed, escalated to Claude
-    RESOLVE    = "resolve"     # Claude fixed the escalation
-    SUBMIT     = "submit"      # application submitted (or paused for human)
-    ERROR      = "error"       # unrecoverable failure
-
-
-class AgentEvent(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    event_type: AgentEventType
-    at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    notes: str = ""
-    ats: str = ""              # e.g. "workday", "taleo"
-    script: str = ""           # script filename that ran
     claude_tokens_in: int = 0
     claude_tokens_out: int = 0
     success: Optional[bool] = None
