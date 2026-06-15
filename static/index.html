@@ -349,57 +349,87 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="card mb-16">
     <div class="card-header">Provider &amp; API Keys</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Set providers independently — e.g. Gemini (free) for scoring, Anthropic for resumes. If API key is left blank, the system key is used.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
-      <div class="form-group">
-        <label>Fast Provider <span style="color:var(--text-dim);font-weight:normal">(scoring, research)</span></label>
-        <select id="cfg-fast-provider" onchange="updateProviderUI()">
-          <option value="anthropic">Anthropic (Claude Haiku)</option>
-          <option value="gemini">Google Gemini — 1,500 free req/day</option>
-          <option value="openai">OpenAI (GPT-4o mini)</option>
-          <option value="ollama">Local Ollama</option>
-        </select>
-        <div id="fast-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px" class="mt-8">
+      <!-- Fast Provider column -->
+      <div>
+        <div class="form-group">
+          <label>Fast Provider <span style="color:var(--text-dim);font-weight:normal">(scoring, research)</span></label>
+          <select id="cfg-fast-provider" onchange="updateProviderUI()">
+            <option value="anthropic">Anthropic (Claude Haiku)</option>
+            <option value="gemini">Google Gemini — 1,500 free req/day</option>
+            <option value="openai">OpenAI (GPT-4o mini)</option>
+            <option value="ollama">Local Ollama / Hermes</option>
+          </select>
+          <div id="fast-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+        </div>
+        <div class="form-group" id="fast-anthropic-key-group">
+          <label>Fast Provider API Key</label>
+          <input type="password" id="cfg-anthropic-key" placeholder="sk-ant-... (blank = use system key)">
+        </div>
+        <div class="form-group" id="fast-gemini-key-group" style="display:none">
+          <label>Fast Provider API Key</label>
+          <input type="password" id="cfg-gemini-key" placeholder="AIza... get free key at aistudio.google.com">
+        </div>
+        <div class="form-group" id="fast-openai-key-group" style="display:none">
+          <label>Fast Provider API Key</label>
+          <input type="password" id="cfg-openai-key" placeholder="sk-... get key at platform.openai.com">
+        </div>
+        <div id="fast-ollama-group" style="display:none">
+          <div class="form-group">
+            <label>Ollama / Hermes URL</label>
+            <input type="text" id="cfg-ollama-url" placeholder="http://10.10.10.226:8642">
+          </div>
+          <div class="form-group">
+            <label>Ollama Model</label>
+            <input type="text" id="cfg-ollama-model" placeholder="gemma4">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Model override <span style="color:var(--text-dim);font-weight:normal">(optional — pins a specific model version)</span></label>
+          <input type="text" id="cfg-fast-model" placeholder="leave blank for provider default">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Strong Provider <span style="color:var(--text-dim);font-weight:normal">(resumes, cover letters)</span></label>
-        <select id="cfg-strong-provider" onchange="updateProviderUI()">
-          <option value="anthropic">Anthropic (Claude Sonnet)</option>
-          <option value="gemini">Google Gemini Flash</option>
-          <option value="openai">OpenAI (GPT-4o)</option>
-          <option value="ollama">Local Ollama</option>
-        </select>
-        <div id="strong-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
-      </div>
-      <div class="form-group" id="anthropic-key-group">
-        <label>Anthropic API Key</label>
-        <input type="password" id="cfg-anthropic-key" placeholder="sk-ant-... (blank = use system key)">
-      </div>
-      <div class="form-group" id="gemini-key-group" style="display:none">
-        <label>Gemini API Key</label>
-        <input type="password" id="cfg-gemini-key" placeholder="AIza... get free key at aistudio.google.com">
-      </div>
-      <div class="form-group" id="openai-key-group" style="display:none">
-        <label>OpenAI API Key</label>
-        <input type="password" id="cfg-openai-key" placeholder="sk-... get key at platform.openai.com">
-      </div>
-      <div class="form-group" id="ollama-url-group" style="display:none">
-        <label>Ollama URL</label>
-        <input type="text" id="cfg-ollama-url" placeholder="http://10.10.10.105:11434">
-      </div>
-      <div class="form-group" id="ollama-model-group" style="display:none">
-        <label>Ollama Model</label>
-        <input type="text" id="cfg-ollama-model" placeholder="gemma4:e4b">
-      </div>
-      <div class="form-group">
-        <label>Fast Model override</label>
-        <input type="text" id="cfg-fast-model" placeholder="leave blank for provider default">
-      </div>
-      <div class="form-group">
-        <label>Strong Model override</label>
-        <input type="text" id="cfg-strong-model" placeholder="leave blank for provider default">
+      <!-- Strong Provider column -->
+      <div>
+        <div class="form-group">
+          <label>Strong Provider <span style="color:var(--text-dim);font-weight:normal">(resumes, cover letters)</span></label>
+          <select id="cfg-strong-provider" onchange="updateProviderUI()">
+            <option value="anthropic">Anthropic (Claude Sonnet)</option>
+            <option value="gemini">Google Gemini Flash</option>
+            <option value="openai">OpenAI (GPT-4o)</option>
+            <option value="ollama">Local Ollama / Hermes</option>
+          </select>
+          <div id="strong-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+        </div>
+        <div class="form-group" id="strong-anthropic-key-group">
+          <label>Strong Provider API Key</label>
+          <input type="password" id="cfg-strong-anthropic-key" placeholder="sk-ant-... (blank = use system key)">
+        </div>
+        <div class="form-group" id="strong-gemini-key-group" style="display:none">
+          <label>Strong Provider API Key</label>
+          <input type="password" id="cfg-strong-gemini-key" placeholder="AIza... get free key at aistudio.google.com">
+        </div>
+        <div class="form-group" id="strong-openai-key-group" style="display:none">
+          <label>Strong Provider API Key</label>
+          <input type="password" id="cfg-strong-openai-key" placeholder="sk-... get key at platform.openai.com">
+        </div>
+        <div id="strong-ollama-group" style="display:none">
+          <div class="form-group">
+            <label>Ollama / Hermes URL</label>
+            <input type="text" id="cfg-strong-ollama-url" placeholder="http://10.10.10.226:8642">
+          </div>
+          <div class="form-group">
+            <label>Ollama Model</label>
+            <input type="text" id="cfg-strong-ollama-model" placeholder="gemma4">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Model override <span style="color:var(--text-dim);font-weight:normal">(optional — pins a specific model version)</span></label>
+          <input type="text" id="cfg-strong-model" placeholder="leave blank for provider default">
+        </div>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring) or Local Ollama/Hermes (zero cost), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
   </div>
   <button class="btn btn-primary" onclick="saveConfig()">Save All Settings</button>
   <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
@@ -924,13 +954,20 @@ async function loadSettings(){
   document.getElementById('cfg-auto-score').checked=!!c.auto_score_new_jobs;
   document.getElementById('cfg-fast-provider').value=c.fast_provider||'anthropic';
   document.getElementById('cfg-strong-provider').value=c.strong_provider||'anthropic';
+  // Fast provider keys
   document.getElementById('cfg-anthropic-key').value=c.anthropic_api_key||'';
   document.getElementById('cfg-gemini-key').value=c.gemini_api_key||'';
   document.getElementById('cfg-openai-key').value=c.openai_api_key||'';
+  document.getElementById('cfg-ollama-url').value=c.ollama_url||'http://10.10.10.226:8642';
+  document.getElementById('cfg-ollama-model').value=c.ollama_model||'gemma4';
+  // Strong provider keys (mirror same stored values — provider determines which is used)
+  document.getElementById('cfg-strong-anthropic-key').value=c.anthropic_api_key||'';
+  document.getElementById('cfg-strong-gemini-key').value=c.gemini_api_key||'';
+  document.getElementById('cfg-strong-openai-key').value=c.openai_api_key||'';
+  document.getElementById('cfg-strong-ollama-url').value=c.ollama_url||'http://10.10.10.226:8642';
+  document.getElementById('cfg-strong-ollama-model').value=c.ollama_model||'gemma4';
   document.getElementById('cfg-fast-model').value=c.fast_model||'';
   document.getElementById('cfg-strong-model').value=c.strong_model||'';
-  document.getElementById('cfg-ollama-url').value=c.ollama_url||'http://10.10.10.105:11434';
-  document.getElementById('cfg-ollama-model').value=c.ollama_model||'gemma4:e4b';
   updateProviderUI();
   document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
   document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
@@ -943,12 +980,16 @@ const PROVIDER_STRONG_DEFAULTS={anthropic:'claude-sonnet-4-5',gemini:'gemini-2.0
 function updateProviderUI(){
   const fp=document.getElementById('cfg-fast-provider')?.value||'anthropic';
   const sp=document.getElementById('cfg-strong-provider')?.value||'anthropic';
-  const providers=new Set([fp,sp]);
-  document.getElementById('anthropic-key-group').style.display=providers.has('anthropic')?'':'none';
-  document.getElementById('gemini-key-group').style.display=providers.has('gemini')?'':'none';
-  document.getElementById('openai-key-group').style.display=providers.has('openai')?'':'none';
-  document.getElementById('ollama-url-group').style.display=providers.has('ollama')?'':'none';
-  document.getElementById('ollama-model-group').style.display=providers.has('ollama')?'':'none';
+  // Fast column
+  document.getElementById('fast-anthropic-key-group').style.display=fp==='anthropic'?'':'none';
+  document.getElementById('fast-gemini-key-group').style.display=fp==='gemini'?'':'none';
+  document.getElementById('fast-openai-key-group').style.display=fp==='openai'?'':'none';
+  document.getElementById('fast-ollama-group').style.display=fp==='ollama'?'':'none';
+  // Strong column
+  document.getElementById('strong-anthropic-key-group').style.display=sp==='anthropic'?'':'none';
+  document.getElementById('strong-gemini-key-group').style.display=sp==='gemini'?'':'none';
+  document.getElementById('strong-openai-key-group').style.display=sp==='openai'?'':'none';
+  document.getElementById('strong-ollama-group').style.display=sp==='ollama'?'':'none';
   const fh=document.getElementById('fast-model-hint');
   const sh=document.getElementById('strong-model-hint');
   if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
@@ -977,9 +1018,11 @@ async function saveConfig(){
   auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7,
   fast_provider:document.getElementById('cfg-fast-provider').value||'anthropic',
   strong_provider:document.getElementById('cfg-strong-provider').value||'anthropic',
-  anthropic_api_key:document.getElementById('cfg-anthropic-key').value||'',
-  gemini_api_key:document.getElementById('cfg-gemini-key').value||'',
-  openai_api_key:document.getElementById('cfg-openai-key').value||'',
+  anthropic_api_key:document.getElementById('cfg-anthropic-key').value||document.getElementById('cfg-strong-anthropic-key').value||'',
+  gemini_api_key:document.getElementById('cfg-gemini-key').value||document.getElementById('cfg-strong-gemini-key').value||'',
+  openai_api_key:document.getElementById('cfg-openai-key').value||document.getElementById('cfg-strong-openai-key').value||'',
+  ollama_url:document.getElementById('cfg-ollama-url').value||document.getElementById('cfg-strong-ollama-url').value||'http://10.10.10.226:8642',
+  ollama_model:document.getElementById('cfg-ollama-model').value||document.getElementById('cfg-strong-ollama-model').value||'gemma4',
   fast_model:document.getElementById('cfg-fast-model').value||'',
   strong_model:document.getElementById('cfg-strong-model').value||'',
   ollama_url:document.getElementById('cfg-ollama-url').value||'http://10.10.10.105:11434',
