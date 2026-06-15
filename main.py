@@ -771,6 +771,67 @@ class AtsUrlPayload(BaseModel):
     ats_url: str
 
 
+@app.get("/api/agent/jobs/{job_id}/package")
+def get_job_package(job_id: str, request: Request):
+    """Return job details + download URLs for resume and cover letter. Called by dispatch.js."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    base = f"/api/agent/jobs/{job_id}"
+    return {
+        "job": {
+            "id": job.id,
+            "title": job.title,
+            "company": job.company,
+            "url": job.url,
+            "ats_url": job.ats_url,
+            "score": job.score.total if job.score else None,
+            "lane": job.market_lane,
+            "recommended_resume": job.score.recommended_resume if job.score else "base",
+        },
+        "downloads": {
+            "resume": f"{base}/resume/download",
+            "cover_letter_direct": f"{base}/cover-letter/download?variant=direct",
+            "cover_letter_brief": f"{base}/cover-letter/download?variant=brief",
+        }
+    }
+
+
+@app.get("/api/agent/jobs/{job_id}/resume/download")
+def download_agent_resume(job_id: str, request: Request):
+    """Download the tailored resume .docx for a job. Called by dispatch.js."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.tailored_resume_docx or not Path(job.tailored_resume_docx).exists():
+        raise HTTPException(404, "No tailored resume found for this job")
+    return FileResponse(job.tailored_resume_docx, filename=f"resume_{job.company}_{job.id}.docx")
+
+
+@app.get("/api/agent/jobs/{job_id}/cover-letter/download")
+def download_agent_cover_letter(job_id: str, variant: str = "direct", request: Request = None):
+    """Download a cover letter .docx for a job. Called by dispatch.js."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    cl = next((c for c in job.cover_letters if c.variant == variant), None)
+    if not cl or not cl.docx_path or not Path(cl.docx_path).exists():
+        raise HTTPException(404, f"No cover letter variant '{variant}' found for this job")
+    return FileResponse(cl.docx_path, filename=f"cover_letter_{variant}_{job.company}_{job.id}.docx")
+
+
 @app.patch("/api/agent/jobs/{job_id}/ats-url")
 def set_ats_url(job_id: str, payload: AtsUrlPayload, request: Request):
     """Save the resolved ATS URL for a job. Called by dispatch.js."""
