@@ -131,10 +131,21 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="flex justify-between items-center mb-16"><h1>Job Tracker</h1>
     <div class="flex gap-8 items-center">
       <button class="btn btn-ghost btn-sm" id="btn-score-unscored" onclick="scoreAllUnscored()">Score All Unscored</button>
+      <button class="btn btn-ghost btn-sm" id="btn-score-cancel" onclick="cancelScoring()" style="display:none;color:var(--red)">Cancel</button>
       <input type="text" id="tracker-search" placeholder="Search company or title..." oninput="renderTracker()" style="width:220px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="ready_to_apply">Ready to Apply</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
     </div>
+  </div>
+  <div id="scoring-progress-bar" style="display:none;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px">
+      <span id="scoring-progress-label" style="color:var(--text-dim)">Scoring…</span>
+      <span id="scoring-progress-pct" style="font-weight:600;color:var(--accent)">0%</span>
+    </div>
+    <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+      <div id="scoring-progress-fill" style="background:var(--accent);height:100%;width:0%;transition:width 0.3s ease"></div>
+    </div>
+    <div id="scoring-progress-errors" style="font-size:11px;color:var(--red);margin-top:4px;display:none"></div>
   </div>
   <div class="card table-wrap"><table><thead><tr>
     <th onclick="sortTracker('company')" style="cursor:pointer;user-select:none">COMPANY <span id="sort-company"></span></th>
@@ -631,24 +642,75 @@ async function scoreAllSearchResults(){
   finally{document.getElementById('btn-score-all').disabled=false}
 }
 // Score All Unscored (tracker)
+let _scoringCancelled=false;
+function cancelScoring(){_scoringCancelled=true;}
+
 async function scoreAllUnscored(){
   const btn=document.getElementById('btn-score-unscored');
-  if(btn){btn.disabled=true;btn.textContent='Scoring... (may take several minutes for large queues)';}
-  try{
-    const res=await api('/api/jobs/score-all',{method:'POST'});
-    const results=res.results||[];
-    const scored=results.filter(r=>r.status==='scored').length;
-    const errors=results.filter(r=>r.status==='error').length;
-    const skipped=(res.total||0)-scored-errors;
-    let msg=`Scored ${scored} job${scored===1?'':'s'}.`;
-    if(errors){
-      const sample=results.filter(r=>r.status==='error').slice(0,3).map(r=>r.error).join('\n');
-      msg+=` ${errors} error${errors===1?'':'s'}.\n\nFirst error(s):\n${sample}`;
+  const cancelBtn=document.getElementById('btn-score-cancel');
+  const bar=document.getElementById('scoring-progress-bar');
+  const label=document.getElementById('scoring-progress-label');
+  const pct=document.getElementById('scoring-progress-pct');
+  const fill=document.getElementById('scoring-progress-fill');
+  const errEl=document.getElementById('scoring-progress-errors');
+
+  // Fetch unscored jobs
+  const allJobs=await api('/api/jobs');
+  const toScore=allJobs.filter(j=>
+    (j.status==='new'||(j.score!==null&&j.score!==undefined&&j.score.total===0))
+  );
+  if(!toScore.length){alert('No unscored jobs found.');return;}
+
+  // Determine delay: Gemini free tier needs throttling
+  const cfg=await api('/api/config');
+  const delay=cfg.fast_provider==='gemini'?5000:500;
+
+  _scoringCancelled=false;
+  btn.disabled=true;
+  cancelBtn.style.display='';
+  bar.style.display='block';
+  errEl.style.display='none';
+  errEl.textContent='';
+
+  let scored=0,errors=0;
+  const errorMsgs=[];
+  const total=toScore.length;
+
+  for(let i=0;i<total;i++){
+    if(_scoringCancelled)break;
+    const job=toScore[i];
+    const remaining=total-i-1;
+    const progress=Math.round((i/total)*100);
+    label.textContent=`Scoring job ${i+1} of ${total} — ${job.company}: ${job.title} — ${remaining} remaining`;
+    pct.textContent=progress+'%';
+    fill.style.width=progress+'%';
+
+    try{
+      const res=await api('/api/jobs/score-batch',{method:'POST',body:[job.id]});
+      const r=res.results?.[0];
+      if(r?.status==='scored')scored++;
+      else{errors++;errorMsgs.push(`${job.company}: ${r?.error||'unknown error'}`);}
+    }catch(e){
+      errors++;
+      errorMsgs.push(`${job.company}: ${e.message}`);
     }
-    if(skipped>0)msg+=`\n${skipped} skipped (no description).`;
-    alert(msg);
-    loadTracker();
-  }catch(e){alert('Failed: '+e.message)}
+
+    if(errors>0){
+      errEl.style.display='block';
+      errEl.textContent=`${errors} error${errors===1?'':'s'} so far — last: ${errorMsgs[errorMsgs.length-1]}`;
+    }
+
+    if(i<total-1&&!_scoringCancelled)await new Promise(r=>setTimeout(r,delay));
+  }
+
+  fill.style.width='100%';
+  pct.textContent='100%';
+  const cancelled=_scoringCancelled?' (cancelled)':'';
+  label.textContent=`Done${cancelled}: ${scored} scored, ${errors} error${errors===1?'':'s'}`;
+  cancelBtn.style.display='none';
+  btn.disabled=false;
+  setTimeout(()=>{bar.style.display='none';},4000);
+  loadTracker();
   finally{if(btn){btn.disabled=false;btn.textContent='Score All Unscored';}}
 }
 // Tracker
