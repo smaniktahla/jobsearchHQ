@@ -122,6 +122,8 @@ class Job(BaseModel):
     emails: list[EmailRecord] = []
     research: Optional[CompanyResearch] = None
     notes: str = ""
+    ats_url: str = ""          # direct ATS portal URL (set by dispatch.js)
+    agent_log: list[AgentEvent] = []
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     status_history: list[dict] = []
@@ -187,8 +189,29 @@ class Job(BaseModel):
         )
 
 
+class AgentEventType(str, Enum):
+    SCORE      = "score"       # Hermes/Gemma4 scored the job
+    DISPATCH   = "dispatch"    # dispatch.js launched a fill script
+    ESCALATE   = "escalate"    # fill script failed, escalated to Claude
+    RESOLVE    = "resolve"     # Claude fixed the escalation
+    SUBMIT     = "submit"      # application submitted (or paused for human)
+    ERROR      = "error"       # unrecoverable failure
+
+
+class AgentEvent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    event_type: AgentEventType
+    at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    notes: str = ""
+    ats: str = ""              # e.g. "workday", "taleo"
+    script: str = ""           # script filename that ran
+    claude_tokens_in: int = 0
+    claude_tokens_out: int = 0
+    success: Optional[bool] = None
+
+
 class ApplicationResult(BaseModel):
-    """Written back by Claude after attempting to submit an application."""
+    """Written back by the agent after attempting to submit an application."""
     status: JobStatus = JobStatus.APPLIED
     notes: str = ""
     portal_url: str = ""

@@ -23,9 +23,9 @@ from auth import (
 )
 from pydantic import BaseModel
 from models import (
-    AppConfig, ApplicationResult, EmailCompose, EmailRecord,
-    IntakeSource, Job, JobCreate, JobStatus, JobUpdate,
-    MarketLane, ProfileUpdate, User,
+    AgentEvent, AgentEventType, AppConfig, ApplicationResult,
+    EmailCompose, EmailRecord, IntakeSource, Job, JobCreate,
+    JobStatus, JobUpdate, MarketLane, ProfileUpdate, User,
 )
 import docx_builder
 import email_service
@@ -696,6 +696,64 @@ def record_application_result(
     job.updated_at = datetime.now().isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
+
+
+# ── Agent: ATS URL + event log ────────────────────────────────────────────────
+
+@app.patch("/api/agent/jobs/{job_id}/ats-url")
+def set_ats_url(job_id: str, payload: dict, request: Request):
+    """Save the resolved ATS URL for a job. Called by dispatch.js."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.ats_url = payload.get("ats_url", "")
+    job.updated_at = datetime.now().isoformat()
+    storage.save_job(admin_id, job)
+    return {"id": job_id, "ats_url": job.ats_url}
+
+
+@app.post("/api/agent/jobs/{job_id}/log")
+def append_agent_log(job_id: str, event: AgentEvent, request: Request):
+    """Append an automation event to a job's agent_log. Called by Hermes/dispatch."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.agent_log.append(event)
+    job.updated_at = datetime.now().isoformat()
+    storage.save_job(admin_id, job)
+    return {"id": job_id, "agent_log_count": len(job.agent_log)}
+
+
+@app.get("/api/agent/jobs/{job_id}/log")
+def get_agent_log(job_id: str, request: Request):
+    """Return the full agent_log for a job."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    total_tokens_in  = sum(e.claude_tokens_in  for e in job.agent_log)
+    total_tokens_out = sum(e.claude_tokens_out for e in job.agent_log)
+    return {
+        "job_id": job_id,
+        "events": [e.model_dump() for e in job.agent_log],
+        "totals": {
+            "events": len(job.agent_log),
+            "claude_tokens_in":  total_tokens_in,
+            "claude_tokens_out": total_tokens_out,
+            "claude_tokens_total": total_tokens_in + total_tokens_out,
+        }
+    }
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
