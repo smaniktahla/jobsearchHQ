@@ -689,7 +689,8 @@ async function scoreAllUnscored(){
       const res=await api('/api/jobs/score-batch',{method:'POST',body:[job.id]});
       const r=res.results?.[0];
       if(r?.status==='scored')scored++;
-      else{errors++;errorMsgs.push(`${job.company}: ${r?.error||'unknown error'}`);}
+      else if(r?.status==='skipped'){errors++;errorMsgs.push(`${job.company}: skipped (no job description)`);}
+      else{errors++;errorMsgs.push(`${job.company}: ${r?.error||r?.status||'unknown error'}`);}
     }catch(e){
       errors++;
       errorMsgs.push(`${job.company}: ${e.message}`);
