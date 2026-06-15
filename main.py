@@ -700,8 +700,12 @@ def record_application_result(
 
 # ── Agent: ATS URL + event log ────────────────────────────────────────────────
 
+class AtsUrlPayload(BaseModel):
+    ats_url: str
+
+
 @app.patch("/api/agent/jobs/{job_id}/ats-url")
-def set_ats_url(job_id: str, payload: dict, request: Request):
+def set_ats_url(job_id: str, payload: AtsUrlPayload, request: Request):
     """Save the resolved ATS URL for a job. Called by dispatch.js."""
     key = request.headers.get("X-API-Key", "")
     if not key or not verify_agent_api_key(key):
@@ -710,7 +714,7 @@ def set_ats_url(job_id: str, payload: dict, request: Request):
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    job.ats_url = payload.get("ats_url", "")
+    job.ats_url = payload.ats_url
     job.updated_at = datetime.now().isoformat()
     storage.save_job(admin_id, job)
     return {"id": job_id, "ats_url": job.ats_url}
