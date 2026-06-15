@@ -1,7 +1,9 @@
+import asyncio
 import os
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -280,35 +282,72 @@ def search_jobs(
 
 # ── Batch scoring (before /{job_id} routes) ───────────────────────────────────
 
-@app.post("/api/jobs/score-all")
-def score_all_jobs(user: User = Depends(get_current_user)):
-    """Score every job with status=new that has a description. No job_ids needed."""
+# ── Background scoring state ───────────────────────────────────────────────────
+
+_score_task: dict = {
+    "running": False,
+    "user_id": None,
+    "total": 0,
+    "done": 0,
+    "scored": 0,
+    "errors": 0,
+    "current": "",
+    "error_msgs": [],
+    "started_at": None,
+    "finished_at": None,
+}
+
+
+def _run_score_all(user_id: str):
     import logging
-    logger = logging.getLogger(__name__)
-    jobs = storage.load_all_jobs(user.id)
+    log = logging.getLogger(__name__)
+    jobs = storage.load_all_jobs(user_id)
     to_score = [
         j for j in jobs
         if j.raw_jd.strip() and len(j.raw_jd) >= 200
         and (j.status == JobStatus.NEW or (j.score is not None and j.score.total == 0))
     ]
-    results = []
+    _score_task.update(running=True, user_id=user_id, total=len(to_score),
+                       done=0, scored=0, errors=0, current="", error_msgs=[],
+                       started_at=datetime.now().isoformat(), finished_at=None)
     for job in to_score:
+        if not _score_task["running"]:
+            break
+        _score_task["current"] = f"{job.company}: {job.title}"
         try:
-            score_result = scoring.score_job(job, user.id)
+            score_result = scoring.score_job(job, user_id)
             job.score = score_result
             job.update_status(JobStatus.SCORED)
             if score_result.recommended_lane:
                 job.market_lane = score_result.recommended_lane
-            storage.save_job(user.id, job)
-            results.append({
-                "id": job.id, "status": "scored",
-                "total": score_result.total,
-                "title": job.title, "company": job.company,
-            })
+            storage.save_job(user_id, job)
+            _score_task["scored"] += 1
         except Exception as e:
-            logger.error(f"score_all: failed job {job.id} ({job.company}): {e}")
-            results.append({"id": job.id, "status": "error", "error": str(e)})
-    return {"total": len(to_score), "results": results}
+            log.error(f"score_all: failed {job.id} ({job.company}): {e}")
+            _score_task["errors"] += 1
+            _score_task["error_msgs"].append(f"{job.company}: {e}")
+        _score_task["done"] += 1
+    _score_task.update(running=False, current="", finished_at=datetime.now().isoformat())
+
+
+@app.post("/api/jobs/score-all")
+async def score_all_jobs(user: User = Depends(get_current_user)):
+    """Kick off background scoring of all new/unscored jobs."""
+    if _score_task["running"]:
+        raise HTTPException(409, "Scoring already in progress")
+    asyncio.get_event_loop().run_in_executor(None, _run_score_all, user.id)
+    return {"started": True}
+
+
+@app.post("/api/jobs/score-all/cancel")
+async def cancel_score_all(user: User = Depends(get_current_user)):
+    _score_task["running"] = False
+    return {"cancelled": True}
+
+
+@app.get("/api/jobs/score-all/status")
+async def score_all_status(user: User = Depends(get_current_user)):
+    return dict(_score_task)
 
 
 @app.post("/api/jobs/score-batch")

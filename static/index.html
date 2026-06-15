@@ -642,8 +642,8 @@ async function scoreAllSearchResults(){
   finally{document.getElementById('btn-score-all').disabled=false}
 }
 // Score All Unscored (tracker)
-let _scoringCancelled=false;
-function cancelScoring(){_scoringCancelled=true;}
+
+let _scorePollInterval=null;
 
 async function scoreAllUnscored(){
   const btn=document.getElementById('btn-score-unscored');
@@ -654,64 +654,53 @@ async function scoreAllUnscored(){
   const fill=document.getElementById('scoring-progress-fill');
   const errEl=document.getElementById('scoring-progress-errors');
 
-  // Fetch unscored jobs
-  const allJobs=await api('/api/jobs');
-  const toScore=allJobs.filter(j=>
-    (j.status==='new'||(j.score!==null&&j.score!==undefined&&j.score.total===0))
-  );
-  if(!toScore.length){alert('No unscored jobs found.');return;}
+  // Check if already running (tab reopen)
+  const status=await api('/api/jobs/score-all/status');
+  if(!status.running){
+    await api('/api/jobs/score-all',{method:'POST'});
+  }
 
-  // Determine delay: Gemini free tier needs throttling
-  const cfg=await api('/api/config');
-  const delay=cfg.fast_provider==='gemini'?5000:500;
-
-  _scoringCancelled=false;
   btn.disabled=true;
   cancelBtn.style.display='';
   bar.style.display='block';
   errEl.style.display='none';
-  errEl.textContent='';
 
-  let scored=0,errors=0;
-  const errorMsgs=[];
-  const total=toScore.length;
-
-  for(let i=0;i<total;i++){
-    if(_scoringCancelled)break;
-    const job=toScore[i];
-    const remaining=total-i-1;
-    const progress=Math.round((i/total)*100);
-    label.textContent=`Scoring job ${i+1} of ${total} — ${job.company}: ${job.title} — ${remaining} remaining`;
-    pct.textContent=progress+'%';
+  if(_scorePollInterval)clearInterval(_scorePollInterval);
+  _scorePollInterval=setInterval(async()=>{
+    const s=await api('/api/jobs/score-all/status');
+    const total=s.total||1;
+    const progress=Math.round((s.done/total)*100);
     fill.style.width=progress+'%';
-
-    try{
-      const res=await api('/api/jobs/score-batch',{method:'POST',body:[job.id]});
-      const r=res.results?.[0];
-      if(r?.status==='scored')scored++;
-      else if(r?.status==='skipped'){errors++;errorMsgs.push(`${job.company}: skipped (no job description)`);}
-      else{errors++;errorMsgs.push(`${job.company}: ${r?.error||r?.status||'unknown error'}`);}
-    }catch(e){
-      errors++;
-      errorMsgs.push(`${job.company}: ${e.message}`);
+    pct.textContent=progress+'%';
+    if(s.running){
+      const remaining=total-s.done;
+      label.textContent=`Scoring job ${s.done+1} of ${total} — ${s.current} — ${remaining} remaining`;
     }
-
-    if(errors>0){
+    if(s.errors>0){
       errEl.style.display='block';
-      errEl.textContent=`${errors} error${errors===1?'':'s'} so far — last: ${errorMsgs[errorMsgs.length-1]}`;
+      errEl.textContent=`${s.errors} error${s.errors===1?'':'s'} so far — last: ${s.error_msgs[s.error_msgs.length-1]}`;
     }
+    if(!s.running){
+      clearInterval(_scorePollInterval);
+      _scorePollInterval=null;
+      fill.style.width='100%';
+      pct.textContent='100%';
+      label.textContent=`Done: ${s.scored} scored, ${s.errors} error${s.errors===1?'':'s'}`;
+      cancelBtn.style.display='none';
+      btn.disabled=false;
+      setTimeout(()=>{bar.style.display='none';},4000);
+      loadTracker();
+    }
+  },2000);
+}
 
-    if(i<total-1&&!_scoringCancelled)await new Promise(r=>setTimeout(r,delay));
-  }
-
-  fill.style.width='100%';
-  pct.textContent='100%';
-  const cancelled=_scoringCancelled?' (cancelled)':'';
-  label.textContent=`Done${cancelled}: ${scored} scored, ${errors} error${errors===1?'':'s'}`;
-  cancelBtn.style.display='none';
-  btn.disabled=false;
-  setTimeout(()=>{bar.style.display='none';},4000);
-  loadTracker();
+async function cancelScoring(){
+  await api('/api/jobs/score-all/cancel',{method:'POST'});
+  if(_scorePollInterval){clearInterval(_scorePollInterval);_scorePollInterval=null;}
+  document.getElementById('btn-score-cancel').style.display='none';
+  document.getElementById('btn-score-unscored').disabled=false;
+  document.getElementById('scoring-progress-label').textContent='Cancelled.';
+  setTimeout(()=>{document.getElementById('scoring-progress-bar').style.display='none';},2000);
 }
 // Tracker
 let trackerJobs=[];
