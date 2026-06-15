@@ -350,6 +350,28 @@ async def score_all_status(user: User = Depends(get_current_user)):
     return dict(_score_task)
 
 
+@app.post("/api/jobs/apply-deal-breakers")
+async def apply_deal_breakers(user: User = Depends(get_current_user)):
+    """Re-apply deal breaker overrides to all scored jobs without re-calling the LLM."""
+    config = storage.load_config(user.id)
+    jobs = storage.load_all_jobs(user.id)
+    fixed = []
+    for job in jobs:
+        if not job.score:
+            continue
+        old_total = job.score.total
+        old_lane = job.score.recommended_lane
+        scoring._apply_deal_breaker_override(job.score, job.raw_jd, config.deal_breakers)
+        if job.score.total != old_total or job.score.recommended_lane != old_lane:
+            job.score.total = job.score.skills_match + job.score.scope_impact + job.score.pay_alignment
+            if job.score.recommended_lane.value == "ignore":
+                job.market_lane = MarketLane.IGNORE
+            storage.save_job(user.id, job)
+            fixed.append({"id": job.id, "company": job.company, "title": job.title,
+                          "old_score": old_total, "new_score": job.score.total})
+    return {"fixed": len(fixed), "jobs": fixed}
+
+
 @app.post("/api/jobs/score-batch")
 async def score_batch(request: Request, user: User = Depends(get_current_user)):
     body = await request.json()

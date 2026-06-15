@@ -132,6 +132,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div class="flex gap-8 items-center">
       <button class="btn btn-ghost btn-sm" id="btn-score-unscored" onclick="scoreAllUnscored()">Score All Unscored</button>
       <button class="btn btn-ghost btn-sm" id="btn-score-cancel" onclick="cancelScoring()" style="display:none;color:var(--red)">Cancel</button>
+      <button class="btn btn-ghost btn-sm" onclick="applyDealBreakers()" title="Re-apply deal breaker rules to all scored jobs without re-scoring">Fix Deal Breakers</button>
       <input type="text" id="tracker-search" placeholder="Search company or title..." oninput="renderTracker()" style="width:220px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="ready_to_apply">Ready to Apply</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
@@ -724,6 +725,13 @@ async function scoreAllUnscored(){
       loadTracker();
     }
   },2000);
+}
+
+async function applyDealBreakers(){
+  if(!confirm('Re-apply deal breaker rules to all scored jobs? This will override scores without re-calling the AI.'))return;
+  const r=await api('/api/jobs/apply-deal-breakers',{method:'POST'});
+  alert(`Done. ${r.fixed} job${r.fixed===1?'':'s'} overridden:\n${r.jobs.map(j=>`${j.company}: ${j.old_score}→${j.new_score}`).join('\n')}`);
+  loadTracker();
 }
 
 async function cancelScoring(){
