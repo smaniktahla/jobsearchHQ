@@ -250,7 +250,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 <div id="view-profile" class="view">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
     <h1>My Profile</h1>
-    <button class="btn btn-primary" onclick="saveProfile()">Save All</button>
+    <button class="btn btn-primary" onclick="saveProfile(this)">Save All</button>
   </div>
 
   <!-- Personal Info -->
@@ -298,7 +298,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div id="prof-cert-list" style="margin-top:12px"></div>
   </div>
 
-  <button class="btn btn-primary" onclick="saveProfile()">Save All</button>
+  <button class="btn btn-primary" onclick="saveProfile(this)">Save All</button>
 </div>
 
 <!-- Settings -->
@@ -336,7 +336,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="form-group"><label>Location</label><input type="text" id="prof-location" placeholder="Washington, DC"></div>
     </div>
     <div class="flex items-center gap-8 mt-8">
-      <button class="btn btn-ghost btn-sm" onclick="saveProfile()">Save Profile</button>
+      <button class="btn btn-ghost btn-sm" onclick="saveProfile(this)">Save Profile</button>
       <span id="prof-save-status" class="text-sm"></span>
     </div>
   </div>
@@ -1052,24 +1052,6 @@ async function sendEmail(){const data={to:document.getElementById('email-to').va
 function openConfirmationParser(){document.getElementById('confirm-email-text').value='';document.getElementById('confirm-result').style.display='none';document.getElementById('confirm-modal').classList.add('show')}
 async function parseConfirmation(){const txt=document.getElementById('confirm-email-text').value;if(!txt.trim())return alert('Paste email text');document.getElementById('confirm-loading').style.display='flex';try{const r=await api('/api/jobs/'+currentJobId+'/parse-confirmation?raw_email='+encodeURIComponent(txt),{method:'POST'});const p=r.parsed;let h=`<div class="card"><div class="card-header">Extracted Info</div>`;if(p.contact_email)h+=`<div>Best Contact: <strong>${esc(p.contact_email)}</strong></div>`;if(p.contact_name)h+=`<div>Name: ${esc(p.contact_name)}</div>`;if(p.contact_phone)h+=`<div>Phone: ${esc(p.contact_phone)}</div>`;if(p.portal_url)h+=`<div>Portal: <a href="${esc(p.portal_url)}" target="_blank" style="color:var(--accent)">${esc(p.portal_url)}</a></div>`;if(p.next_steps)h+=`<div>Next Steps: <em>${esc(p.next_steps)}</em></div>`;if(p.all_emails?.length)h+=`<div class="mt-8"><strong>All Emails Found:</strong><div class="flex gap-8 mt-8" style="flex-wrap:wrap">${p.all_emails.map(e=>`<button class="btn btn-ghost btn-sm" onclick="setContactEmail('${esc(e)}')" title="Set as contact email">${esc(e)}</button>`).join('')}</div></div>`;if(p.all_urls?.length)h+=`<div class="mt-8"><strong>All Links Found:</strong><ul style="margin:4px 0 0 16px">${p.all_urls.map(u=>`<li class="text-sm"><a href="${u.startsWith('http')?esc(u):'https://'+esc(u)}" target="_blank" style="color:var(--accent)">${esc(u)}</a></li>`).join('')}</ul></div>`;if(p.is_rejection)h+=`<div class="mt-8" style="color:var(--red)">⚠ This looks like a rejection.</div>`;if(p.is_interview_request)h+=`<div class="mt-8" style="color:var(--green)">✓ Interview request detected!</div>`;h+='</div>';document.getElementById('confirm-result').innerHTML=h;document.getElementById('confirm-result').style.display='block';setTimeout(()=>{document.getElementById('confirm-modal').classList.remove('show');showDetail(currentJobId)},3000)}catch(e){alert(e.message)}finally{document.getElementById('confirm-loading').style.display='none'}}
 // Profile
-async function loadProfile(){
-  try{
-    const p=await api('/api/profile');
-    document.getElementById('prof-name').value=p.name||'';
-    document.getElementById('prof-email').value=p.email||'';
-    document.getElementById('prof-phone').value=p.phone||'';
-    document.getElementById('prof-location').value=p.location||'';
-  }catch(e){}
-}
-async function saveProfile(){
-  const s=document.getElementById('prof-save-status');
-  if(s){s.textContent='Saving...';s.style.color='var(--text-dim)';}
-  try{
-    await api('/api/profile',{method:'PUT',body:{name:document.getElementById('prof-name').value,email:document.getElementById('prof-email').value,phone:document.getElementById('prof-phone').value,location:document.getElementById('prof-location').value}});
-    if(s){s.textContent='✓ Saved';s.style.color='var(--green)';setTimeout(()=>{s.textContent=''},2000);}
-  }catch(e){if(s){s.textContent='✕ '+e.message;s.style.color='var(--red)';}}
-}
-// Profile
 let _profileData = {};
 async function loadProfile(){
   try{
@@ -1134,7 +1116,7 @@ function removeWorkEntry(i){_profileData.work_experience.splice(i,1);renderWorkL
 function addCert(){_profileData.certifications=_profileData.certifications||[];_profileData.certifications.push('');renderCertList(_profileData.certifications);}
 function removeCert(i){_profileData.certifications.splice(i,1);renderCertList(_profileData.certifications);}
 
-async function saveProfile(){
+async function saveProfile(btn){
   const payload={
     name:document.getElementById('prof-name').value,
     email:document.getElementById('prof-email').value,
@@ -1157,8 +1139,7 @@ async function saveProfile(){
   };
   try{
     await api('/api/profile',{method:'PUT',body:payload});
-    const btn=event.target; btn.textContent='Saved ✓'; btn.style.background='var(--green)';
-    setTimeout(()=>{btn.textContent='Save All';btn.style.background='';},2000);
+    if(btn){btn.textContent='Saved ✓';btn.style.background='var(--green)';setTimeout(()=>{btn.textContent='Save All';btn.style.background='';},2000);}
   }catch(e){alert('Save failed: '+e.message);}
 }
 
