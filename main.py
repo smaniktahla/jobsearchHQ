@@ -26,7 +26,7 @@ from auth import (
 )
 from pydantic import BaseModel
 from models import (
-    AgentEvent, AgentEventType, AppConfig, ApplicationResult,
+    ReviewStatus, AgentEvent, AgentEventType, AppConfig, ApplicationResult,
     EmailCompose, EmailRecord, IntakeSource, Job, JobCreate,
     JobStatus, JobUpdate, MarketLane, ProfileUpdate, User,
 )
@@ -942,6 +942,28 @@ def get_agent_log(job_id: str, request: Request):
     }
 
 
+
+@app.patch("/api/agent/jobs/{job_id}/review")
+def agent_set_review_status(job_id: str, request: Request, body: dict):
+    """Set review_status on a job (pending/approved/rejected). Agent-auth."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    status_val = body.get("review_status", "")
+    try:
+        new_status = ReviewStatus(status_val)
+    except ValueError:
+        raise HTTPException(400, f"Invalid review_status '{status_val}'. Use: pending, approved, rejected")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.review_status = new_status
+    job.updated_at = datetime.now().isoformat()
+    storage.save_job(admin_id, job)
+    return {"job_id": job_id, "review_status": new_status}
+
+
 # ── Email ─────────────────────────────────────────────────────────────────────
 
 @app.post("/api/jobs/{job_id}/send-email")
@@ -1150,6 +1172,59 @@ def send_follow_up_digest(user: User = Depends(get_current_user)):
         return email_service.send_follow_up_digest(config, due_jobs)
     except Exception as e:
         raise HTTPException(500, f"Email send failed: {str(e)}")
+
+
+
+@app.post("/api/jobs/send-scored-digest")
+def send_scored_digest(request: Request):
+    """Email digest of pending-review jobs scored >= threshold. Accepts agent API key or user session."""
+    key = request.headers.get("X-API-Key", "")
+    if key and verify_agent_api_key(key):
+        admin_id = get_admin_user_id()
+    else:
+        raise HTTPException(401, "Authentication required — use X-API-Key header")
+
+    config = storage.load_config(admin_id)
+    if not config.smtp_user or not config.smtp_password:
+        raise HTTPException(400, "SMTP not configured")
+
+    jobs = storage.load_all_jobs(admin_id)
+    threshold = config.auto_generate_threshold or 7
+    eligible = [
+        j for j in jobs
+        if j.score and j.score.total >= threshold
+        and j.review_status == ReviewStatus.PENDING
+        and j.status not in (JobStatus.APPLIED, JobStatus.REJECTED, JobStatus.PASSED)
+    ]
+    eligible.sort(key=lambda j: j.score.total, reverse=True)
+
+    if not eligible:
+        return {"sent": False, "reason": "No pending high-score jobs", "count": 0}
+
+    header = f"Job Search HQ: {len(eligible)} job(s) scored >={threshold} awaiting review"
+    parts = [header, ""]
+    for j in eligible:
+        score_str = f"{j.score.total}/10" if j.score else "?"
+        parts.append(f"[{score_str}] {j.title} @ {j.company}")
+        if j.pay_range:
+            parts.append(f"  Pay: {j.pay_range}")
+        if j.url:
+            parts.append(f"  URL: {j.url}")
+        if j.score and j.score.analysis:
+            parts.append(f"  Why: {j.score.analysis[:200]}")
+        parts.append(f"  ID: {j.id}")
+        parts.append("")
+    parts.append("Review at: http://10.10.10.13:8094")
+    body = "\n".join(parts)
+
+    to_addr = config.follow_up_email or config.smtp_user
+    email_service.send_email(
+        config=config,
+        to=to_addr,
+        subject=f"JSHQ: {len(eligible)} new job(s) ready for review",
+        body=body,
+    )
+    return {"sent": True, "count": len(eligible), "to": to_addr}
 
 
 # ── Config, Profile & Resumes ─────────────────────────────────────────────────

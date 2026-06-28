@@ -101,6 +101,12 @@ class CompanyResearch(BaseModel):
     searches_run: list[str] = []
 
 
+class ReviewStatus(str, Enum):
+    PENDING  = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class AgentEventType(str, Enum):
     SCORE      = "score"
     DISPATCH   = "dispatch"
@@ -144,6 +150,7 @@ class Job(BaseModel):
     research: Optional[CompanyResearch] = None
     notes: str = ""
     ats_url: str = ""          # direct ATS portal URL (set by dispatch.js)
+    review_status: ReviewStatus = ReviewStatus.PENDING  # human go/no-go decision
     agent_log: list[AgentEvent] = []
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())

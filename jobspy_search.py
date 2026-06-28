@@ -4,10 +4,11 @@ Scrapes LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter for job postings.
 """
 
 import logging
+import math
+from datetime import datetime
 from pydantic import BaseModel
 from jobspy import scrape_jobs
 
-import company_site_search
 from models import Job, JobStatus, MarketLane, IntakeSource
 import storage
 import scoring
@@ -19,15 +20,14 @@ class JobSearchRequest(BaseModel):
     search_term: str
     location: str = "Washington DC-Baltimore Area"
     sites: list[str] = ["indeed", "linkedin", "google"]
-    company_sites: list[company_site_search.CompanySiteRequest] = []
     results_wanted: int = 25
     hours_old: int = 72
     is_remote: bool = True
-    job_type: str = ""
+    job_type: str = ""  # fulltime, parttime, contract, internship, or empty for all
     distance: int = 50
     linkedin_fetch_description: bool = True
     country_indeed: str = "USA"
-    auto_score: bool = False
+    auto_score: bool = False  # score jobs with full descriptions
     skip_existing: bool = True
 
 
@@ -39,9 +39,13 @@ class JobSearchResult(BaseModel):
 
 
 def find_existing(all_jobs: list[Job], title: str, company: str, url: str) -> Job | None:
+    """Check for duplicate by URL or title+company."""
     for j in all_jobs:
         if url and j.url:
-            if url.rstrip("/").lower() == j.url.rstrip("/").lower():
+            # Normalize URLs for comparison
+            u1 = url.rstrip("/").lower()
+            u2 = j.url.rstrip("/").lower()
+            if u1 == u2:
                 return j
         if (title and company and
                 title.lower().strip() == j.title.lower().strip() and
@@ -50,29 +54,12 @@ def find_existing(all_jobs: list[Job], title: str, company: str, url: str) -> Jo
     return None
 
 
-def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
-    jobspy_sites = [s for s in req.sites if s != "company_site"]
-    result = JobSearchResult()
+def run_search(req: JobSearchRequest) -> JobSearchResult:
+    """Execute a JobSpy search and import results into the job tracker."""
 
-    if req.company_sites:
-        company_result = company_site_search.search_company_sites(
-            sites=req.company_sites,
-            search_term=req.search_term,
-            user_id=user_id,
-            results_wanted=req.results_wanted,
-            auto_score=req.auto_score,
-            skip_existing=req.skip_existing,
-        )
-        result.created.extend(company_result.get("created", []))
-        result.skipped.extend(company_result.get("skipped", []))
-        result.errors.extend(company_result.get("errors", []))
-        result.total_scraped += company_result.get("total_scraped", 0)
-
-    if not jobspy_sites:
-        return result
-
+    # Build scrape_jobs kwargs
     kwargs = {
-        "site_name": jobspy_sites,
+        "site_name": req.sites,
         "search_term": req.search_term,
         "location": req.location,
         "results_wanted": req.results_wanted,
@@ -84,30 +71,34 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
         "description_format": "markdown",
     }
 
-    if "google" in jobspy_sites:
+    # Google Jobs needs its own search term with location baked in
+    if "google" in req.sites:
         remote_str = " remote" if req.is_remote else ""
         kwargs["google_search_term"] = f"{req.search_term}{remote_str} jobs near {req.location}"
 
     if req.job_type:
         kwargs["job_type"] = req.job_type
 
-    logger.info(f"JobSpy search: sites={jobspy_sites}, term='{req.search_term}', location='{req.location}'")
+    # Run the scrape
+    logger.info(f"JobSpy search: sites={req.sites}, term='{req.search_term}', location='{req.location}'")
     try:
         df = scrape_jobs(**kwargs)
     except Exception as e:
         logger.error(f"JobSpy scrape failed: {e}", exc_info=True)
-        result.errors.append({"error": f"Scrape failed: {str(e)}"})
-        return result
+        return JobSearchResult(errors=[{"error": f"Scrape failed: {str(e)}"}])
 
     if df is None or df.empty:
-        return result
+        logger.info("JobSpy returned 0 results")
+        return JobSearchResult(total_scraped=0)
 
+    # Log per-site breakdown
     if "site" in df.columns:
-        logger.info(f"JobSpy results by site: {df['site'].value_counts().to_dict()}")
+        site_counts = df["site"].value_counts().to_dict()
+        logger.info(f"JobSpy results by site: {site_counts}")
     logger.info(f"JobSpy total results: {len(df)}")
 
-    result.total_scraped += len(df)
-    all_existing = storage.load_all_jobs(user_id) if req.skip_existing else []
+    result = JobSearchResult(total_scraped=len(df))
+    all_existing = storage.load_all_jobs() if req.skip_existing else []
 
     for _, row in df.iterrows():
         try:
@@ -120,12 +111,19 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
             if not title:
                 continue
 
+            # Skip duplicates
             if req.skip_existing:
                 existing = find_existing(all_existing, title, company, job_url)
                 if existing:
-                    result.skipped.append({"id": existing.id, "title": title, "company": company, "reason": "duplicate"})
+                    result.skipped.append({
+                        "id": existing.id,
+                        "title": title,
+                        "company": company,
+                        "reason": "duplicate",
+                    })
                     continue
 
+            # Build location string
             city = str(row.get("city", "")).strip() if row.get("city") else ""
             state = str(row.get("state", "")).strip() if row.get("state") else ""
             location_str = ", ".join(filter(None, [city, state]))
@@ -133,16 +131,18 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
             if is_remote:
                 location_str = f"{location_str} (Remote)" if location_str else "Remote"
 
+            # Build pay range string
             pay_range = ""
             min_amt = row.get("min_amount")
             max_amt = row.get("max_amount")
             interval = str(row.get("interval", "")).strip() if row.get("interval") else ""
+            currency = str(row.get("currency", "USD")).strip() if row.get("currency") else "USD"
             if min_amt and max_amt:
                 try:
-                    import math
-                    min_val, max_val = float(min_amt), float(max_amt)
+                    min_val = float(min_amt)
+                    max_val = float(max_amt)
                     if math.isnan(min_val) or math.isnan(max_val):
-                        raise ValueError("NaN pay value")
+                        raise ValueError("NaN")
                     if interval == "yearly":
                         pay_range = f"${min_val:,.0f} - ${max_val:,.0f}/year"
                     elif interval == "hourly":
@@ -152,6 +152,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
                 except (ValueError, TypeError):
                     pass
 
+            # Build raw JD
             jd_parts = [description] if description and len(description) > 50 else []
             if not jd_parts:
                 jd_parts = [
@@ -161,8 +162,10 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
                 ]
             raw_jd = "\n".join(p for p in jd_parts if p).strip()
 
+            # Determine job type
             job_type_raw = str(row.get("job_type", "")).strip().lower() if row.get("job_type") else ""
 
+            # Build notes
             date_posted = ""
             if row.get("date_posted"):
                 try:
@@ -178,6 +181,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
             if job_type_raw:
                 notes_parts.append(f"Type: {job_type_raw}")
 
+            # Create the job
             job = Job(
                 title=title,
                 company=company,
@@ -190,21 +194,26 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
                 notes=" | ".join(notes_parts),
             )
 
-            storage.save_job(user_id, job)
+            storage.save_job(job)
             all_existing.append(job)
 
             score_val = None
+            # Auto-score if requested and we have a real description
             if req.auto_score and len(raw_jd) > 200:
                 try:
-                    score_result = scoring.score_job(job, user_id)
+                    score_result = scoring.score_job(job)
                     job.score = score_result
                     job.update_status(JobStatus.SCORED)
                     if score_result.recommended_lane:
                         job.market_lane = score_result.recommended_lane
-                    storage.save_job(user_id, job)
+                    storage.save_job(job)
                     score_val = score_result.total
                 except Exception as e:
-                    result.errors.append({"title": title, "company": company, "error": f"scoring failed: {str(e)}"})
+                    result.errors.append({
+                        "title": title,
+                        "company": company,
+                        "error": f"scoring failed: {str(e)}",
+                    })
 
             result.created.append({
                 "id": job.id,
@@ -213,7 +222,6 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
                 "location": location_str,
                 "pay_range": pay_range,
                 "source": site,
-                "job_url": job_url,
                 "has_description": len(raw_jd) > 200,
                 "score": score_val,
             })
