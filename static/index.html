@@ -538,6 +538,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </div>
 </div>
 <script>
+if(new URLSearchParams(window.location.search).get('logged_out')==='1'){window.location.replace('/auth/login');}
 const API='';let currentJobId=null,allJobs=[],currentJob=null;
 let resumeLabels={director:'Resume 1 — Director',base:'Resume 2 — Base',contract:'Resume 3 — Contract'};
 function resumeLabel(key){return resumeLabels[key]||key||'none'}

@@ -330,8 +330,7 @@ async def callback_handler(request: Request):
 async def logout_handler(request: Request):
     import logging as _logging
     _log = _logging.getLogger(__name__)
-    # Default: show login overlay locally (no Authentik cooperation needed)
-    redirect_target = "/?logged_out=1"
+    redirect_target = "/auth/login"
     try:
         discovery = await get_discovery()
         end_session = discovery.get("end_session_endpoint")
@@ -339,11 +338,18 @@ async def logout_handler(request: Request):
             cfg = load_system_config()
             base_url = cfg.get("oidc_redirect_uri", "").rsplit("/auth/callback", 1)[0]
             from urllib.parse import urlencode
-            params = urlencode({"post_logout_redirect_uri": base_url + "/"})
-            redirect_target = f"{end_session}?{params}"
+            logout_params: dict = {"post_logout_redirect_uri": base_url + "/auth/login"}
+            # Pass id_token_hint so Authentik completes RP-initiated logout and redirects back
+            session = get_session_from_cookie(request)
+            if session:
+                id_token = get_id_token(session["user_id"])
+                if id_token:
+                    logout_params["id_token_hint"] = id_token
+            logout_params["client_id"] = cfg["oidc_client_id"]
+            redirect_target = f"{end_session}?{urlencode(logout_params)}"
             _log.info("Logout: RP-initiated to %s", end_session)
     except Exception as exc:
-        _log.warning("Logout: RP-initiated logout failed (%s), falling back to local overlay", exc)
+        _log.warning("Logout: RP-initiated logout failed (%s), falling back to /auth/login", exc)
     response = RedirectResponse(redirect_target, status_code=302)
     clear_session_cookie(response, secure=True)
     clear_session_cookie(response, secure=False)
