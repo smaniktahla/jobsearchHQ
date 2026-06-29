@@ -323,6 +323,7 @@ class AppConfig(BaseModel):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    email_html: bool = True   # send HTML digest emails (false = plain text only)
     # Resume variants
     resume_labels: dict[str, str] = {
         "director": "Resume 1 — Director",

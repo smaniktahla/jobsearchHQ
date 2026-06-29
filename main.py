@@ -580,7 +580,7 @@ def send_scored_digest(request: Request):
         to=to_addr,
         subject=f"JSHQ: {len(eligible)} job(s) ready for review",
         body=plain_body,
-        html_body=html_body,
+        html_body=html_body if config.email_html else "",
     )
     return {"sent": True, "count": len(eligible), "to": to_addr}
 
