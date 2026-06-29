@@ -502,29 +502,85 @@ def send_scored_digest(request: Request):
     if not eligible:
         return {"sent": False, "reason": "No pending high-score jobs", "count": 0}
 
-    header = f"Job Search HQ: {len(eligible)} job(s) scored >={threshold} awaiting review"
-    parts = [header, ""]
+    JSHQ_URL = "http://jobsearch.lightbulbfan.duckdns.org"
+
+    # ── Plain-text fallback ───────────────────────────────────────────────────
+    lines = [f"Job Search HQ: {len(eligible)} job(s) scored >={threshold} awaiting review", ""]
     for j in eligible:
         score_str = f"{j.score.total}/10" if j.score else "?"
-        parts.append(f"[{score_str}] {j.title} @ {j.company}")
         pay = j.pay_range if j.pay_range and "nan" not in j.pay_range.lower() else ""
+        lines.append(f"[{score_str}] {j.title} @ {j.company}")
         if pay:
-            parts.append(f"  Pay: {pay}")
+            lines.append(f"  Pay: {pay}")
         if j.score and j.score.raw_analysis:
-            parts.append(f"  Why: {j.score.raw_analysis[:200]}")
-        jshq_url = f"http://jobsearch.lightbulbfan.duckdns.org"
-        parts.append(f"  Review: {jshq_url}")
-        parts.append(f"  ID: {j.id}")
-        parts.append("")
-    parts.append(f"Open JSHQ: http://jobsearch.lightbulbfan.duckdns.org")
-    body = "\n".join(parts)
+            lines.append(f"  Why: {j.score.raw_analysis[:200]}")
+        lines.append(f"  Open: {JSHQ_URL}")
+        lines.append("")
+    lines.append(f"Review all: {JSHQ_URL}")
+    plain_body = "\n".join(lines)
+
+    # ── HTML body ─────────────────────────────────────────────────────────────
+    def score_color(total):
+        if total >= 9: return "#34d399"   # green
+        if total >= 8: return "#4f8ff7"   # accent blue
+        if total >= 7: return "#fbbf24"   # yellow
+        return "#8b8fa3"
+
+    cards_html = []
+    for j in eligible:
+        total = j.score.total if j.score else 0
+        pay = j.pay_range if j.pay_range and "nan" not in j.pay_range.lower() else ""
+        analysis = (j.score.raw_analysis[:280] + "...") if j.score and j.score.raw_analysis else ""
+        sc = score_color(total)
+        cards_html.append(f"""
+        <div style="background:#1a1d27;border:1px solid #2e3347;border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+            <span style="background:{sc};color:#0f1117;font-weight:700;font-size:15px;border-radius:6px;padding:2px 10px;white-space:nowrap;">{total}/10</span>
+            <span style="color:#e1e4ed;font-size:16px;font-weight:600;">{j.title}</span>
+          </div>
+          <div style="color:#8b8fa3;font-size:13px;margin-bottom:6px;">{j.company}</div>
+          {"<div style='color:#4f8ff7;font-size:13px;margin-bottom:6px;'>💰 " + pay + "</div>" if pay else ""}
+          {"<div style='color:#c4c8d8;font-size:13px;line-height:1.5;margin-bottom:10px;'>" + analysis + "</div>" if analysis else ""}
+          <a href="{JSHQ_URL}" style="display:inline-block;background:rgba(79,143,247,.15);color:#4f8ff7;border:1px solid rgba(79,143,247,.3);border-radius:6px;padding:5px 14px;font-size:12px;text-decoration:none;">Open in JSHQ →</a>
+        </div>""")
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:680px;margin:0 auto;padding:24px 16px;">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+      <span style="color:#4f8ff7;font-size:22px;font-weight:700;">JOB SEARCH HQ</span>
+    </div>
+
+    <div style="background:#1a1d27;border:1px solid #2e3347;border-radius:10px;padding:20px;margin-bottom:20px;">
+      <div style="color:#e1e4ed;font-size:18px;font-weight:600;margin-bottom:4px;">
+        {len(eligible)} job{'s' if len(eligible) != 1 else ''} ready for review
+      </div>
+      <div style="color:#8b8fa3;font-size:13px;">Scored &ge;{threshold}/10 &middot; Pending your go/no-go</div>
+    </div>
+
+    {"".join(cards_html)}
+
+    <div style="text-align:center;margin-top:24px;">
+      <a href="{JSHQ_URL}" style="display:inline-block;background:#4f8ff7;color:#fff;border-radius:8px;padding:12px 32px;font-size:15px;font-weight:600;text-decoration:none;">Open Job Search HQ</a>
+    </div>
+
+    <div style="color:#4a4f68;font-size:11px;text-align:center;margin-top:20px;">
+      Sent by your homelab automation &middot; Job Search HQ
+    </div>
+  </div>
+</body>
+</html>"""
 
     to_addr = config.follow_up_email or config.smtp_user
     email_service.send_email(
         config=config,
         to=to_addr,
-        subject=f"JSHQ: {len(eligible)} new job(s) ready for review",
-        body=body,
+        subject=f"JSHQ: {len(eligible)} job(s) ready for review",
+        body=plain_body,
+        html_body=html_body,
     )
     return {"sent": True, "count": len(eligible), "to": to_addr}
 

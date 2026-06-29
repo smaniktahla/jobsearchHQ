@@ -25,12 +25,13 @@ def send_email(
     body: str,
     cc: str = "",
     attachments: list[str] = None,
+    html_body: str = "",
 ) -> dict:
-    """Send an email via Gmail SMTP with optional file attachments."""
+    """Send an email via Gmail SMTP with optional HTML body and file attachments."""
     if not config.smtp_user or not config.smtp_password:
         raise ValueError("SMTP not configured. Set Gmail address and App Password in Settings.")
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart("alternative" if html_body else "mixed")
     msg["From"] = config.smtp_user
     msg["To"] = to
     msg["Subject"] = subject
@@ -38,6 +39,8 @@ def send_email(
         msg["Cc"] = cc
 
     msg.attach(MIMEText(body, "plain"))
+    if html_body:
+        msg.attach(MIMEText(html_body, "html"))
 
     # Attach files
     if attachments:
