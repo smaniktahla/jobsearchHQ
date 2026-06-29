@@ -476,6 +476,58 @@ async def apply_batch(
     return {"results": results}
 
 
+@app.post("/api/jobs/send-scored-digest")
+def send_scored_digest(request: Request):
+    """Email digest of pending-review jobs scored >= threshold. Accepts agent API key or user session."""
+    key = request.headers.get("X-API-Key", "")
+    if key and verify_agent_api_key(key):
+        admin_id = get_admin_user_id()
+    else:
+        raise HTTPException(401, "Authentication required — use X-API-Key header")
+
+    config = storage.load_config(admin_id)
+    if not config.smtp_user or not config.smtp_password:
+        raise HTTPException(400, "SMTP not configured")
+
+    jobs = storage.load_all_jobs(admin_id)
+    threshold = config.auto_generate_threshold or 7
+    eligible = [
+        j for j in jobs
+        if j.score and j.score.total >= threshold
+        and j.review_status == ReviewStatus.PENDING
+        and j.status not in (JobStatus.APPLIED, JobStatus.REJECTED, JobStatus.PASSED)
+    ]
+    eligible.sort(key=lambda j: j.score.total, reverse=True)
+
+    if not eligible:
+        return {"sent": False, "reason": "No pending high-score jobs", "count": 0}
+
+    header = f"Job Search HQ: {len(eligible)} job(s) scored >={threshold} awaiting review"
+    parts = [header, ""]
+    for j in eligible:
+        score_str = f"{j.score.total}/10" if j.score else "?"
+        parts.append(f"[{score_str}] {j.title} @ {j.company}")
+        if j.pay_range:
+            parts.append(f"  Pay: {j.pay_range}")
+        if j.url:
+            parts.append(f"  URL: {j.url}")
+        if j.score and j.score.raw_analysis:
+            parts.append(f"  Why: {j.score.raw_analysis[:200]}")
+        parts.append(f"  ID: {j.id}")
+        parts.append("")
+    parts.append("Review at: http://10.10.10.13:8094")
+    body = "\n".join(parts)
+
+    to_addr = config.follow_up_email or config.smtp_user
+    email_service.send_email(
+        config=config,
+        to=to_addr,
+        subject=f"JSHQ: {len(eligible)} new job(s) ready for review",
+        body=body,
+    )
+    return {"sent": True, "count": len(eligible), "to": to_addr}
+
+
 @app.patch("/api/jobs/{job_id}")
 def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_user)):
     job = storage.load_job(user.id, job_id)
@@ -1174,57 +1226,6 @@ def send_follow_up_digest(user: User = Depends(get_current_user)):
         raise HTTPException(500, f"Email send failed: {str(e)}")
 
 
-
-@app.post("/api/jobs/send-scored-digest")
-def send_scored_digest(request: Request):
-    """Email digest of pending-review jobs scored >= threshold. Accepts agent API key or user session."""
-    key = request.headers.get("X-API-Key", "")
-    if key and verify_agent_api_key(key):
-        admin_id = get_admin_user_id()
-    else:
-        raise HTTPException(401, "Authentication required — use X-API-Key header")
-
-    config = storage.load_config(admin_id)
-    if not config.smtp_user or not config.smtp_password:
-        raise HTTPException(400, "SMTP not configured")
-
-    jobs = storage.load_all_jobs(admin_id)
-    threshold = config.auto_generate_threshold or 7
-    eligible = [
-        j for j in jobs
-        if j.score and j.score.total >= threshold
-        and j.review_status == ReviewStatus.PENDING
-        and j.status not in (JobStatus.APPLIED, JobStatus.REJECTED, JobStatus.PASSED)
-    ]
-    eligible.sort(key=lambda j: j.score.total, reverse=True)
-
-    if not eligible:
-        return {"sent": False, "reason": "No pending high-score jobs", "count": 0}
-
-    header = f"Job Search HQ: {len(eligible)} job(s) scored >={threshold} awaiting review"
-    parts = [header, ""]
-    for j in eligible:
-        score_str = f"{j.score.total}/10" if j.score else "?"
-        parts.append(f"[{score_str}] {j.title} @ {j.company}")
-        if j.pay_range:
-            parts.append(f"  Pay: {j.pay_range}")
-        if j.url:
-            parts.append(f"  URL: {j.url}")
-        if j.score and j.score.analysis:
-            parts.append(f"  Why: {j.score.analysis[:200]}")
-        parts.append(f"  ID: {j.id}")
-        parts.append("")
-    parts.append("Review at: http://10.10.10.13:8094")
-    body = "\n".join(parts)
-
-    to_addr = config.follow_up_email or config.smtp_user
-    email_service.send_email(
-        config=config,
-        to=to_addr,
-        subject=f"JSHQ: {len(eligible)} new job(s) ready for review",
-        body=body,
-    )
-    return {"sent": True, "count": len(eligible), "to": to_addr}
 
 
 # ── Config, Profile & Resumes ─────────────────────────────────────────────────
