@@ -507,15 +507,16 @@ def send_scored_digest(request: Request):
     for j in eligible:
         score_str = f"{j.score.total}/10" if j.score else "?"
         parts.append(f"[{score_str}] {j.title} @ {j.company}")
-        if j.pay_range:
-            parts.append(f"  Pay: {j.pay_range}")
-        if j.url:
-            parts.append(f"  URL: {j.url}")
+        pay = j.pay_range if j.pay_range and "nan" not in j.pay_range.lower() else ""
+        if pay:
+            parts.append(f"  Pay: {pay}")
         if j.score and j.score.raw_analysis:
             parts.append(f"  Why: {j.score.raw_analysis[:200]}")
+        jshq_url = f"http://jobsearch.lightbulbfan.duckdns.org"
+        parts.append(f"  Review: {jshq_url}")
         parts.append(f"  ID: {j.id}")
         parts.append("")
-    parts.append("Review at: http://10.10.10.13:8094")
+    parts.append(f"Open JSHQ: http://jobsearch.lightbulbfan.duckdns.org")
     body = "\n".join(parts)
 
     to_addr = config.follow_up_email or config.smtp_user
