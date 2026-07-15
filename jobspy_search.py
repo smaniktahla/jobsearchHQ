@@ -54,7 +54,7 @@ def find_existing(all_jobs: list[Job], title: str, company: str, url: str) -> Jo
     return None
 
 
-def run_search(req: JobSearchRequest) -> JobSearchResult:
+def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
     """Execute a JobSpy search and import results into the job tracker."""
 
     # Build scrape_jobs kwargs
@@ -98,7 +98,7 @@ def run_search(req: JobSearchRequest) -> JobSearchResult:
     logger.info(f"JobSpy total results: {len(df)}")
 
     result = JobSearchResult(total_scraped=len(df))
-    all_existing = storage.load_all_jobs() if req.skip_existing else []
+    all_existing = storage.load_all_jobs(user_id) if req.skip_existing else []
 
     for _, row in df.iterrows():
         try:
@@ -194,19 +194,19 @@ def run_search(req: JobSearchRequest) -> JobSearchResult:
                 notes=" | ".join(notes_parts),
             )
 
-            storage.save_job(job)
+            storage.save_job(user_id, job)
             all_existing.append(job)
 
             score_val = None
             # Auto-score if requested and we have a real description
             if req.auto_score and len(raw_jd) > 200:
                 try:
-                    score_result = scoring.score_job(job)
+                    score_result = scoring.score_job(job, user_id)
                     job.score = score_result
                     job.update_status(JobStatus.SCORED)
                     if score_result.recommended_lane:
                         job.market_lane = score_result.recommended_lane
-                    storage.save_job(job)
+                    storage.save_job(user_id, job)
                     score_val = score_result.total
                 except Exception as e:
                     result.errors.append({

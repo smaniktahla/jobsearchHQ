@@ -964,6 +964,60 @@ def get_job_package(job_id: str, request: Request):
     }
 
 
+@app.get("/api/agent/jobs/{job_id}/research")
+def agent_get_job_research(job_id: str, request: Request):
+    """Return existing company research (contacts, summary) for a job, if
+    any has been run. Read-only - does NOT trigger a new (paid) research
+    run. Called by company-intel."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return {
+        "job_id": job_id,
+        "company": job.company,
+        "title": job.title,
+        "research": job.research,
+    }
+
+
+@app.post("/api/agent/jobs/{job_id}/research")
+def agent_trigger_job_research(job_id: str, request: Request):
+    """Trigger a NEW company research run for a job (uses the paid Claude
+    web-search API, same as the session-authenticated /api/jobs/{id}/research
+    route). Deliberately a separate opt-in endpoint from the GET above, so
+    an agent reading job data doesn't silently incur API cost. Called by
+    company-intel."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.company or job.company.lower() in ("nan", "unknown", ""):
+        raise HTTPException(400, "Job has no company name to research")
+    try:
+        result = company_research.research_company(
+            company=job.company, job_title=job.title, user_id=admin_id,
+        )
+        from models import CompanyResearch, Contact
+        job.research = CompanyResearch(
+            contacts=[Contact(**c) for c in result.get("contacts", [])],
+            company_summary=result.get("company_summary", ""),
+            researched_at=datetime.now().isoformat(),
+            searches_run=result.get("searches_run", []),
+        )
+        job.updated_at = datetime.now().isoformat()
+        storage.save_job(admin_id, job)
+    except Exception as e:
+        raise HTTPException(500, f"Research failed: {str(e)}")
+    return {"job_id": job_id, "researched": True}
+
+
 @app.get("/api/agent/jobs/{job_id}/resume/download")
 def download_agent_resume(job_id: str, request: Request):
     """Download the tailored resume .docx for a job. Called by dispatch.js."""
@@ -1071,6 +1125,75 @@ def agent_set_review_status(job_id: str, request: Request, body: dict):
     job.updated_at = datetime.now().isoformat()
     storage.save_job(admin_id, job)
     return {"job_id": job_id, "review_status": new_status}
+
+
+@app.get("/api/agent/jobs/needs-refresh")
+def agent_jobs_needing_refresh(request: Request, url_contains: str = "", limit: int = 500):
+    """
+    List pending jobs whose raw_jd is too thin to score (e.g. digest-sourced
+    listings awaiting a full JD fetch). Optionally filter by URL substring
+    (e.g. 'linkedin.com') so a single-site refresher only pulls its own jobs.
+    """
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    jobs = storage.load_all_jobs(admin_id)
+    candidates = [
+        j for j in jobs
+        if j.review_status == ReviewStatus.PENDING
+        and not j.score
+        and len((j.raw_jd or "").strip()) < 200
+        and j.url
+        and (url_contains in j.url if url_contains else True)
+    ]
+    candidates = candidates[:limit]
+    return {
+        "count": len(candidates),
+        "jobs": [{"id": j.id, "url": j.url, "title": j.title, "company": j.company} for j in candidates],
+    }
+
+
+class RefreshAndScorePayload(BaseModel):
+    raw_jd: str
+    title: str = ""
+    company: str = ""
+    pay_range: str = ""
+
+
+@app.post("/api/agent/jobs/{job_id}/refresh-and-score")
+def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, request: Request):
+    """Replace a job's raw_jd with a freshly-fetched full JD and score it. Agent-auth."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    if not payload.raw_jd.strip():
+        raise HTTPException(400, "raw_jd is required")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    job.raw_jd = payload.raw_jd.strip()
+    if payload.title:
+        job.title = payload.title
+    if payload.company:
+        job.company = payload.company
+    if payload.pay_range:
+        job.pay_range = payload.pay_range
+    job.updated_at = datetime.now().isoformat()
+
+    try:
+        result = scoring.score_job(job, admin_id)
+        job.score = result
+        job.update_status(JobStatus.SCORED)
+        if result.recommended_lane:
+            job.market_lane = result.recommended_lane
+        storage.save_job(admin_id, job)
+        return {"job_id": job_id, "total": result.total, "recommended_lane": job.market_lane}
+    except Exception as e:
+        storage.save_job(admin_id, job)
+        raise HTTPException(500, f"Scoring failed after refresh: {str(e)}")
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────

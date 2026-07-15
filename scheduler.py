@@ -21,6 +21,7 @@ from apscheduler.triggers.cron import CronTrigger
 import storage
 import scoring
 import jobspy_search
+import email_intake
 import docx_builder
 from models import AppConfig, JobStatus
 
@@ -179,6 +180,7 @@ def run_daily_pipeline(user_id: str) -> dict:
         "user_id": user_id,
         "started_at": datetime.now().isoformat(),
         "search_results": [],
+        "email_alerts": {},
         "scored": [],
         "generated": [],
         "errors": [],
@@ -186,15 +188,36 @@ def run_daily_pipeline(user_id: str) -> dict:
 
     logger.info(f"=== Daily pipeline started for user {user_id} ===")
 
-    # ── Step 1: Search job boards ──────────────────────────────────────────────
+    all_created_ids = []
+
+    # ── Step 1a: LinkedIn Job Alert emails ──────────────────────────────────────
+    try:
+        email_result = email_intake.process_linkedin_alerts(user_id)
+        if email_result.get("error"):
+            run_log["errors"].append(f"Email alerts: {email_result['error']}")
+        else:
+            all_created_ids.extend(j["id"] for j in email_result["created"])
+            run_log["email_alerts"] = {
+                "emails_processed": email_result["emails_processed"],
+                "created": email_result["count_created"],
+                "skipped": email_result["count_skipped"],
+                "errors": email_result["count_errors"],
+            }
+            logger.info(
+                f"[{user_id}] LinkedIn email alerts: {email_result['emails_processed']} emails, "
+                f"{email_result['count_created']} new, {email_result['count_skipped']} dupes"
+            )
+    except Exception as e:
+        logger.error(f"[{user_id}] Email alert intake failed: {e}", exc_info=True)
+        run_log["errors"].append(f"Email alerts: {str(e)}")
+
+    # ── Step 1b: Search job boards ───────────────────────────────────────────────
     search_terms = [t.strip() for t in config.scheduled_search_terms if t.strip()]
     if not search_terms:
         logger.warning(f"No search terms configured for user {user_id}, skipping search")
         run_log["errors"].append("No search terms configured")
         _save_run_log(run_log)
         return run_log
-
-    all_created_ids = []
 
     for term in search_terms:
         try:

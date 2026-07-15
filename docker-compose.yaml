@@ -2,6 +2,9 @@ services:
   jobsearch-v2:
     build: .
     container_name: jobsearch-v2
+    labels:
+      kuma.jobsearch-v2.http.name: "JSHQ (jobsearch-v2)"
+      kuma.jobsearch-v2.http.url: "http://10.10.10.13:8094/"
     restart: unless-stopped
     ports:
       - "8094:8094"
