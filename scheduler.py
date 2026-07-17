@@ -23,6 +23,7 @@ import scoring
 import jobspy_search
 import email_intake
 import docx_builder
+import jd_cleanup
 from models import AppConfig, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,15 @@ def start_scheduler():
     sched.start()
     logger.info("Scheduler started")
 
+    sched.add_job(
+        _run_jd_cleanup_all_users,
+        trigger=CronTrigger(hour=5, minute=30),
+        id="daily_jd_cleanup",
+        name="Daily JD Cleanup (all users)",
+        replace_existing=True,
+    )
+    logger.info("Scheduled daily JD cleanup at 05:30 ET")
+
     # Walk all user dirs and re-apply their schedules
     users_dir = Path("/app/data/users")
     if not users_dir.exists():
@@ -75,6 +85,24 @@ def shutdown_scheduler():
     if sched.running:
         sched.shutdown(wait=False)
         logger.info("Scheduler shut down")
+
+
+def _run_jd_cleanup_all_users():
+    """Daily sweep across every user: re-scrape jobs with broken raw_jd."""
+    users_dir = Path("/app/data/users")
+    if not users_dir.exists():
+        return
+    for user_dir in users_dir.iterdir():
+        if not user_dir.is_dir():
+            continue
+        try:
+            result = jd_cleanup.cleanup_all(user_dir.name)
+            logger.info(
+                f"[{user_dir.name}] Daily JD cleanup: {result['fixed']} fixed, "
+                f"{result['unresolved']} unresolved, {len(result['errors'])} errors"
+            )
+        except Exception as e:
+            logger.error(f"JD cleanup failed for {user_dir.name}: {e}")
 
 
 # ── Per-user schedule management ──────────────────────────────────────────────

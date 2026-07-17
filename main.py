@@ -41,6 +41,7 @@ import company_site_search
 import ai_router
 import scheduler
 from intake import process_intake
+import jd_cleanup
 
 app = FastAPI(title="Job Search HQ", version="2.2")
 
@@ -402,6 +403,67 @@ async def cancel_score_all(user: User = Depends(get_current_user)):
 @app.get("/api/jobs/score-all/status")
 async def score_all_status(user: User = Depends(get_current_user)):
     return dict(_score_task)
+
+
+_cleanup_task: dict = {
+    "running": False,
+    "user_id": None,
+    "total": 0,
+    "done": 0,
+    "fixed": 0,
+    "unresolved": 0,
+    "current": "",
+    "errors": 0,
+    "error_msgs": [],
+    "started_at": None,
+    "finished_at": None,
+}
+
+
+def _run_cleanup_jds(user_id: str):
+    import logging
+    log = logging.getLogger(__name__)
+    candidates = jd_cleanup.find_junk_jobs(user_id)
+    _cleanup_task.update(running=True, user_id=user_id, total=len(candidates),
+                         done=0, fixed=0, unresolved=0, current="", errors=0,
+                         error_msgs=[], started_at=datetime.now().isoformat(), finished_at=None)
+    for job in candidates:
+        if not _cleanup_task["running"]:
+            break
+        _cleanup_task["current"] = f"{job.company}: {job.title}"
+        try:
+            if jd_cleanup.rescrape_job(job):
+                storage.save_job(user_id, job)
+                _cleanup_task["fixed"] += 1
+            else:
+                _cleanup_task["unresolved"] += 1
+        except Exception as e:
+            log.warning(f"cleanup_jds: failed {job.id} ({job.company}): {e}")
+            _cleanup_task["unresolved"] += 1
+            _cleanup_task["errors"] += 1
+            _cleanup_task["error_msgs"].append(f"{job.company}: {e}")
+        _cleanup_task["done"] += 1
+    _cleanup_task.update(running=False, current="", finished_at=datetime.now().isoformat())
+
+
+@app.post("/api/jobs/cleanup-junk-jds")
+async def cleanup_junk_jds(user: User = Depends(get_current_user)):
+    """Kick off background re-scrape of jobs with broken raw_jd (login walls, dead postings, stubs)."""
+    if _cleanup_task["running"]:
+        raise HTTPException(409, "Cleanup already in progress")
+    asyncio.get_event_loop().run_in_executor(None, _run_cleanup_jds, user.id)
+    return {"started": True}
+
+
+@app.post("/api/jobs/cleanup-junk-jds/cancel")
+async def cancel_cleanup_junk_jds(user: User = Depends(get_current_user)):
+    _cleanup_task["running"] = False
+    return {"cancelled": True}
+
+
+@app.get("/api/jobs/cleanup-junk-jds/status")
+async def cleanup_junk_jds_status(user: User = Depends(get_current_user)):
+    return dict(_cleanup_task)
 
 
 @app.post("/api/jobs/apply-deal-breakers")
