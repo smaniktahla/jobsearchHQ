@@ -416,6 +416,11 @@ def _json_items(payload: str) -> list[dict]:
 
 
 def _parse_job_page(url: str, html: str, fallback_company: str) -> CandidateJob:
+    if "linkedin.com" in urlparse(url).netloc.lower():
+        linkedin_job = _extract_linkedin_job(url, html, fallback_company)
+        if linkedin_job and len(linkedin_job.raw_jd) > 200:
+            return linkedin_job
+
     phenom_job = _extract_phenom_job(url, html, fallback_company)
     if phenom_job and len(phenom_job.raw_jd) > 200:
         return phenom_job
@@ -437,7 +442,7 @@ def _parse_job_page(url: str, html: str, fallback_company: str) -> CandidateJob:
         title = meta_title.get("content", "") if meta_title and meta_title.has_attr("content") else ""
         if not title and meta_title:
             title = meta_title.get_text(" ", strip=True)
-    title = re.sub(r"\\s+", " ", title).strip(" -|")
+    title = re.sub(r"\s+", " ", title).strip(" -|")
 
     text = soup.get_text("\n", strip=True)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -451,6 +456,35 @@ def _parse_job_page(url: str, html: str, fallback_company: str) -> CandidateJob:
         location=location,
         pay_range=_guess_pay(text),
         extraction_method="html_text",
+    )
+
+
+def _extract_linkedin_job(url: str, html: str, fallback_company: str) -> CandidateJob | None:
+    soup = BeautifulSoup(html, "html.parser")
+    desc = soup.find(class_="description__text")
+    if not desc:
+        return None
+
+    raw_jd = desc.get_text("\n", strip=True)
+    raw_jd = re.sub(r"\n{3,}", "\n\n", raw_jd)
+
+    title_tag = soup.find(class_="top-card-layout__title")
+    title = title_tag.get_text(strip=True) if title_tag else ""
+
+    org_tag = soup.find(class_="topcard__org-name-link")
+    company = org_tag.get_text(strip=True) if org_tag else fallback_company
+
+    loc_tag = soup.find(class_="topcard__flavor--bullet")
+    location = loc_tag.get_text(strip=True) if loc_tag else ""
+
+    return CandidateJob(
+        url=_clean_tracking_url(url),
+        title=title[:200],
+        company=company,
+        raw_jd=raw_jd[:12000],
+        location=location,
+        pay_range=_guess_pay(raw_jd),
+        extraction_method="linkedin_dom",
     )
 
 
@@ -675,7 +709,7 @@ def _pay_range(item: dict) -> str:
 
 
 def _guess_location(text: str) -> str:
-    for pattern in (r"Location\\s*:\\s*([^\\n]+)", r"Job Location\\s*:\\s*([^\\n]+)"):
+    for pattern in (r"Location\s*:\s*([^\n]+)", r"Job Location\s*:\s*([^\n]+)"):
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             return match.group(1).strip()[:120]
@@ -683,5 +717,5 @@ def _guess_location(text: str) -> str:
 
 
 def _guess_pay(text: str) -> str:
-    match = re.search(r"\\$\\s?[0-9][0-9,]*(?:\\.\\d+)?\\s*(?:-|to)\\s*\\$?\\s?[0-9][0-9,]*(?:\\.\\d+)?", text)
+    match = re.search(r"\$\s?[0-9][0-9,]*(?:\.\d+)?\s*(?:-|to)\s*\$?\s?[0-9][0-9,]*(?:\.\d+)?", text)
     return match.group(0) if match else ""

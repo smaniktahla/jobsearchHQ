@@ -1427,6 +1427,24 @@ def test_email(user: User = Depends(get_current_user)):
         raise HTTPException(500, f"SMTP test failed: {str(e)}")
 
 
+@app.post("/api/config/test-ai-provider")
+def test_ai_provider(tier: str, user: User = Depends(get_current_user)):
+    if tier not in ("fast", "strong"):
+        raise HTTPException(400, "tier must be 'fast' or 'strong'")
+    config = storage.load_config(user.id)
+    try:
+        reply = ai_router.chat(
+            system="You are a connectivity test.",
+            user_msg="Reply with exactly one word: OK",
+            tier=tier,
+            config=config,
+            max_tokens=10,
+        )
+        return {"success": True, "model": ai_router.get_last_model(tier), "reply": reply.strip()[:200]}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/config")
 def get_config(user: User = Depends(get_current_user)):
     return storage.load_config(user.id).model_dump()

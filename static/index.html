@@ -418,9 +418,9 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="card mb-16">
     <div class="card-header">Provider &amp; API Keys</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Set providers independently — e.g. Gemini (free) for scoring, Anthropic for resumes. If API key is left blank, the system key is used.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px" class="mt-8">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch" class="mt-8">
       <!-- Fast Provider column -->
-      <div>
+      <div style="display:flex;flex-direction:column">
         <div class="form-group">
           <label>Fast Provider <span style="color:var(--text-dim);font-weight:normal">(scoring, research)</span></label>
           <select id="cfg-fast-provider" onchange="updateProviderUI()">
@@ -457,9 +457,13 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
           <label>Model override <span style="color:var(--text-dim);font-weight:normal">(optional — pins a specific model version)</span></label>
           <input type="text" id="cfg-fast-model" placeholder="leave blank for provider default">
         </div>
+        <div style="margin-top:auto;padding-top:16px;display:flex;align-items:center;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="testAIProvider('fast')">Test Fast Provider</button>
+          <span id="test-fast-provider-status" class="text-sm"></span>
+        </div>
       </div>
       <!-- Strong Provider column -->
-      <div>
+      <div style="display:flex;flex-direction:column">
         <div class="form-group">
           <label>Strong Provider <span style="color:var(--text-dim);font-weight:normal">(resumes, cover letters)</span></label>
           <select id="cfg-strong-provider" onchange="updateProviderUI()">
@@ -495,6 +499,10 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div class="form-group">
           <label>Model override <span style="color:var(--text-dim);font-weight:normal">(optional — pins a specific model version)</span></label>
           <input type="text" id="cfg-strong-model" placeholder="leave blank for provider default">
+        </div>
+        <div style="margin-top:auto;padding-top:16px;display:flex;align-items:center;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="testAIProvider('strong')">Test Strong Provider</button>
+          <span id="test-strong-provider-status" class="text-sm"></span>
         </div>
       </div>
     </div>
@@ -1266,6 +1274,7 @@ async function saveConfig(){
   refreshSchedulerStatus();alert('Saved')
 }
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
+async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');s.textContent='Testing...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/config/test-ai-provider?tier='+tier,{method:'POST'});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 // Scheduler / Automation
 async function refreshSchedulerStatus(){
