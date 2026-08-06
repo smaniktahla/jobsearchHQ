@@ -160,6 +160,43 @@ def agent_ready_queue(request: Request):
     return {"count": len(queue), "jobs": queue}
 
 
+@app.get("/api/agent/jobs")
+def agent_list_jobs(
+    request: Request,
+    status: str | None = None,
+    company: str | None = None,
+    q: str | None = None,
+    lane: str | None = None,
+):
+    """
+    Agent-accessible full job list — X-API-Key auth.
+
+    Unlike /api/agent/ready-queue (which only returns pending, unapplied
+    jobs), this returns the entire tracker so agents can look up applied,
+    rejected, or otherwise historical jobs by status, company, or free-text
+    query against title/company. Mirrors the filtering on /api/jobs.
+    """
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    if not admin_id:
+        raise HTTPException(503, "No admin user configured")
+    jobs = storage.load_all_jobs(admin_id)
+    if status:
+        jobs = [j for j in jobs if j.status == status]
+    if lane:
+        jobs = [j for j in jobs if j.market_lane == lane]
+    if company:
+        needle = company.lower()
+        jobs = [j for j in jobs if needle in j.company.lower()]
+    if q:
+        needle = q.lower()
+        jobs = [j for j in jobs if needle in j.title.lower() or needle in j.company.lower()]
+    jobs.sort(key=lambda j: j.updated_at, reverse=True)
+    return {"count": len(jobs), "jobs": [enrich_job(j) for j in jobs]}
+
+
 @app.get("/api/agent/profile")
 def agent_get_profile(request: Request):
     """Agent-accessible profile endpoint — uses X-API-Key auth."""
