@@ -238,11 +238,18 @@ No markdown. No explanation. No extra keys. ONLY the JSON object."""
         data = json.loads(raw)
         logger.info(f"Parsed scoring JSON OK: skills={data.get('skills_match')}, scope={data.get('scope_impact')}, pay={data.get('pay_alignment')}")
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse scoring JSON: {e}\nRaw: {raw[:1500]}")
-        return ScoreBreakdown(
-            skills_match=0, scope_impact=0, pay_alignment=0,
-            raw_analysis=f"Failed to parse scoring response: {raw[:1500]}"
-        )
+        # Grammar-constrained retry — much slower on Ollama (esp. under GPU
+        # contention) than free decoding, so only pay that cost when the fast
+        # unconstrained call actually produced broken JSON, not on every call.
+        logger.warning(f"Failed to parse scoring JSON, retrying with json_mode: {e}\nRaw: {raw[:1500]}")
+        raw = ai_router.chat(system, user_msg, "fast", config, max_tokens=5000, json_mode=True)
+        raw = clean_json_response(raw)
+        try:
+            data = json.loads(raw)
+            logger.info(f"Parsed scoring JSON OK on json_mode retry: skills={data.get('skills_match')}, scope={data.get('scope_impact')}, pay={data.get('pay_alignment')}")
+        except json.JSONDecodeError as e2:
+            logger.error(f"Failed to parse scoring JSON even with json_mode: {e2}\nRaw: {raw[:1500]}")
+            raise RuntimeError(f"Failed to parse scoring response: {raw[:1500]}") from e2
 
     sm = safe_int(data.get("skills_match"), 0)
     si = safe_int(data.get("scope_impact"), 0)
@@ -338,7 +345,14 @@ Job posting:
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        return {}
+        # json_mode retry is much slower under GPU contention — only pay for
+        # it when the fast unconstrained call actually broke.
+        raw = ai_router.chat("", user_msg, "fast", config, max_tokens=500, json_mode=True)
+        raw = clean_json_response(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
 
 
 # === COVER LETTERS ===

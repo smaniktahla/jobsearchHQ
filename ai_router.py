@@ -127,15 +127,31 @@ def _openai_chat(system: str, user_msg: str, model: str, api_key: str, max_token
     return resp.choices[0].message.content.strip()
 
 
-def _ollama_chat(system: str, user_msg: str, config) -> str:
+def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False) -> str:
     import requests as req
+    # OpenAI-compatible endpoint — works against both real Ollama and a bare
+    # llama.cpp llama-server (which only speaks this protocol, not Ollama's
+    # native /api/chat). chat_template_kwargs.enable_thinking=False suppresses
+    # hidden reasoning tokens on templates that support it (e.g. Gemma4); it's
+    # a no-op on servers/templates that don't recognize the field.
     url = (config.ollama_url or "http://10.10.10.105:11434").rstrip("/") + "/v1/chat/completions"
     model = config.ollama_model or "gemma4:e4b"
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": user_msg})
-    r = req.post(url, json={"model": model, "messages": messages}, timeout=120)
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    if json_mode:
+        # Grammar-constrained decoding — guarantees syntactically valid JSON,
+        # instead of relying on the prompt alone (which local models occasionally
+        # violate: unescaped quotes, stray control chars, missing commas).
+        payload["response_format"] = {"type": "json_object"}
+    r = req.post(url, json=payload, timeout=120)
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"].strip()
 
@@ -148,11 +164,16 @@ def chat(
     tier: str,       # "fast" or "strong"
     config,          # AppConfig instance
     max_tokens: int = 4000,
+    json_mode: bool = False,
 ) -> str:
     """
     Route an LLM call to the configured provider for this tier.
     tier="fast"   → config.fast_provider   (scoring, metadata, research)
     tier="strong" → config.strong_provider (resumes, cover letters, messages)
+
+    json_mode=True constrains the response to valid JSON where the provider
+    supports it (currently: Ollama). Only pass this when the caller actually
+    parses the reply as JSON — it changes the wire format, not just a hint.
     """
     provider_field = "fast_provider" if tier == "fast" else "strong_provider"
     provider = getattr(config, provider_field, "anthropic") or "anthropic"
@@ -163,7 +184,7 @@ def chat(
 
     if provider == "ollama":
         _last_model_used[tier] = f"ollama/{getattr(config, 'ollama_model', 'unknown')}"
-        return _ollama_chat(system, user_msg, config)
+        return _ollama_chat(system, user_msg, config, json_mode=json_mode)
 
     api_key = _resolve_key(provider, config)
 
