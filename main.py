@@ -39,6 +39,7 @@ import storage
 import company_research
 import company_site_search
 import ai_router
+import activity
 import scheduler
 from intake import process_intake
 import jd_cleanup
@@ -1099,6 +1100,7 @@ def agent_trigger_job_research(job_id: str, request: Request):
         raise HTTPException(404, "Job not found")
     if not job.company or job.company.lower() in ("nan", "unknown", ""):
         raise HTTPException(400, "Job has no company name to research")
+    op_id = activity.start("research", job_id=job_id, detail=job.company)
     try:
         result = company_research.research_company(
             company=job.company, job_title=job.title, user_id=admin_id,
@@ -1112,7 +1114,9 @@ def agent_trigger_job_research(job_id: str, request: Request):
         )
         job.updated_at = datetime.now().isoformat()
         storage.save_job(admin_id, job)
+        activity.finish(op_id, status="done", detail=f"{len(result.get('contacts', []))} contacts found")
     except Exception as e:
+        activity.finish(op_id, status="error", detail=str(e)[:200])
         raise HTTPException(500, f"Research failed: {str(e)}")
     return {"job_id": job_id, "researched": True}
 
@@ -1282,6 +1286,7 @@ def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, reques
         job.pay_range = payload.pay_range
     job.updated_at = datetime.now().isoformat()
 
+    op_id = activity.start("refresh-and-score", job_id=job_id, detail=f"{job.company}: {job.title}")
     try:
         result = scoring.score_job(job, admin_id)
         job.score = result
@@ -1289,9 +1294,11 @@ def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, reques
         if result.recommended_lane:
             job.market_lane = result.recommended_lane
         storage.save_job(admin_id, job)
+        activity.finish(op_id, status="done", detail=f"scored {result.total}/10")
         return {"job_id": job_id, "total": result.total, "recommended_lane": job.market_lane}
     except Exception as e:
         storage.save_job(admin_id, job)
+        activity.finish(op_id, status="error", detail=str(e)[:200])
         raise HTTPException(500, f"Scoring failed after refresh: {str(e)}")
 
 
@@ -1672,6 +1679,32 @@ def dashboard_stats(user: User = Depends(get_current_user)):
 def scheduler_status(user: User = Depends(get_current_user)):
     """Get current scheduler status, next run, and config."""
     return scheduler.get_schedule_status(user.id)
+
+
+@app.get("/api/activity")
+def get_activity(user: User = Depends(get_current_user)):
+    """
+    Combined live-status feed: in-flight + recently completed agent
+    operations (Hermes refresh-and-score, research, etc.), the score-all
+    batch runner, and the daily scheduler — one call for the Activity tab.
+    """
+    snap = activity.snapshot()
+    return {
+        "active": snap["active"],
+        "recent": snap["recent"],
+        "score_all": {
+            "running": _score_task["running"],
+            "total": _score_task["total"],
+            "done": _score_task["done"],
+            "scored": _score_task["scored"],
+            "errors": _score_task["errors"],
+            "current": _score_task["current"],
+            "started_at": _score_task["started_at"],
+            "finished_at": _score_task["finished_at"],
+        },
+        "scheduler": scheduler.get_schedule_status(user.id),
+        "recent_runs": scheduler.get_recent_logs(5),
+    }
 
 
 @app.post("/api/scheduler/run-now")

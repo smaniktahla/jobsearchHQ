@@ -39,6 +39,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="nav-item" data-view="tracker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Tracker<span id="nav-tracker-count" class="nav-badge" style="display:none;background:var(--surface2);color:var(--text-dim)"></span><span id="nav-followup-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
+  <div class="nav-item" data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Activity<span id="nav-activity-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
   <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;overflow:hidden">
@@ -523,6 +524,30 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </div>
 </div>
 </div>
+<!-- Activity -->
+<div id="view-activity" class="view">
+  <div class="flex justify-between items-center mb-16"><h1>Activity</h1><button class="btn btn-ghost btn-sm" onclick="fetchActivity()">Refresh</button></div>
+  <div class="stats-row" style="grid-template-columns:1fr 1fr">
+    <div class="card">
+      <div class="card-header">Batch Scoring</div>
+      <div id="activity-score-all"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Scheduler</div>
+      <div id="activity-scheduler"></div>
+      <div id="activity-recent-runs"></div>
+      <button class="btn btn-ghost btn-sm mt-16" onclick="showSchedulerLogs()">View Full Run History</button>
+    </div>
+  </div>
+  <div class="card mb-16">
+    <div class="card-header">In Progress <span class="text-dim" style="font-weight:normal;text-transform:none">— agent-triggered (Hermes)</span></div>
+    <div id="activity-active"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">Recent Activity</div>
+    <div id="activity-recent"></div>
+  </div>
+</div>
 <!-- Email Compose Modal -->
 <div id="email-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
 <div class="modal">
@@ -552,7 +577,7 @@ if(new URLSearchParams(window.location.search).get('logged_out')==='1'){window.l
 const API='';let currentJobId=null,allJobs=[],currentJob=null;
 let resumeLabels={director:'Resume 1 — Director',base:'Resume 2 — Base',contract:'Resume 3 — Contract'};
 function resumeLabel(key){return resumeLabels[key]||key||'none'}
-function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile()}
+function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity()}
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
 async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
@@ -1370,6 +1395,58 @@ ${errors?`<div class="mt-8" style="font-size:11px;color:var(--red)">${log.errors
 </div>`}).join('');
     document.getElementById('logs-modal').classList.add('show');
   }catch(e){alert('Failed to load logs: '+e.message)}}
+// Activity
+let _activityPollInterval=null;
+function loadActivity(){
+  fetchActivity();
+  if(_activityPollInterval)clearInterval(_activityPollInterval);
+  _activityPollInterval=setInterval(()=>{
+    if(!document.getElementById('view-activity').classList.contains('active')){clearInterval(_activityPollInterval);_activityPollInterval=null;return}
+    fetchActivity();
+  },5000);
+}
+async function fetchActivity(){
+  try{const d=await api('/api/activity');renderActivity(d)}catch(e){}
+}
+function renderActivity(d){
+  const activeEl=document.getElementById('activity-active');
+  if(!d.active.length){activeEl.innerHTML='<div class="text-dim text-sm">Nothing running right now.</div>'}
+  else{activeEl.innerHTML=d.active.map(op=>{
+    const elapsed=Math.max(0,Math.round((Date.now()-new Date(op.started_at).getTime())/1000));
+    return`<div class="mb-16" style="padding:12px;background:var(--surface2);border-left:3px solid var(--accent);border-radius:6px">
+<div class="flex justify-between"><strong>${esc(op.type)}</strong><span class="text-dim text-sm">${elapsed}s ago</span></div>
+<div class="text-sm mt-8">${esc(op.detail||op.job_id||'')}</div>
+</div>`}).join('')}
+  document.getElementById('nav-activity-badge').style.display=d.active.length?'inline':'none';
+  document.getElementById('nav-activity-badge').textContent=d.active.length||'';
+
+  const recentEl=document.getElementById('activity-recent');
+  if(!d.recent.length){recentEl.innerHTML='<div class="text-dim text-sm">No recent activity.</div>'}
+  else{recentEl.innerHTML=d.recent.map(op=>{
+    const color=op.status==='error'?'var(--red)':'var(--green)';
+    const when=op.finished_at?new Date(op.finished_at).toLocaleTimeString():'';
+    return`<div class="flex justify-between items-center" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+<div><strong>${esc(op.type)}</strong> <span class="text-dim">${esc(op.detail||'')}</span></div>
+<div style="color:${color};white-space:nowrap;margin-left:12px">${when}</div>
+</div>`}).join('')}
+
+  const sa=d.score_all,saEl=document.getElementById('activity-score-all');
+  if(sa.running){
+    const pct=sa.total?Math.round((sa.done/sa.total)*100):0;
+    saEl.innerHTML=`<div class="score-bar"><div class="score-bar-label">Progress</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:var(--accent)"></div></div><span class="text-sm">${pct}%</span></div><div class="text-sm mt-8">Job ${sa.done+1} of ${sa.total} — ${esc(sa.current)}</div>${sa.errors?`<div class="text-sm mt-8" style="color:var(--red)">${sa.errors} error(s)</div>`:''}`;
+  }else{
+    saEl.innerHTML='<div class="text-dim text-sm">No batch scoring in progress.</div>';
+  }
+
+  const sc=d.scheduler,scEl=document.getElementById('activity-scheduler');
+  scEl.innerHTML=sc.enabled?`<div class="text-sm">Enabled — next run <strong>${sc.next_run?new Date(sc.next_run).toLocaleString():'?'}</strong></div>`:'<div class="text-dim text-sm">Disabled</div>';
+  const runsEl=document.getElementById('activity-recent-runs');
+  if(!d.recent_runs.length){runsEl.innerHTML='<div class="text-dim text-sm mt-8">No runs yet.</div>'}
+  else{runsEl.innerHTML=d.recent_runs.slice(0,3).map(log=>{
+    const started=log.started_at?new Date(log.started_at).toLocaleString():'?';
+    const scored=log.scored?.length||0,errors=log.errors?.length||0;
+    return`<div class="flex justify-between text-sm mt-8"><span class="text-dim">${started}</span><span>scored ${scored}${errors?`, <span style="color:var(--red)">${errors} err</span>`:''}</span></div>`}).join('')}
+}
 // Helpers
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 function escAttr(s){return(s||'').replace(/`/g,'\\`').replace(/\$/g,'\\$')}
