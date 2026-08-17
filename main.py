@@ -333,7 +333,7 @@ def intake_job(
         intake_source=IntakeSource(source) if source in IntakeSource._value2member_map_ else IntakeSource.MANUAL_PASTE,
     )
     try:
-        meta = scoring.extract_job_metadata(job.raw_jd)
+        meta = scoring.extract_job_metadata(job.raw_jd, user.id)
         if meta:
             if not job.title and meta.get("title"):
                 job.title = meta["title"]
