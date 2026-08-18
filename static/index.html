@@ -1418,6 +1418,12 @@ function loadActivity(){
 async function fetchActivity(){
   try{const d=await api('/api/activity');renderActivity(d)}catch(e){}
 }
+function activityJobLink(op){
+  const text=esc(op.detail||op.job_id||'');
+  if(!text) return '';
+  if(!op.job_id) return text;
+  return `<a href="javascript:void(0)" onclick="showDetail('${escAttr(op.job_id)}')" style="color:var(--accent);text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${text}</a>`;
+}
 const ACTIVITY_GROUP_GAP_MS=5*60*1000; // collapse same-type entries within 5 min of each other
 function groupActivity(list){
   // list is sorted newest-first. Collapse consecutive same-type runs (e.g.
@@ -1456,14 +1462,13 @@ function renderActivity(d){
     const newestTime=g.items[0].finished_at?new Date(g.items[0].finished_at).toLocaleTimeString():'';
     if(g.items.length===1){
       const op=g.items[0];
-      const clickable=op.job_id?` onclick="showDetail('${escAttr(op.job_id)}')" style="cursor:pointer"`:'';
-      return`<div class="flex justify-between items-center"${clickable} style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
-<div><strong>${esc(op.type)}</strong> <span class="text-dim">${esc(op.detail||'')}</span></div>
+      return`<div class="flex justify-between items-center" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+<div><strong>${esc(op.type)}</strong> <span class="text-dim">${activityJobLink(op)}</span></div>
 <div style="color:${color};white-space:nowrap;margin-left:12px">${newestTime}</div>
 </div>`;
     }
     const oldestTime=g.items[g.items.length-1].finished_at?new Date(g.items[g.items.length-1].finished_at).toLocaleTimeString():'';
-    const details=g.items.map(i=>esc(i.detail||'')).filter(Boolean).slice(0,6).join(' · ');
+    const details=g.items.slice(0,6).map(i=>activityJobLink(i)).filter(Boolean).join(' · ');
     const more=g.items.length>6?` +${g.items.length-6} more`:'';
     return`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
 <div class="flex justify-between items-center"><strong>${esc(g.type)}</strong> ×${g.items.length}<span class="text-dim" style="margin-left:auto;white-space:nowrap">${oldestTime} – ${newestTime}</span></div>
