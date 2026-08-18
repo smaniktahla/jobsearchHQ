@@ -7,7 +7,7 @@ from typing import Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from auth import (
@@ -1603,8 +1603,10 @@ def export_config(user: User = Depends(get_current_user)):
     """
     config = storage.load_config(user.id)
     filename = f"jshq_config_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
-    return JSONResponse(
-        content=config.model_dump(),
+    import json as _json
+    return Response(
+        content=_json.dumps(config.model_dump(), indent=2),
+        media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
