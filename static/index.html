@@ -523,7 +523,6 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </div>
 </div>
 </div>
-</div>
 <!-- Activity -->
 <div id="view-activity" class="view">
   <div class="flex justify-between items-center mb-16"><h1>Activity</h1><button class="btn btn-ghost btn-sm" onclick="fetchActivity()">Refresh</button></div>
@@ -547,6 +546,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div class="card-header">Recent Activity</div>
     <div id="activity-recent"></div>
   </div>
+</div>
 </div>
 <!-- Email Compose Modal -->
 <div id="email-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
