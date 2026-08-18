@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -31,6 +31,7 @@ from models import (
     JobStatus, JobUpdate, MarketLane, ProfileUpdate, User,
 )
 import docx_builder
+import docx_utils
 import email_service
 import jobspy_search
 import linkedin_intake
@@ -1676,6 +1677,28 @@ async def upload_resume(variant: str, request: Request, user: User = Depends(get
         raise HTTPException(400, "Invalid variant")
     body = await request.json()
     content = body.get("content", "")
+    storage.save_resume_text(user.id, variant, content)
+    return {"ok": True, "variant": variant, "length": len(content)}
+
+
+@app.put("/api/resumes/{variant}/upload-docx")
+async def upload_resume_docx(variant: str, user: User = Depends(get_current_user), file: UploadFile = File(...)):
+    """Upload a .docx resume directly instead of pasting text — extracts text via docx_utils."""
+    if variant not in ["director", "base", "contract", "full_history"]:
+        raise HTTPException(400, "Invalid variant")
+    if not file.filename.lower().endswith(".docx"):
+        raise HTTPException(400, "Only .docx files are supported")
+    import tempfile
+    data = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".docx") as tmp:
+        tmp.write(data)
+        tmp.flush()
+        try:
+            content = docx_utils.extract_text_from_docx(tmp.name)
+        except Exception as e:
+            raise HTTPException(400, f"Could not read .docx file: {str(e)}")
+    if not content.strip():
+        raise HTTPException(400, "No text found in that .docx file")
     storage.save_resume_text(user.id, variant, content)
     return {"ok": True, "variant": variant, "length": len(content)}
 
