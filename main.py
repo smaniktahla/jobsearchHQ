@@ -530,6 +530,7 @@ async def apply_deal_breakers(user: User = Depends(get_current_user)):
 async def score_batch(request: Request, user: User = Depends(get_current_user)):
     body = await request.json()
     job_ids = body if isinstance(body, list) else body.get("job_ids", [])
+    op_id = activity.start("batch-score", detail=f"{len(job_ids)} job(s) selected")
     results = []
     for jid in job_ids:
         job = storage.load_job(user.id, jid)
@@ -546,6 +547,8 @@ async def score_batch(request: Request, user: User = Depends(get_current_user)):
             results.append({"id": jid, "status": "scored", "total": score_result.total})
         except Exception as e:
             results.append({"id": jid, "status": "error", "error": str(e)})
+    scored_n = sum(1 for r in results if r["status"] == "scored")
+    activity.finish(op_id, status="done", detail=f"{scored_n}/{len(job_ids)} scored")
     return {"results": results}
 
 
@@ -813,6 +816,7 @@ def generate_tailored_resume(job_id: str, user: User = Depends(get_current_user)
         raise HTTPException(404, "Job not found")
     if not job.score:
         raise HTTPException(400, "Job must be scored first")
+    op_id = activity.start("resume-generated", job_id=job_id, detail=f"{job.company}: {job.title}")
     try:
         resume_text = scoring.generate_tailored_resume(job, user.id)
         job.tailored_resume = resume_text
@@ -822,12 +826,14 @@ def generate_tailored_resume(job_id: str, user: User = Depends(get_current_user)
         job.tailored_resume_docx = docx_path
         job.updated_at = datetime.now().isoformat()
         storage.save_job(user.id, job)
+        activity.finish(op_id, status="done")
         return {
             "tailored_resume": resume_text,
             "docx_path": docx_path,
             "docx_filename": Path(docx_path).name,
         }
     except Exception as e:
+        activity.finish(op_id, status="error", detail=str(e)[:200])
         raise HTTPException(500, f"Resume generation failed: {str(e)}")
 
 
@@ -854,6 +860,7 @@ def generate_cover_letters(job_id: str, user: User = Depends(get_current_user)):
         raise HTTPException(404, "Job not found")
     if not job.score:
         raise HTTPException(400, "Job must be scored first")
+    op_id = activity.start("cover-letters-generated", job_id=job_id, detail=f"{job.company}: {job.title}")
     try:
         config = storage.load_config(user.id)
         letters = scoring.generate_cover_letters(job, user.id)
@@ -874,8 +881,10 @@ def generate_cover_letters(job_id: str, user: User = Depends(get_current_user)):
         job.cover_letters = letters
         job.updated_at = datetime.now().isoformat()
         storage.save_job(user.id, job)
+        activity.finish(op_id, status="done", detail=f"{len(letters)} variant(s)")
         return [l.model_dump() for l in letters]
     except Exception as e:
+        activity.finish(op_id, status="error", detail=str(e)[:200])
         raise HTTPException(500, f"Cover letter generation failed: {str(e)}")
 
 
@@ -1681,17 +1690,81 @@ def scheduler_status(user: User = Depends(get_current_user)):
     return scheduler.get_schedule_status(user.id)
 
 
+def _job_label(job) -> str:
+    company = job.company or "Unknown company"
+    title = job.title or "Untitled"
+    return f"{company}: {title}"
+
+
+def _intake_label(job) -> str:
+    src = (job.source or "").lower()
+    if src.startswith("jobspy_"):
+        return f"Scraped ({src[len('jobspy_'):].title()})"
+    if src == "linkedin_email_alert":
+        return "LinkedIn email alert"
+    return {
+        IntakeSource.MANUAL_PASTE: "Pasted JD",
+        IntakeSource.URL_SCRAPE: "Added from URL",
+        IntakeSource.EMAIL_FORWARD: "Forwarded email",
+        IntakeSource.API: "Added via API",
+    }.get(job.intake_source, "Added")
+
+
+def build_history(user_id: str, before: str, limit: int = 150) -> list[dict]:
+    """
+    Reconstruct historical activity events from job storage (job creation,
+    resume/cover-letter generation) — data that already persists on each
+    Job, so no separate event log is needed. Only returns events older than
+    `before` (the current process's start time); everything since then is
+    covered live by activity.py, so the two never overlap.
+    """
+    events = []
+    for job in storage.load_all_jobs(user_id):
+        if job.created_at < before:
+            events.append({
+                "type": "job-added", "job_id": job.id,
+                "detail": f"{_intake_label(job)} — {_job_label(job)}",
+                "started_at": job.created_at, "finished_at": job.created_at,
+                "status": "done",
+            })
+        if job.tailored_resume_docx and job.updated_at < before:
+            events.append({
+                "type": "resume-generated", "job_id": job.id,
+                "detail": _job_label(job),
+                "started_at": job.updated_at, "finished_at": job.updated_at,
+                "status": "done",
+            })
+        for cl in job.cover_letters:
+            if cl.created_at < before:
+                events.append({
+                    "type": "cover-letters-generated", "job_id": job.id,
+                    "detail": _job_label(job),
+                    "started_at": cl.created_at, "finished_at": cl.created_at,
+                    "status": "done",
+                })
+                break  # one event per job, not per variant
+    events.sort(key=lambda e: e["finished_at"], reverse=True)
+    return events[:limit]
+
+
 @app.get("/api/activity")
 def get_activity(user: User = Depends(get_current_user)):
     """
-    Combined live-status feed: in-flight + recently completed agent
-    operations (Hermes refresh-and-score, research, etc.), the score-all
-    batch runner, and the daily scheduler — one call for the Activity tab.
+    Combined status + history feed for the Activity tab: in-flight agent
+    operations, a merged log of live (this-process) and reconstructed
+    (from job storage) events — job adds, scoring, resume/cover-letter
+    generation — plus the score-all batch runner and daily scheduler.
     """
     snap = activity.snapshot()
+    history = build_history(user.id, before=activity.PROCESS_STARTED_AT)
+    merged = sorted(
+        snap["recent"] + history,
+        key=lambda e: e.get("finished_at") or e.get("started_at") or "",
+        reverse=True,
+    )[:150]
     return {
         "active": snap["active"],
-        "recent": snap["recent"],
+        "recent": merged,
         "score_all": {
             "running": _score_task["running"],
             "total": _score_task["total"],

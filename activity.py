@@ -15,7 +15,13 @@ from datetime import datetime
 _lock = threading.Lock()
 _counter = itertools.count(1)
 _active: dict[int, dict] = {}
-_recent: deque = deque(maxlen=50)
+_recent: deque = deque(maxlen=200)
+
+# Marks the boundary between "live" events (tracked here, since this process
+# started) and "historical" events reconstructed from job storage on request
+# (see main.py build_history()). Keeps /api/activity from double-showing an
+# event that both this tracker and the storage-reconstruction would produce.
+PROCESS_STARTED_AT = datetime.now().isoformat()
 
 
 def start(op_type: str, job_id: str = "", detail: str = "") -> int:
