@@ -1366,7 +1366,7 @@ async function importConfig(file){
 }
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');s.textContent='Testing...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/config/test-ai-provider?tier='+tier,{method:'POST'});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
-async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v+'?content='+encodeURIComponent(c),{method:'PUT'});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
+async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v,{method:'PUT',body:{content:c}});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 // Scheduler / Automation
 async function refreshSchedulerStatus(){
   try{
