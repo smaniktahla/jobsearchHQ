@@ -517,6 +517,16 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring) or Local Ollama/Hermes (zero cost), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
   </div>
   <button class="btn btn-primary" onclick="saveConfig()">Save All Settings</button>
+  <div class="card mt-16">
+    <div class="card-header">Backup &amp; Restore</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Export all settings — including API keys and SMTP password in plain text — to a local file. Keep it somewhere private. Import restores everything from a previous export, overwriting current settings.</div>
+    <div class="flex items-center gap-8">
+      <a class="btn btn-ghost btn-sm" href="/api/config/export" download>Export Config</a>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('config-import-file').click()">Import Config</button>
+      <input type="file" id="config-import-file" accept="application/json,.json" style="display:none" onchange="importConfig(this.files[0])">
+      <span id="config-import-status" class="text-sm"></span>
+    </div>
+  </div>
   <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
 </div>
 <!-- Scheduler Logs Modal -->
@@ -1338,6 +1348,21 @@ async function saveConfig(){
   author_location:document.getElementById('prof-location').value||''}});
   resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};
   refreshSchedulerStatus();alert('Saved')
+}
+async function importConfig(file){
+  if(!file) return;
+  const statusEl=document.getElementById('config-import-status');
+  if(!confirm('This overwrites your current settings with the contents of this file. Continue?')){document.getElementById('config-import-file').value='';return}
+  try{
+    const data=JSON.parse(await file.text());
+    await api('/api/config/import',{method:'POST',body:data});
+    statusEl.textContent='Imported ✓';statusEl.style.color='var(--green)';
+    await loadSettings();
+  }catch(e){
+    statusEl.textContent='Import failed: '+e.message;statusEl.style.color='var(--red)';
+  }
+  document.getElementById('config-import-file').value='';
+  setTimeout(()=>{statusEl.textContent=''},5000);
 }
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');s.textContent='Testing...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/config/test-ai-provider?tier='+tier,{method:'POST'});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}

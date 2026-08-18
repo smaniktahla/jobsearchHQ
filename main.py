@@ -1592,6 +1592,30 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     return config.model_dump()
 
 
+@app.get("/api/config/export")
+def export_config(user: User = Depends(get_current_user)):
+    """
+    Download the full config (settings + profile) as JSON, for manual
+    backup/restore. Includes API keys and SMTP password in plain text —
+    it's a personal backup file, not a shareable one; store it somewhere
+    only you can access.
+    """
+    config = storage.load_config(user.id)
+    filename = f"jshq_config_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+    return JSONResponse(
+        content=config.model_dump(),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/config/import")
+def import_config(config: AppConfig, user: User = Depends(get_current_user)):
+    """Restore config from a previously exported backup JSON file."""
+    storage.save_config(user.id, config)
+    scheduler.update_schedule(config, user.id)
+    return config.model_dump()
+
+
 @app.get("/api/profile")
 def get_profile(user: User = Depends(get_current_user)):
     config = storage.load_config(user.id)
