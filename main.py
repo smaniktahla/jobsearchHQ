@@ -1567,12 +1567,26 @@ def get_config(user: User = Depends(get_current_user)):
 
 @app.put("/api/config")
 def update_config(config: AppConfig, user: User = Depends(get_current_user)):
-    # Preserve profile fields from existing config if not provided in payload
+    # Settings' form only edits name/email/phone/location directly (preserve
+    # only when left blank, same as before). Every other profile field —
+    # address/city/state/zip/linkedin/website/work history/education/
+    # certifications — belongs to /api/profile and isn't present in this
+    # form at all, so it must always be carried over here or a plain
+    # "Save All Settings" click silently wipes it back to defaults.
     existing = storage.load_config(user.id)
-    if not config.author_name:    config.author_name    = existing.author_name
-    if not config.author_email:   config.author_email   = existing.author_email
-    if not config.author_phone:   config.author_phone   = existing.author_phone
+    if not config.author_name:     config.author_name     = existing.author_name
+    if not config.author_email:    config.author_email    = existing.author_email
+    if not config.author_phone:    config.author_phone    = existing.author_phone
     if not config.author_location: config.author_location = existing.author_location
+    config.author_address  = existing.author_address
+    config.author_city     = existing.author_city
+    config.author_state    = existing.author_state
+    config.author_zip      = existing.author_zip
+    config.author_linkedin = existing.author_linkedin
+    config.author_website  = existing.author_website
+    config.work_experience = existing.work_experience
+    config.education       = existing.education
+    config.certifications  = existing.certifications
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
     return config.model_dump()
