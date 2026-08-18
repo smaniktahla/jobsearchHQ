@@ -522,30 +522,28 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="flex gap-8 mt-16"><button class="btn btn-ghost" onclick="document.getElementById('logs-modal').classList.remove('show')">Close</button></div>
 </div>
 </div>
-</div>
 <!-- Activity -->
 <div id="view-activity" class="view">
   <div class="flex justify-between items-center mb-16"><h1>Activity</h1><button class="btn btn-ghost btn-sm" onclick="fetchActivity()">Refresh</button></div>
-  <div class="stats-row" style="grid-template-columns:1fr 1fr">
-    <div class="card">
-      <div class="card-header">Batch Scoring</div>
-      <div id="activity-score-all"></div>
-    </div>
-    <div class="card">
-      <div class="card-header">Scheduler</div>
-      <div id="activity-scheduler"></div>
-      <div id="activity-recent-runs"></div>
-      <button class="btn btn-ghost btn-sm mt-16" onclick="showSchedulerLogs()">View Full Run History</button>
-    </div>
-  </div>
   <div class="card mb-16">
     <div class="card-header">In Progress <span class="text-dim" style="font-weight:normal;text-transform:none">— agent-triggered (Hermes)</span></div>
     <div id="activity-active"></div>
   </div>
-  <div class="card">
+  <div class="card mb-16">
     <div class="card-header">Recent Activity</div>
     <div id="activity-recent"></div>
   </div>
+  <div class="card mb-16">
+    <div class="card-header">Batch Scoring</div>
+    <div id="activity-score-all"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">Scheduler</div>
+    <div id="activity-scheduler"></div>
+    <div id="activity-recent-runs"></div>
+    <button class="btn btn-ghost btn-sm mt-16" onclick="showSchedulerLogs()">View Full Run History</button>
+  </div>
+</div>
 </div>
 </div>
 <!-- Email Compose Modal -->
