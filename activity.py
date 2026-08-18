@@ -10,7 +10,7 @@ Single-process app (uvicorn, no workers), so a module-level dict is safe.
 import itertools
 import threading
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 
 _lock = threading.Lock()
 _counter = itertools.count(1)
@@ -21,7 +21,7 @@ _recent: deque = deque(maxlen=200)
 # started) and "historical" events reconstructed from job storage on request
 # (see main.py build_history()). Keeps /api/activity from double-showing an
 # event that both this tracker and the storage-reconstruction would produce.
-PROCESS_STARTED_AT = datetime.now().isoformat()
+PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat()
 
 
 def start(op_type: str, job_id: str = "", detail: str = "") -> int:
@@ -33,7 +33,7 @@ def start(op_type: str, job_id: str = "", detail: str = "") -> int:
             "type": op_type,
             "job_id": job_id,
             "detail": detail,
-            "started_at": datetime.now().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
         }
     return op_id
 
@@ -45,7 +45,7 @@ def finish(op_id: int, status: str = "done", detail: str = "") -> None:
         if op is None:
             return
         op["status"] = status
-        op["finished_at"] = datetime.now().isoformat()
+        op["finished_at"] = datetime.now(timezone.utc).isoformat()
         if detail:
             op["detail"] = detail
         _recent.appendleft(op)

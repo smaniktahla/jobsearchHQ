@@ -1,7 +1,7 @@
 import asyncio
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -402,7 +402,7 @@ def _run_score_all(user_id: str):
     ]
     _score_task.update(running=True, user_id=user_id, total=len(to_score),
                        done=0, scored=0, errors=0, current="", error_msgs=[],
-                       started_at=datetime.now().isoformat(), finished_at=None)
+                       started_at=datetime.now(timezone.utc).isoformat(), finished_at=None)
     for job in to_score:
         if not _score_task["running"]:
             break
@@ -420,7 +420,7 @@ def _run_score_all(user_id: str):
             _score_task["errors"] += 1
             _score_task["error_msgs"].append(f"{job.company}: {e}")
         _score_task["done"] += 1
-    _score_task.update(running=False, current="", finished_at=datetime.now().isoformat())
+    _score_task.update(running=False, current="", finished_at=datetime.now(timezone.utc).isoformat())
 
 
 @app.post("/api/jobs/score-all")
@@ -464,7 +464,7 @@ def _run_cleanup_jds(user_id: str):
     candidates = jd_cleanup.find_junk_jobs(user_id)
     _cleanup_task.update(running=True, user_id=user_id, total=len(candidates),
                          done=0, fixed=0, unresolved=0, current="", errors=0,
-                         error_msgs=[], started_at=datetime.now().isoformat(), finished_at=None)
+                         error_msgs=[], started_at=datetime.now(timezone.utc).isoformat(), finished_at=None)
     for job in candidates:
         if not _cleanup_task["running"]:
             break
@@ -481,7 +481,7 @@ def _run_cleanup_jds(user_id: str):
             _cleanup_task["errors"] += 1
             _cleanup_task["error_msgs"].append(f"{job.company}: {e}")
         _cleanup_task["done"] += 1
-    _cleanup_task.update(running=False, current="", finished_at=datetime.now().isoformat())
+    _cleanup_task.update(running=False, current="", finished_at=datetime.now(timezone.utc).isoformat())
 
 
 @app.post("/api/jobs/cleanup-junk-jds")
@@ -715,7 +715,7 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
             job.score.skills_match + job.score.scope_impact
             + job.score.pay_alignment + job.score.gut_interest
         )
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
 
@@ -772,7 +772,7 @@ def refresh_job_from_url(job_id: str, user: User = Depends(get_current_user)):
     if parsed.get("url"):
         job.url = parsed["url"]
     job.source = parsed.get("source", job.source) or job.source
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
 
@@ -824,7 +824,7 @@ def generate_tailored_resume(job_id: str, user: User = Depends(get_current_user)
             resume_text, job.id, user.id, job.company, job.title
         )
         job.tailored_resume_docx = docx_path
-        job.updated_at = datetime.now().isoformat()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user.id, job)
         activity.finish(op_id, status="done")
         return {
@@ -879,7 +879,7 @@ def generate_cover_letters(job_id: str, user: User = Depends(get_current_user)):
             )
             letter.docx_path = docx_path
         job.cover_letters = letters
-        job.updated_at = datetime.now().isoformat()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user.id, job)
         activity.finish(op_id, status="done", detail=f"{len(letters)} variant(s)")
         return [l.model_dump() for l in letters]
@@ -950,7 +950,7 @@ def generate_docs(job_id: str, user: User = Depends(get_current_user)):
     except Exception as e:
         errors.append(f"Cover letters: {str(e)}")
 
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     result = enrich_job(job)
     result["errors"] = errors
@@ -1032,7 +1032,7 @@ def record_application_result(
         ).strip() if job.follow_up.notes else portal_note
     if result.error:
         job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
 
@@ -1118,10 +1118,10 @@ def agent_trigger_job_research(job_id: str, request: Request):
         job.research = CompanyResearch(
             contacts=[Contact(**c) for c in result.get("contacts", [])],
             company_summary=result.get("company_summary", ""),
-            researched_at=datetime.now().isoformat(),
+            researched_at=datetime.now(timezone.utc).isoformat(),
             searches_run=result.get("searches_run", []),
         )
-        job.updated_at = datetime.now().isoformat()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(admin_id, job)
         activity.finish(op_id, status="done", detail=f"{len(result.get('contacts', []))} contacts found")
     except Exception as e:
@@ -1172,7 +1172,7 @@ def set_ats_url(job_id: str, payload: AtsUrlPayload, request: Request):
     if not job:
         raise HTTPException(404, "Job not found")
     job.ats_url = payload.ats_url
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(admin_id, job)
     return {"id": job_id, "ats_url": job.ats_url}
 
@@ -1188,7 +1188,7 @@ def append_agent_log(job_id: str, event: AgentEvent, request: Request):
     if not job:
         raise HTTPException(404, "Job not found")
     job.agent_log.append(event)
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(admin_id, job)
     return {"id": job_id, "agent_log_count": len(job.agent_log)}
 
@@ -1234,7 +1234,7 @@ def agent_set_review_status(job_id: str, request: Request, body: dict):
     if not job:
         raise HTTPException(404, "Job not found")
     job.review_status = new_status
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(admin_id, job)
     return {"job_id": job_id, "review_status": new_status}
 
@@ -1293,7 +1293,7 @@ def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, reques
         job.company = payload.company
     if payload.pay_range:
         job.pay_range = payload.pay_range
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
 
     op_id = activity.start("refresh-and-score", job_id=job_id, detail=f"{job.company}: {job.title}")
     try:
@@ -1333,7 +1333,7 @@ def send_job_email(job_id: str, data: EmailCompose, user: User = Depends(get_cur
             direction="sent", to=data.to, subject=data.subject,
             body=data.body, attachments=[Path(a).name for a in attachments],
         ))
-        job.updated_at = datetime.now().isoformat()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user.id, job)
         return result
     except Exception as e:
@@ -1386,7 +1386,7 @@ async def parse_confirmation(job_id: str, request: Request, user: User = Depends
         elif parsed.get("is_rejection"):
             job.update_status(JobStatus.REJECTED)
 
-        job.updated_at = datetime.now().isoformat()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user.id, job)
         return {"parsed": parsed, "job": enrich_job(job)}
     except Exception as e:
@@ -1416,8 +1416,8 @@ def snooze_follow_up(job_id: str, days: int = 7, user: User = Depends(get_curren
     job = storage.load_job(user.id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    job.follow_up.due_at = (datetime.now() + timedelta(days=days)).isoformat()
-    job.updated_at = datetime.now().isoformat()
+    job.follow_up.due_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
 
@@ -1434,7 +1434,7 @@ def set_contact_email(
         job.follow_up.contact_email = email
     if name:
         job.follow_up.contact_name = name
-    job.updated_at = datetime.now().isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
 
@@ -1446,8 +1446,8 @@ def mark_followed_up(job_id: str, user: User = Depends(get_current_user)):
         raise HTTPException(404, "Job not found")
     config = storage.load_config(user.id)
     job.follow_up.count += 1
-    job.follow_up.due_at = (datetime.now() + timedelta(days=config.follow_up_days)).isoformat()
-    job.updated_at = datetime.now().isoformat()
+    job.follow_up.due_at = (datetime.now(timezone.utc) + timedelta(days=config.follow_up_days)).isoformat()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
 
@@ -1471,10 +1471,10 @@ def research_job_company(job_id: str, user: User = Depends(get_current_user)):
         job.research = CompanyResearch(
             contacts=[Contact(**c) for c in result.get("contacts", [])],
             company_summary=result.get("company_summary", ""),
-            researched_at=datetime.now().isoformat(),
+            researched_at=datetime.now(timezone.utc).isoformat(),
             searches_run=result.get("searches_run", []),
         )
-        job.updated_at = datetime.now().isoformat()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user.id, job)
         return enrich_job(job)
     except Exception as e:

@@ -381,7 +381,12 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       </label>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="form-group"><label>Run Time (HH:MM, Eastern)</label><input type="time" id="cfg-sched-time" value="07:00"></div>
+      <div class="form-group"><label>Run Time (HH:MM)</label><input type="time" id="cfg-sched-time" value="07:00"></div>
+      <div class="form-group">
+        <label>Timezone <span style="color:var(--text-dim);font-weight:normal">(optional override)</span></label>
+        <input type="text" id="cfg-timezone" placeholder="e.g. America/New_York">
+        <div id="cfg-timezone-hint" class="text-dim" style="font-size:11px;margin-top:4px"></div>
+      </div>
       <div class="form-group"><label>Search Terms (one per line)</label><textarea id="cfg-sched-terms" rows="3" placeholder="senior director data analytics&#10;data architecture manager"></textarea></div>
         <div class="form-group"><label>Job Boards</label>
           <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
@@ -1234,6 +1239,12 @@ async function loadSettings(){
   document.getElementById('cfg-w2-min').value=c.w2_salary_min;document.getElementById('cfg-w2-max').value=c.w2_salary_max;document.getElementById('cfg-hr-min').value=c.contract_hourly_min;document.getElementById('cfg-hr-max').value=c.contract_hourly_max;document.getElementById('cfg-followup-days').value=c.follow_up_days;document.getElementById('cfg-followup-email').value=c.follow_up_email;document.getElementById('cfg-smtp-user').value=c.smtp_user;document.getElementById('cfg-smtp-pass').value=c.smtp_password;document.getElementById('cfg-smtp-host').value=c.smtp_host||'smtp.gmail.com';document.getElementById('cfg-smtp-port').value=c.smtp_port||587;document.getElementById('cfg-email-html').checked=c.email_html!==false;document.getElementById('cfg-dealbreakers').value=c.deal_breakers.join('\n');document.getElementById('cfg-keywords').value=c.preferred_keywords.join(', ');
   document.getElementById('cfg-sched-enabled').checked=!!c.scheduled_search_enabled;
   document.getElementById('cfg-sched-time').value=c.scheduled_search_time||'07:00';
+  document.getElementById('cfg-timezone').value=c.timezone||'';
+  api('/api/scheduler/status').then(s=>{
+    document.getElementById('cfg-timezone-hint').textContent=s.timezone_explicit
+      ?`Explicit override in effect: ${s.timezone}`
+      :`Auto-detected from your profile location/state: ${s.timezone}. Leave blank to keep using this.`;
+  }).catch(()=>{});
   document.getElementById('cfg-sched-terms').value=(c.scheduled_search_terms||[]).join('\n');
   const schedSites=c.scheduled_search_sites||['indeed','linkedin','google'];
   document.getElementById('cfg-sched-indeed').checked=schedSites.includes('indeed');
@@ -1301,6 +1312,7 @@ async function saveConfig(){
   await api('/api/config',{method:'PUT',body:{w2_salary_min:+document.getElementById('cfg-w2-min').value||160000,w2_salary_max:+document.getElementById('cfg-w2-max').value||220000,contract_hourly_min:+document.getElementById('cfg-hr-min').value||85,contract_hourly_max:+document.getElementById('cfg-hr-max').value||125,follow_up_days:+document.getElementById('cfg-followup-days').value||14,follow_up_email:document.getElementById('cfg-followup-email').value,smtp_host:document.getElementById('cfg-smtp-host').value||'smtp.gmail.com',smtp_port:+document.getElementById('cfg-smtp-port').value||587,smtp_user:document.getElementById('cfg-smtp-user').value,smtp_password:document.getElementById('cfg-smtp-pass').value,email_html:document.getElementById('cfg-email-html').checked,resume_labels:{director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'},deal_breakers:document.getElementById('cfg-dealbreakers').value.split('\n').filter(Boolean),preferred_keywords:document.getElementById('cfg-keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
   scheduled_search_enabled:document.getElementById('cfg-sched-enabled').checked,
   scheduled_search_time:document.getElementById('cfg-sched-time').value||'07:00',
+  timezone:document.getElementById('cfg-timezone').value.trim()||'',
   scheduled_search_terms:document.getElementById('cfg-sched-terms').value.split('\n').filter(Boolean),
   scheduled_search_sites:schedSites,
   scheduled_company_sites:schedCompanySites,
@@ -1406,6 +1418,23 @@ function loadActivity(){
 async function fetchActivity(){
   try{const d=await api('/api/activity');renderActivity(d)}catch(e){}
 }
+const ACTIVITY_GROUP_GAP_MS=5*60*1000; // collapse same-type entries within 5 min of each other
+function groupActivity(list){
+  // list is sorted newest-first. Collapse consecutive same-type runs (e.g.
+  // a burst of 7 refresh-and-score calls) into one line instead of one per call.
+  const groups=[];
+  for(const op of list){
+    const t=new Date(op.finished_at||op.started_at).getTime();
+    const last=groups[groups.length-1];
+    if(last && last.type===op.type && (last.lastTime-t)<=ACTIVITY_GROUP_GAP_MS){
+      last.items.push(op);
+      last.lastTime=t;
+    }else{
+      groups.push({type:op.type,items:[op],lastTime:t});
+    }
+  }
+  return groups;
+}
 function renderActivity(d){
   const activeEl=document.getElementById('activity-active');
   if(!d.active.length){activeEl.innerHTML='<div class="text-dim text-sm">Nothing running right now.</div>'}
@@ -1419,14 +1448,28 @@ function renderActivity(d){
   document.getElementById('nav-activity-badge').textContent=d.active.length||'';
 
   const recentEl=document.getElementById('activity-recent');
-  if(!d.recent.length){recentEl.innerHTML='<div class="text-dim text-sm">No recent activity.</div>'}
-  else{recentEl.innerHTML=d.recent.map(op=>{
-    const color=op.status==='error'?'var(--red)':'var(--green)';
-    const when=op.finished_at?new Date(op.finished_at).toLocaleTimeString():'';
-    return`<div class="flex justify-between items-center" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+  const groups=groupActivity(d.recent);
+  if(!groups.length){recentEl.innerHTML='<div class="text-dim text-sm">No recent activity.</div>'}
+  else{recentEl.innerHTML=groups.map(g=>{
+    const anyError=g.items.some(i=>i.status==='error');
+    const color=anyError?'var(--red)':'var(--green)';
+    const newestTime=g.items[0].finished_at?new Date(g.items[0].finished_at).toLocaleTimeString():'';
+    if(g.items.length===1){
+      const op=g.items[0];
+      const clickable=op.job_id?` onclick="showDetail('${escAttr(op.job_id)}')" style="cursor:pointer"`:'';
+      return`<div class="flex justify-between items-center"${clickable} style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
 <div><strong>${esc(op.type)}</strong> <span class="text-dim">${esc(op.detail||'')}</span></div>
-<div style="color:${color};white-space:nowrap;margin-left:12px">${when}</div>
-</div>`}).join('')}
+<div style="color:${color};white-space:nowrap;margin-left:12px">${newestTime}</div>
+</div>`;
+    }
+    const oldestTime=g.items[g.items.length-1].finished_at?new Date(g.items[g.items.length-1].finished_at).toLocaleTimeString():'';
+    const details=g.items.map(i=>esc(i.detail||'')).filter(Boolean).slice(0,6).join(' · ');
+    const more=g.items.length>6?` +${g.items.length-6} more`:'';
+    return`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+<div class="flex justify-between items-center"><strong>${esc(g.type)}</strong> ×${g.items.length}<span class="text-dim" style="margin-left:auto;white-space:nowrap">${oldestTime} – ${newestTime}</span></div>
+<div class="text-dim mt-8" style="font-size:12px">${details}${more}</div>
+</div>`;
+  }).join('')}
 
   const sa=d.score_all,saEl=document.getElementById('activity-score-all');
   if(sa.running){

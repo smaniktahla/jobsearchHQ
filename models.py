@@ -1,8 +1,16 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
+
+
+def _aware(dt: datetime) -> datetime:
+    """Legacy timestamps stored before timezone-aware timestamps were
+    introduced are naive but were always wall-clock UTC (container runs
+    UTC) — treat a naive value as UTC rather than crashing on comparison
+    against an aware datetime.now(timezone.utc)."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 class MarketLane(str, Enum):
@@ -60,7 +68,7 @@ class CoverLetter(BaseModel):
     variant: str  # "direct", "consultative", "brief"
     content: str
     docx_path: str = ""
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class FollowUp(BaseModel):
@@ -82,7 +90,7 @@ class EmailRecord(BaseModel):
     subject: str = ""
     body: str = ""
     attachments: list[str] = []
-    sent_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    sent_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class Contact(BaseModel):
@@ -119,7 +127,7 @@ class AgentEventType(str, Enum):
 class AgentEvent(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     event_type: AgentEventType
-    at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     notes: str = ""
     ats: str = ""
     script: str = ""
@@ -152,27 +160,27 @@ class Job(BaseModel):
     ats_url: str = ""          # direct ATS portal URL (set by dispatch.js)
     review_status: ReviewStatus = ReviewStatus.PENDING  # human go/no-go decision
     agent_log: list[AgentEvent] = []
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status_history: list[dict] = []
 
     def update_status(self, new_status: JobStatus, applied_date: str = ""):
         self.status_history.append({
             "from": self.status,
             "to": new_status,
-            "at": datetime.now().isoformat()
+            "at": datetime.now(timezone.utc).isoformat()
         })
         self.status = new_status
-        self.updated_at = datetime.now().isoformat()
+        self.updated_at = datetime.now(timezone.utc).isoformat()
 
         if new_status == JobStatus.APPLIED:
             if applied_date:
                 try:
-                    dt = datetime.fromisoformat(applied_date)
+                    dt = _aware(datetime.fromisoformat(applied_date))
                 except ValueError:
-                    dt = datetime.now()
+                    dt = datetime.now(timezone.utc)
             else:
-                dt = datetime.now()
+                dt = datetime.now(timezone.utc)
             if not self.applied_at:
                 self.applied_at = dt.isoformat()
                 self.follow_up.due_at = (dt + timedelta(days=14)).isoformat()
@@ -186,8 +194,8 @@ class Job(BaseModel):
         if not self.follow_up.due_at:
             return False
         try:
-            due = datetime.fromisoformat(self.follow_up.due_at)
-            return datetime.now() >= due
+            due = _aware(datetime.fromisoformat(self.follow_up.due_at))
+            return datetime.now(timezone.utc) >= due
         except (ValueError, TypeError):
             return False
 
@@ -196,8 +204,8 @@ class Job(BaseModel):
         if not self.applied_at:
             return None
         try:
-            applied = datetime.fromisoformat(self.applied_at)
-            return (datetime.now() - applied).days
+            applied = _aware(datetime.fromisoformat(self.applied_at))
+            return (datetime.now(timezone.utc) - applied).days
         except (ValueError, TypeError):
             return None
 
@@ -312,6 +320,11 @@ class AppConfig(BaseModel):
     author_city: str = ""
     author_state: str = ""
     author_zip: str = ""
+    # IANA tz name (e.g. "America/New_York"). Explicit value always wins;
+    # blank means "infer from author_state/author_location" — see
+    # scheduler.effective_timezone(). Used for the scheduled search's
+    # Run Time and for display purposes.
+    timezone: str = ""
     author_linkedin: str = ""
     author_website: str = ""
     work_experience: list[WorkExperience] = []

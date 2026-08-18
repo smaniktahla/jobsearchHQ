@@ -12,7 +12,7 @@ v2 architecture: per-user storage under /app/data/users/{user_id}/
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -31,6 +31,52 @@ logger = logging.getLogger(__name__)
 _scheduler: BackgroundScheduler | None = None
 
 LOG_DIR = Path("/app/data/scheduler_logs")
+
+
+# ── Timezone inference ──────────────────────────────────────────────────────
+
+# US state → dominant IANA timezone (best-effort; a few states span more than
+# one zone — this picks the zone covering the state's population center).
+# Only used when config.timezone is blank; an explicit setting always wins.
+_STATE_TIMEZONES = {
+    "AL": "America/Chicago", "AK": "America/Anchorage", "AZ": "America/Phoenix",
+    "AR": "America/Chicago", "CA": "America/Los_Angeles", "CO": "America/Denver",
+    "CT": "America/New_York", "DE": "America/New_York", "DC": "America/New_York",
+    "FL": "America/New_York", "GA": "America/New_York", "HI": "Pacific/Honolulu",
+    "ID": "America/Denver", "IL": "America/Chicago", "IN": "America/Indiana/Indianapolis",
+    "IA": "America/Chicago", "KS": "America/Chicago", "KY": "America/New_York",
+    "LA": "America/Chicago", "ME": "America/New_York", "MD": "America/New_York",
+    "MA": "America/New_York", "MI": "America/New_York", "MN": "America/Chicago",
+    "MS": "America/Chicago", "MO": "America/Chicago", "MT": "America/Denver",
+    "NE": "America/Chicago", "NV": "America/Los_Angeles", "NH": "America/New_York",
+    "NJ": "America/New_York", "NM": "America/Denver", "NY": "America/New_York",
+    "NC": "America/New_York", "ND": "America/Chicago", "OH": "America/New_York",
+    "OK": "America/Chicago", "OR": "America/Los_Angeles", "PA": "America/New_York",
+    "RI": "America/New_York", "SC": "America/New_York", "SD": "America/Chicago",
+    "TN": "America/Chicago", "TX": "America/Chicago", "UT": "America/Denver",
+    "VT": "America/New_York", "VA": "America/New_York", "WA": "America/Los_Angeles",
+    "WV": "America/New_York", "WI": "America/Chicago", "WY": "America/Denver",
+}
+
+DEFAULT_TIMEZONE = "America/New_York"
+
+
+def effective_timezone(config: AppConfig) -> str:
+    """
+    Explicit config.timezone always wins. Otherwise infer from
+    author_state, falling back to scanning author_location text for a
+    state code, then to DEFAULT_TIMEZONE.
+    """
+    if config.timezone:
+        return config.timezone
+    state = (config.author_state or "").strip().upper()
+    if state in _STATE_TIMEZONES:
+        return _STATE_TIMEZONES[state]
+    location = f" {(config.author_location or '').upper()} "
+    for code, tz in _STATE_TIMEZONES.items():
+        if f" {code} " in location or f" {code}," in location or location.strip().endswith(code):
+            return tz
+    return DEFAULT_TIMEZONE
 
 
 # ── Scheduler lifecycle ────────────────────────────────────────────────────────
@@ -139,15 +185,16 @@ def _apply_schedule(user_id: str, config: AppConfig):
             f"defaulting to 07:00"
         )
 
+    tz = effective_timezone(config)
     sched.add_job(
         run_daily_pipeline,
-        trigger=CronTrigger(hour=hour, minute=minute),
+        trigger=CronTrigger(hour=hour, minute=minute, timezone=tz),
         id=job_id,
         name=f"Daily Search — {user_id}",
         replace_existing=True,
         kwargs={"user_id": user_id},
     )
-    logger.info(f"Scheduled daily search for user {user_id} at {hour:02d}:{minute:02d} ET")
+    logger.info(f"Scheduled daily search for user {user_id} at {hour:02d}:{minute:02d} {tz}")
 
 
 # ── Status & logs ──────────────────────────────────────────────────────────────
@@ -163,6 +210,8 @@ def get_schedule_status(user_id: str) -> dict:
         "scheduler_running": sched.running if sched else False,
         "enabled": config.scheduled_search_enabled,
         "schedule_time": config.scheduled_search_time,
+        "timezone": effective_timezone(config),
+        "timezone_explicit": bool(config.timezone),
         "next_run": str(job.next_run_time) if job else None,
         "auto_score": config.auto_score_new_jobs,
         "auto_generate": config.auto_generate_above_threshold,
@@ -206,7 +255,7 @@ def run_daily_pipeline(user_id: str) -> dict:
     config = storage.load_config(user_id)
     run_log = {
         "user_id": user_id,
-        "started_at": datetime.now().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
         "search_results": [],
         "email_alerts": {},
         "scored": [],
@@ -367,7 +416,7 @@ def run_daily_pipeline(user_id: str) -> dict:
                 job_label = f"{job.company} - {job.title}" if job else job_id
                 run_log["errors"].append(f"Generate {job_id} ({job_label}): {str(e)}")
 
-    run_log["finished_at"] = datetime.now().isoformat()
+    run_log["finished_at"] = datetime.now(timezone.utc).isoformat()
     _save_run_log(run_log)
 
     total_new = sum(r["created"] for r in run_log["search_results"])
@@ -383,7 +432,7 @@ def _save_run_log(run_log: dict):
     """Persist the run log."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     user_id = run_log.get("user_id", "unknown")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     log_path = LOG_DIR / f"run_{user_id}_{timestamp}.json"
     log_path.write_text(json.dumps(run_log, indent=2))
 
