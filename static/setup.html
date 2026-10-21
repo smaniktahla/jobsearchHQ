@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Search HQ — Setup</title>
 <style>
+
 :root{--bg:#0f1117;--surface:#1a1d27;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--radius:8px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -23,121 +24,52 @@ input:focus{outline:none;border-color:var(--accent)}
 .msg{margin-top:16px;padding:12px 16px;border-radius:6px;font-size:13px;display:none}
 .msg.success{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--green)}
 .msg.error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red)}
-.divider{border:none;border-top:1px solid var(--border);margin:28px 0}
-.docs{font-size:12px;color:var(--text-dim);line-height:1.7}
-.docs a{color:var(--accent);text-decoration:none}
-code{background:#232736;padding:1px 5px;border-radius:3px;font-size:11px;font-family:monospace}
-/* Admin callout */
-.admin-callout{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.28);border-radius:8px;padding:14px 16px;margin-bottom:24px;display:flex;gap:12px;align-items:flex-start}
-.admin-callout-icon{font-size:18px;flex-shrink:0;line-height:1}
-.admin-callout-body{font-size:12px;line-height:1.65;color:var(--text-dim)}
-.admin-callout-body strong{color:var(--yellow)}
-.admin-callout-body ul{margin:6px 0 0 14px}
-.admin-callout-body li{margin-bottom:3px}
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0}
+.sso{display:block;text-align:center;text-decoration:none;background:transparent;border:1px solid var(--border);color:var(--text)}
+.sso:hover{background:#232736}
+.hint a{color:var(--accent)}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">Job Search HQ</div>
-  <h1>First-run Setup</h1>
-  <p class="subtitle">Configure your Authentik OIDC provider to enable login. This only needs to be done once.</p>
-
-  <div class="admin-callout">
-    <div class="admin-callout-icon">⚠️</div>
-    <div class="admin-callout-body">
-      <strong>Your admin account is set on first login.</strong>
-      The first user to log in after saving this config will automatically become the app admin —
-      the account used to manage global settings. Before clicking Save:
-      <ul>
-        <li>Create your Authentik user first (step 6 in the guide below).</li>
-        <li><strong>Make note of the username and password you set</strong> — you'll use them every time you log in.</li>
-        <li>Keep this account private; it has full admin access to the app.</li>
-      </ul>
-      <div style="margin-top:8px">To reassign admin later, edit <code>admin_user_id</code> in <code>/app/data/system_config.json</code> and restart the container.</div>
-    </div>
-  </div>
-
+  <h1>Welcome — create your admin account</h1>
+  <p class="subtitle">This is the account you'll use to sign in and manage the app. You can add other people and optional single sign-on later from Settings.</p>
   <form id="setup-form">
-    <div class="form-group">
-      <label>Issuer URL</label>
-      <input type="url" id="oidc_issuer" placeholder="http://10.10.10.13:9000/application/o/jobsearch/" required>
-      <div class="hint">Found in Authentik → Applications → Your App → Edit Provider → OpenID Configuration Issuer</div>
-    </div>
-    <div class="form-group">
-      <label>Client ID</label>
-      <input type="text" id="oidc_client_id" placeholder="paste-client-id-here" required>
-    </div>
-    <div class="form-group">
-      <label>Client Secret</label>
-      <input type="password" id="oidc_client_secret" placeholder="paste-client-secret-here" required>
-    </div>
-    <div class="form-group">
-      <label>Redirect URI</label>
-      <input type="url" id="oidc_redirect_uri" placeholder="http://10.10.10.13:8094/auth/callback" required>
-      <div class="hint">Must exactly match the redirect URI configured in Authentik.</div>
-    </div>
-    <button type="submit" class="btn" id="submit-btn">Save &amp; Continue to Login</button>
+    <div class="form-group"><label>Your name</label><input type="text" id="name" autocomplete="name" required></div>
+    <div class="form-group"><label>Email</label><input type="email" id="email" autocomplete="username" required></div>
+    <div class="form-group"><label>Password</label><input type="password" id="password" autocomplete="new-password" minlength="10" required><div class="hint">At least 10 characters.</div></div>
+    <div class="form-group"><label>Confirm password</label><input type="password" id="confirm" autocomplete="new-password" required></div>
+    <div class="form-group" id="token-group" style="display:none"><label>Setup token</label><input type="password" id="setup_token"><div class="hint">This server requires the <code>JSHQ_SETUP_TOKEN</code> value to create the first account.</div></div>
+    <button type="submit" class="btn" id="submit-btn">Create admin account</button>
   </form>
-  <div id="msg" class="msg"></div>
-  <hr class="divider">
-  <div class="docs">
-    <strong style="color:var(--text)">Quick Authentik setup:</strong><br><br>
-    1. Open <a href="http://10.10.10.13:9000" target="_blank">Authentik</a> → Admin → Applications → Create<br>
-    2. Name: <code>JobSearch HQ</code> · Slug: <code>jobsearch</code><br>
-    3. Create provider: OAuth2/OpenID → pick <em>Client Credentials + Code</em><br>
-    4. Set Redirect URI: <code>http://10.10.10.13:8094/auth/callback</code><br>
-    5. Copy the Client ID &amp; Secret above, paste the Issuer URL from the provider page<br>
-    6. Create a user, add them to the application's policy<br>
-  </div>
+  <div id="msg" class="msg error"></div>
 </div>
 <script>
-// Pre-fill from existing config
-fetch('/api/setup').then(r => r.json()).then(cfg => {
-  document.getElementById('oidc_issuer').value = cfg.oidc_issuer || '';
-  document.getElementById('oidc_client_id').value = cfg.oidc_client_id || '';
-  document.getElementById('oidc_client_secret').value = cfg.oidc_client_secret || '';
-  document.getElementById('oidc_redirect_uri').value = cfg.oidc_redirect_uri || 'http://' + location.hostname + ':8094/auth/callback';
-}).catch(() => {
-  document.getElementById('oidc_redirect_uri').value = 'http://' + location.hostname + ':8094/auth/callback';
+const $ = id => document.getElementById(id);
+fetch('/api/setup/status').then(r => r.json()).then(s => {
+  if (!s.needs_admin) location.replace('/auth/login');
+  if (s.setup_token_required) { $('token-group').style.display = 'block'; $('setup_token').required = true; }
 });
-document.getElementById('setup-form').addEventListener('submit', async (e) => {
+function fail(text) { const m = $('msg'); m.textContent = text; m.style.display = 'block'; }
+$('setup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const btn = document.getElementById('submit-btn');
-  const msg = document.getElementById('msg');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  msg.style.display = 'none';
+  $('msg').style.display = 'none';
+  if ($('password').value !== $('confirm').value) return fail('Passwords do not match');
+  const btn = $('submit-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
   try {
-    const res = await fetch('/api/setup', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        oidc_issuer: document.getElementById('oidc_issuer').value.trim(),
-        oidc_client_id: document.getElementById('oidc_client_id').value.trim(),
-        oidc_client_secret: document.getElementById('oidc_client_secret').value.trim(),
-        oidc_redirect_uri: document.getElementById('oidc_redirect_uri').value.trim(),
-      }),
+    const res = await fetch('/api/setup/admin', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: $('name').value.trim(), email: $('email').value.trim(),
+        password: $('password').value, setup_token: $('setup_token').value}),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Save failed');
-    if (data.is_complete) {
-      msg.className = 'msg success';
-      msg.textContent = 'Saved! Redirecting to login…';
-      msg.style.display = 'block';
-      setTimeout(() => { window.location.href = '/auth/login'; }, 1200);
-    } else {
-      msg.className = 'msg error';
-      msg.textContent = 'Saved, but config appears incomplete. Check all fields.';
-      msg.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Save & Continue to Login';
-    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Setup failed');
+    location.href = '/';
   } catch (err) {
-    msg.className = 'msg error';
-    msg.textContent = err.message;
-    msg.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Save & Continue to Login';
+    fail(err.message);
+    btn.disabled = false; btn.textContent = 'Create admin account';
   }
 });
 </script>

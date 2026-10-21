@@ -7,7 +7,7 @@ from typing import Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from auth import (
@@ -17,13 +17,23 @@ from auth import (
     verify_agent_api_key,
     invalidate_discovery_cache,
     is_admin,
+    is_oidc_configured,
     is_setup_complete,
     load_system_config,
     login_handler,
+    local_login_handler,
+    sso_login_handler,
     callback_handler,
     logout_handler,
     save_system_config,
+    bootstrap_admin,
+    require_admin,
+    session_is_valid,
+    setup_token_required,
+    set_session_cookie,
+    _is_https,
 )
+import local_users
 from pydantic import BaseModel
 from models import (
     ReviewStatus, AgentEvent, AgentEventType, AppConfig, ApplicationResult,
@@ -79,6 +89,16 @@ async def route_login(request: Request):
     return await login_handler(request)
 
 
+@app.post("/auth/login/local")
+async def route_login_local(request: Request):
+    return await local_login_handler(request)
+
+
+@app.get("/auth/sso")
+async def route_sso(request: Request):
+    return await sso_login_handler(request)
+
+
 @app.get("/auth/callback")
 async def route_callback(request: Request):
     return await callback_handler(request)
@@ -96,10 +116,11 @@ async def auth_me(request: Request):
         raise HTTPException(503, detail="setup_required")
     from auth import get_session_from_cookie
     session = get_session_from_cookie(request)
-    if not session:
+    if not session or not session_is_valid(session):
         raise HTTPException(401, detail="not_authenticated")
     user_id = session["user_id"]
     return {
+        "local": local_users.is_local_id(user_id),
         "id": user_id,
         "email": session["email"],
         "name": session["name"],
@@ -109,37 +130,140 @@ async def auth_me(request: Request):
 
 @app.get("/setup")
 async def serve_setup():
+    # First-run only: once an admin exists there is nothing left to set up here.
+    if is_setup_complete():
+        return RedirectResponse("/auth/login")
     return FileResponse("static/setup.html")
 
 
-@app.get("/api/setup")
-async def get_setup_config():
-    """Return current OIDC config (secrets masked) for the setup form."""
+@app.get("/api/setup/status")
+async def setup_status():
+    return {
+        "needs_admin": not is_setup_complete(),
+        "setup_token_required": setup_token_required(),
+    }
+
+
+@app.get("/api/auth/login-options")
+async def login_options():
+    return {"sso": is_oidc_configured()}
+
+
+class AdminSetup(BaseModel):
+    name: str
+    email: str
+    password: str
+    setup_token: str = ""
+
+
+@app.post("/api/setup/admin")
+async def create_first_admin(data: AdminSetup, request: Request):
+    """Create the first admin account and sign them in. Refuses once an admin exists."""
+    user = bootstrap_admin(data.name, data.email, data.password, data.setup_token)
+    response = JSONResponse({"ok": True})
+    set_session_cookie(response, user["id"], user["email"], user["name"], secure=_is_https(request))
+    return response
+
+
+# ── Admin: users & SSO (admin session required) ──────────────────────────────
+
+class NewUser(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class PasswordChange(BaseModel):
+    current_password: str = ""
+    new_password: str
+
+
+class OidcConfig(BaseModel):
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_redirect_uri: str = ""
+
+
+@app.get("/api/admin/users")
+def admin_list_users(user: User = Depends(get_current_user)):
+    require_admin(user)
+    return local_users.list_users()
+
+
+@app.post("/api/admin/users")
+def admin_create_user(data: NewUser, user: User = Depends(get_current_user)):
+    require_admin(user)
+    try:
+        return local_users.create_user(data.name, data.email, data.password)
+    except local_users.UserError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: str, user: User = Depends(get_current_user)):
+    require_admin(user)
+    if user_id == user.id:
+        raise HTTPException(400, "You can't delete your own account")
+    if not local_users.delete_user(user_id):
+        raise HTTPException(404, "User not found")
+    return {"ok": True}
+
+
+@app.post("/api/admin/users/{user_id}/password")
+def admin_reset_password(user_id: str, data: PasswordChange, user: User = Depends(get_current_user)):
+    require_admin(user)
+    try:
+        local_users.set_password(user_id, data.new_password)
+    except local_users.UserError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True}
+
+
+@app.post("/api/auth/password")
+def change_own_password(data: PasswordChange, user: User = Depends(get_current_user)):
+    if not local_users.is_local_id(user.id):
+        raise HTTPException(400, "Your password is managed by your SSO provider")
+    if not local_users.check_password(user.id, data.current_password):
+        raise HTTPException(403, "Current password is incorrect")
+    try:
+        local_users.set_password(user.id, data.new_password)
+    except local_users.UserError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True}
+
+
+@app.get("/api/admin/oidc")
+def admin_get_oidc(user: User = Depends(get_current_user)):
+    require_admin(user)
     cfg = load_system_config()
     return {
         "oidc_issuer": cfg.get("oidc_issuer", ""),
         "oidc_client_id": cfg.get("oidc_client_id", ""),
         "oidc_client_secret": "••••••••" if cfg.get("oidc_client_secret") else "",
         "oidc_redirect_uri": cfg.get("oidc_redirect_uri", ""),
-        "is_complete": is_setup_complete(),
+        "enabled": is_oidc_configured(),
     }
 
 
-@app.post("/api/setup")
-async def save_setup_config(request: Request):
-    """Save OIDC configuration. Accessible without auth (needed for first run)."""
-    body = await request.json()
+@app.put("/api/admin/oidc")
+def admin_save_oidc(data: OidcConfig, user: User = Depends(get_current_user)):
+    """Enable, change or (with every field blank) remove optional SSO."""
+    require_admin(user)
     cfg = load_system_config()
-    cfg["oidc_issuer"] = body.get("oidc_issuer", "").rstrip("/")
-    cfg["oidc_client_id"] = body.get("oidc_client_id", "")
-    cfg["oidc_redirect_uri"] = body.get("oidc_redirect_uri", "")
-    # Only update secret if a real value was provided (not the masked placeholder)
-    secret = body.get("oidc_client_secret", "")
-    if secret and not secret.startswith("•"):
-        cfg["oidc_client_secret"] = secret
+    if not any([data.oidc_issuer, data.oidc_client_id, data.oidc_client_secret, data.oidc_redirect_uri]):
+        for k in ("oidc_issuer", "oidc_client_id", "oidc_client_secret", "oidc_redirect_uri"):
+            cfg.pop(k, None)
+    else:
+        cfg["oidc_issuer"] = data.oidc_issuer.strip().rstrip("/")
+        cfg["oidc_client_id"] = data.oidc_client_id.strip()
+        cfg["oidc_redirect_uri"] = data.oidc_redirect_uri.strip()
+        # Keep the stored secret when the masked placeholder is sent back
+        if data.oidc_client_secret and not data.oidc_client_secret.startswith("•"):
+            cfg["oidc_client_secret"] = data.oidc_client_secret.strip()
     save_system_config(cfg)
     invalidate_discovery_cache()
-    return {"ok": True, "is_complete": is_setup_complete()}
+    return {"ok": True, "enabled": is_oidc_configured()}
 
 
 # ── Agent endpoints (API key auth — for job-agent automation) ─────────────────

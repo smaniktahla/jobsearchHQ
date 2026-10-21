@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from models import Job, AppConfig
 
-DATA_DIR = Path("/app/data")
+DATA_DIR = Path(os.environ.get("JSHQ_DATA_DIR", "/app/data"))
 SYSTEM_CONFIG_PATH = DATA_DIR / "system_config.json"
 
 
