@@ -325,8 +325,43 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div id="acct-admin-note" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(79,143,247,.08);border:1px solid rgba(79,143,247,.2);border-radius:6px;font-size:12px;color:var(--text-dim)">
       <strong style="color:var(--accent)">You are the admin.</strong>
       Your User ID above is stored as <code style="font-size:11px;background:var(--surface2);padding:1px 4px;border-radius:3px">admin_user_id</code> in system_config.json.
-      OIDC configuration is managed at <a href="/setup" style="color:var(--accent)">/setup</a>.
+      Add users and optional single sign-on in the cards below.
     </div>
+  </div>
+
+  <!-- Password (local accounts) -->
+  <div class="card mb-16" id="pw-card" style="display:none">
+    <div class="card-header">Change Password</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
+      <div class="form-group"><label>Current password</label><input type="password" id="pw-current" autocomplete="current-password"></div>
+      <div class="form-group"><label>New password (10+ characters)</label><input type="password" id="pw-new" autocomplete="new-password"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm mt-8" onclick="changeOwnPassword()">Update Password</button><span id="pw-status" class="text-sm" style="margin-left:8px"></span>
+  </div>
+
+  <!-- Users (admin) -->
+  <div class="card mb-16" id="users-card" style="display:none">
+    <div class="card-header">Users</div>
+    <div id="users-list" class="mt-8" style="font-size:13px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px">
+      <div class="form-group"><label>Name</label><input type="text" id="nu-name"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="nu-email"></div>
+      <div class="form-group"><label>Temporary password</label><input type="password" id="nu-pass" autocomplete="new-password"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="addUser()">Add User</button><span id="users-status" class="text-sm" style="margin-left:8px"></span>
+  </div>
+
+  <!-- SSO (admin, optional) -->
+  <div class="card mb-16" id="sso-card" style="display:none">
+    <div class="card-header">Single Sign-On (optional)</div>
+    <p class="text-sm" style="color:var(--text-dim);margin:8px 0 12px">Add an OpenID Connect provider (Authentik, Keycloak, Auth0…) so people can also sign in with SSO. Local accounts keep working. Clear every field and save to turn SSO off.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="form-group"><label>Issuer URL</label><input type="url" id="oidc-issuer"></div>
+      <div class="form-group"><label>Redirect URI</label><input type="url" id="oidc-redirect"></div>
+      <div class="form-group"><label>Client ID</label><input type="text" id="oidc-client-id"></div>
+      <div class="form-group"><label>Client Secret</label><input type="password" id="oidc-secret"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="saveOidc()">Save SSO Settings</button><span id="oidc-status" class="text-sm" style="margin-left:8px"></span>
   </div>
 
   <!-- Applicant Profile -->
@@ -593,7 +628,7 @@ function resumeLabel(key){return resumeLabels[key]||key||'none'}
 function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity()}
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
-async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
+async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(res.status===503){window.location.href='/setup';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
 // Dashboard
 async function loadDashboard(){const[stats,jobs]=await Promise.all([api('/api/stats'),api('/api/jobs')]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);updateTrackerCountBadge(stats.total);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';
 document.getElementById('funnel').innerHTML=['new','scored','applied','interview','offer'].map(s=>`<div class="funnel-step"><div class="count">${stats.by_status[s]||0}</div><div class="label">${s}</div></div>`).join('');
@@ -1224,6 +1259,46 @@ async function saveProfile(btn){
   }catch(e){alert('Save failed: '+e.message);}
 }
 
+// Accounts & SSO
+function setStatus(id,msg,ok){const el=document.getElementById(id);el.textContent=msg;el.style.color=ok?'var(--green)':'var(--red)'}
+async function changeOwnPassword(){
+  try{await api('/api/auth/password',{method:'POST',body:{current_password:document.getElementById('pw-current').value,new_password:document.getElementById('pw-new').value}});
+    setStatus('pw-status','Password updated',true);document.getElementById('pw-current').value='';document.getElementById('pw-new').value=''}
+  catch(e){setStatus('pw-status',e.message,false)}
+}
+async function loadUsers(){
+  const users=await api('/api/admin/users').catch(()=>[]);
+  const me=(window._currentUser||{}).id;
+  document.getElementById('users-list').innerHTML=users.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span>${esc(u.name)} <span style="color:var(--text-dim)">&lt;${esc(u.email)}&gt;</span></span>${u.id===me?'<span style="color:var(--text-dim);font-size:11px">you</span>':`<span><button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${u.id}')">Reset password</button> <button class="btn btn-ghost btn-sm" onclick="deleteUser('${u.id}')">Delete</button></span>`}</div>`).join('')||'<span style="color:var(--text-dim)">No local users</span>';
+}
+async function addUser(){
+  try{await api('/api/admin/users',{method:'POST',body:{name:document.getElementById('nu-name').value,email:document.getElementById('nu-email').value,password:document.getElementById('nu-pass').value}});
+    ['nu-name','nu-email','nu-pass'].forEach(i=>document.getElementById(i).value='');setStatus('users-status','User added',true);loadUsers()}
+  catch(e){setStatus('users-status',e.message,false)}
+}
+async function resetUserPassword(id){
+  const pw=prompt('New password for this user (10+ characters):');if(!pw)return;
+  try{await api('/api/admin/users/'+id+'/password',{method:'POST',body:{new_password:pw}});setStatus('users-status','Password reset',true)}
+  catch(e){setStatus('users-status',e.message,false)}
+}
+async function deleteUser(id){
+  if(!confirm('Delete this user? They will be signed out. Their saved jobs are kept on disk.'))return;
+  try{await api('/api/admin/users/'+id,{method:'DELETE'});loadUsers()}catch(e){setStatus('users-status',e.message,false)}
+}
+async function loadOidc(){
+  const c=await api('/api/admin/oidc').catch(()=>null);if(!c)return;
+  document.getElementById('oidc-issuer').value=c.oidc_issuer;document.getElementById('oidc-client-id').value=c.oidc_client_id;
+  document.getElementById('oidc-secret').value=c.oidc_client_secret;
+  document.getElementById('oidc-redirect').value=c.oidc_redirect_uri||(location.origin+'/auth/callback');
+}
+async function saveOidc(){
+  const v=id=>document.getElementById(id).value.trim();
+  const blank=!v('oidc-issuer')&&!v('oidc-client-id')&&!v('oidc-secret');
+  try{const r=await api('/api/admin/oidc',{method:'PUT',body:{oidc_issuer:v('oidc-issuer'),oidc_client_id:v('oidc-client-id'),oidc_client_secret:v('oidc-secret'),oidc_redirect_uri:blank?'':v('oidc-redirect')}});
+    setStatus('oidc-status',r.enabled?'SSO enabled':'SSO off',true);loadOidc()}
+  catch(e){setStatus('oidc-status',e.message,false)}
+}
+
 // Settings
 async function loadSettings(){
   const c=await api('/api/config');
@@ -1243,6 +1318,9 @@ async function loadSettings(){
       :'<span style="background:rgba(139,143,163,.12);color:var(--text-dim);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">User</span>';
     if(idEl) idEl.textContent=u.id||'—';
     if(noteEl) noteEl.style.display=u.is_admin?'block':'none';
+    document.getElementById('pw-card').style.display=u.local?'block':'none';
+    ['users-card','sso-card'].forEach(id=>document.getElementById(id).style.display=u.is_admin?'block':'none');
+    if(u.is_admin){loadUsers();loadOidc();}
   }
 
   loadProfile();

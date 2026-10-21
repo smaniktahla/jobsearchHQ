@@ -1,28 +1,37 @@
 """
-OIDC authentication for JobSearchHQ.
+Authentication for JobSearchHQ.
 
-Provider-agnostic — works with Authentik, Auth0, Keycloak, or any OIDC provider.
-Config lives in /app/data/system_config.json, managed via the /setup UI.
+Default: local email/password accounts (see local_users.py). The first-run
+/setup page creates the admin account — no identity provider needed.
+
+Optional: OIDC single sign-on, provider-agnostic (Authentik, Auth0, Keycloak...).
+Configured later by the admin from Settings; config lives in
+/app/data/system_config.json. When enabled, the login page also offers SSO.
+
 Session: HTTP-only HMAC-signed cookie (Python stdlib only, no extra deps).
 
-Admin: the first OIDC user to log in is automatically designated admin.
-Admin user ID is stored in system_config.json under 'admin_user_id'.
+Admin user ID is stored in system_config.json under 'admin_user_id'. Legacy
+installs that configured OIDC before any admin existed still promote the first
+OIDC login to admin.
 """
 
 import hashlib
 import hmac
 import json
+import os
 import secrets
+import threading
 import time
 from pathlib import Path
 from typing import Optional
 
 import httpx
 from fastapi import HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+import local_users
 from models import User
 
-DATA_DIR = Path("/app/data")
+DATA_DIR = Path(os.environ.get("JSHQ_DATA_DIR", "/app/data"))
 SYSTEM_CONFIG_PATH = DATA_DIR / "system_config.json"
 
 COOKIE_NAME = "jshq_session"
@@ -87,7 +96,7 @@ def save_system_config(config: dict) -> None:
     SYSTEM_CONFIG_PATH.write_text(json.dumps(config, indent=2))
 
 
-def is_setup_complete() -> bool:
+def is_oidc_configured() -> bool:
     cfg = load_system_config()
     return bool(
         cfg.get("oidc_issuer")
@@ -95,6 +104,35 @@ def is_setup_complete() -> bool:
         and cfg.get("oidc_client_secret")
         and cfg.get("oidc_redirect_uri")
     )
+
+
+def is_setup_complete() -> bool:
+    """Setup is done once an admin exists (or a legacy OIDC config is in place)."""
+    return bool(get_admin_user_id()) or is_oidc_configured()
+
+
+def setup_token_required() -> bool:
+    """Operators can set JSHQ_SETUP_TOKEN to gate first-run admin creation."""
+    return bool(os.environ.get("JSHQ_SETUP_TOKEN"))
+
+
+_setup_lock = threading.Lock()
+
+
+def bootstrap_admin(name: str, email: str, password: str, setup_token: str = "") -> dict:
+    """Create the first admin account. Only works while no admin exists."""
+    expected = os.environ.get("JSHQ_SETUP_TOKEN", "")
+    if expected and not hmac.compare_digest(setup_token or "", expected):
+        raise HTTPException(403, "Invalid setup token")
+    with _setup_lock:
+        if get_admin_user_id():
+            raise HTTPException(403, "Setup is already complete")
+        try:
+            user = local_users.create_user(name, email, password)
+        except local_users.UserError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        set_admin_user_id(user["id"])
+    return user
 
 
 def get_session_secret() -> str:
@@ -225,13 +263,25 @@ def invalidate_discovery_cache() -> None:
     _discovery_cache["at"] = 0.0
 
 
+def session_is_valid(session: dict) -> bool:
+    """A local user's session dies with their account; OIDC sessions are provider-managed."""
+    uid = session["user_id"]
+    return not local_users.is_local_id(uid) or local_users.exists(uid)
+
+
+def require_admin(user: User) -> User:
+    if not is_admin(user.id):
+        raise HTTPException(403, "Admin only")
+    return user
+
+
 # ── FastAPI dependency ─────────────────────────────────────────────────────────
 
 async def get_current_user(request: Request) -> User:
     if not is_setup_complete():
         raise HTTPException(503, detail="setup_required")
     session = get_session_from_cookie(request)
-    if not session:
+    if not session or not session_is_valid(session):
         raise HTTPException(401, detail="not_authenticated")
     return User(
         id=session["user_id"],
@@ -243,8 +293,29 @@ async def get_current_user(request: Request) -> User:
 # ── Route handlers (mounted in main.py) ───────────────────────────────────────
 
 async def login_handler(request: Request):
+    """Local sign-in page (also lists SSO when OIDC is enabled)."""
     if not is_setup_complete():
         return RedirectResponse("/setup")
+    return FileResponse("static/login.html")
+
+
+async def local_login_handler(request: Request):
+    body = await request.json()
+    client = request.client.host if request.client else ""
+    try:
+        user = local_users.authenticate(body.get("email", ""), body.get("password", ""), client)
+    except local_users.UserError as exc:
+        raise HTTPException(429, str(exc)) from exc
+    if not user:
+        raise HTTPException(401, "Incorrect email or password")
+    response = JSONResponse({"ok": True})
+    set_session_cookie(response, user["id"], user["email"], user["name"], secure=_is_https(request))
+    return response
+
+
+async def sso_login_handler(request: Request):
+    if not is_oidc_configured():
+        raise HTTPException(404, "SSO is not configured")
     cfg = load_system_config()
     discovery = await get_discovery()
     state = secrets.token_urlsafe(32)
@@ -331,7 +402,11 @@ async def logout_handler(request: Request):
     import logging as _logging
     _log = _logging.getLogger(__name__)
     redirect_target = "/auth/login"
+    session = get_session_from_cookie(request)
+    is_oidc_session = bool(session) and not local_users.is_local_id(session["user_id"])
     try:
+        if not (is_oidc_session and is_oidc_configured()):
+            raise LookupError("local session — nothing to end at the provider")
         discovery = await get_discovery()
         end_session = discovery.get("end_session_endpoint")
         if end_session:
@@ -340,7 +415,6 @@ async def logout_handler(request: Request):
             from urllib.parse import urlencode
             logout_params: dict = {"post_logout_redirect_uri": base_url + "/auth/login"}
             # Pass id_token_hint so Authentik completes RP-initiated logout and redirects back
-            session = get_session_from_cookie(request)
             if session:
                 id_token = get_id_token(session["user_id"])
                 if id_token:
@@ -348,6 +422,8 @@ async def logout_handler(request: Request):
             logout_params["client_id"] = cfg["oidc_client_id"]
             redirect_target = f"{end_session}?{urlencode(logout_params)}"
             _log.info("Logout: RP-initiated to %s", end_session)
+    except LookupError:
+        pass
     except Exception as exc:
         _log.warning("Logout: RP-initiated logout failed (%s), falling back to /auth/login", exc)
     response = RedirectResponse(redirect_target, status_code=302)
