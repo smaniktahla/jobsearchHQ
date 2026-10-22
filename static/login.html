@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Search HQ — Sign in</title>
+<style>
+
+:root{--bg:#0f1117;--surface:#1a1d27;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:520px}
+.logo{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+h1{font-size:22px;font-weight:700;margin-bottom:6px}
+.subtitle{font-size:14px;color:var(--text-dim);margin-bottom:20px;line-height:1.5}
+.form-group{margin-bottom:20px}
+label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px}
+input{width:100%;background:#232736;border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;transition:border-color .15s}
+input:focus{outline:none;border-color:var(--accent)}
+.hint{font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.4}
+.btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;margin-top:8px}
+.btn:hover{background:#6ba0f8}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{margin-top:16px;padding:12px 16px;border-radius:6px;font-size:13px;display:none}
+.msg.success{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--green)}
+.msg.error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red)}
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0}
+.sso{display:block;text-align:center;text-decoration:none;background:transparent;border:1px solid var(--border);color:var(--text)}
+.sso:hover{background:#232736}
+.hint a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Job Search HQ</div>
+  <h1>Sign in</h1>
+  <p class="subtitle" style="margin-bottom:24px">Welcome back.</p>
+  <form id="login-form">
+    <div class="form-group"><label>Email</label><input type="email" id="email" autocomplete="username" required autofocus></div>
+    <div class="form-group"><label>Password</label><input type="password" id="password" autocomplete="current-password" required></div>
+    <button type="submit" class="btn" id="submit-btn">Sign in</button>
+  </form>
+  <div id="sso-block" style="display:none"><hr class="divider"><a class="btn sso" href="/auth/sso">Sign in with SSO</a></div>
+  <div id="msg" class="msg error"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+fetch('/api/auth/login-options').then(r => r.json()).then(o => { if (o.sso) $('sso-block').style.display = 'block'; }).catch(() => {});
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('msg').style.display = 'none';
+  const btn = $('submit-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res = await fetch('/auth/login/local', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: $('email').value.trim(), password: $('password').value}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Sign in failed');
+    location.href = '/';
+  } catch (err) {
+    $('msg').textContent = err.message; $('msg').style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+});
+</script>
+</body>
+</html>

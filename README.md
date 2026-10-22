@@ -35,7 +35,7 @@ Most people default to spreadsheets (or chaos).
 - **Application tracker** — Pipeline view with sortable columns. Filter by lane and status.
 - **Batch scoring** — Score all unscored jobs with descriptions in one click.
 - **Scheduled automation** — Daily job search at a configured time, auto-score new results, auto-generate docs above a score threshold.
-- **Multi-user OIDC auth** — Authentik SSO with per-user data isolation.
+- **Multi-user auth** — local email/password accounts out of the box, optional OIDC SSO (Authentik, Keycloak, Auth0…), per-user data isolation.
 - **AI backend toggle** — Switch scoring between Anthropic API (Haiku) and local Ollama in Settings.
 
 ## Screenshots
@@ -80,12 +80,13 @@ cp .env.example .env
 docker compose up -d --build
 
 # Access at http://localhost:8094
-# First run: visit /setup to configure OIDC auth
+# First run: visit /setup to create your admin account
 ```
 
 ## First Run Setup
 
-1. Visit `/setup` to configure Authentik OIDC (or disable auth for local-only use)
+1. Visit `/setup` and create your admin account (name, email, password). No identity provider needed. To restrict who can claim the admin account on a network-exposed install, set `JSHQ_SETUP_TOKEN` in the container environment; setup then requires it.
+   Add other users, or turn on optional OIDC single sign-on, from **Settings** afterwards.
 2. **Settings** → Set pay targets (W2 salary range, contract hourly rate)
 3. **Settings** → Add Gmail credentials for sending applications
 4. **Settings** → Upload "Full Employment History" text (used for AI scoring)
@@ -102,7 +103,8 @@ docker compose up -d --build
 ├── jobspy_search.py     # python-jobspy multi-board search wrapper
 ├── docx_builder.py      # .docx generation (resumes + cover letters)
 ├── email_service.py     # Gmail SMTP send + confirmation email parser
-├── auth.py              # Authentik OIDC authentication
+├── auth.py              # Sessions, first-run admin setup, optional OIDC
+├── local_users.py       # Local accounts (scrypt-hashed passwords)
 ├── intake.py            # Pluggable intake handlers (manual/URL/email)
 ├── storage.py           # Per-user JSON file persistence
 ├── scheduler.py         # APScheduler daily pipeline (per-user)
@@ -192,7 +194,7 @@ Works regardless of whether the company site is plain HTML, JS-rendered, or bloc
 - **Scraping:** [python-jobspy](https://github.com/speedyapply/JobSpy)
 - **Documents:** python-docx
 - **Storage:** JSON files (no database)
-- **Auth:** Authentik OIDC
+- **Auth:** Local accounts (scrypt) with optional OIDC SSO
 - **Deploy:** Docker + APScheduler
 
 ## Acknowledgments
