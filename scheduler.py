@@ -24,6 +24,7 @@ import jobspy_search
 import email_intake
 import docx_builder
 import jd_cleanup
+import archiving
 from models import AppConfig, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,15 @@ def start_scheduler():
     )
     logger.info("Scheduled daily JD cleanup at 05:30 ET")
 
+    sched.add_job(
+        _run_archive_all_users,
+        trigger=CronTrigger(hour=5, minute=0),
+        id="daily_archive",
+        name="Daily Job Archive (all users)",
+        replace_existing=True,
+    )
+    logger.info("Scheduled daily job archive at 05:00 ET")
+
     # Walk all user dirs and re-apply their schedules
     users_dir = Path("/app/data/users")
     if not users_dir.exists():
@@ -149,6 +159,21 @@ def _run_jd_cleanup_all_users():
             )
         except Exception as e:
             logger.error(f"JD cleanup failed for {user_dir.name}: {e}")
+
+
+def _run_archive_all_users():
+    """Nightly sweep across every user: archive old, dead-ended jobs off the hot path."""
+    users_dir = Path("/app/data/users")
+    if not users_dir.exists():
+        return
+    for user_dir in users_dir.iterdir():
+        if not user_dir.is_dir():
+            continue
+        try:
+            result = archiving.run_archive_pass(user_dir.name)
+            logger.info(f"[{user_dir.name}] Daily archive: {result['archived_count']} archived")
+        except Exception as e:
+            logger.error(f"Archive pass failed for {user_dir.name}: {e}")
 
 
 # ── Per-user schedule management ──────────────────────────────────────────────
@@ -264,6 +289,13 @@ def run_daily_pipeline(user_id: str) -> dict:
     }
 
     logger.info(f"=== Daily pipeline started for user {user_id} ===")
+
+    if config.job_search_paused:
+        logger.info(f"[{user_id}] Job search is paused — skipping pipeline run")
+        run_log["errors"].append("Job search is paused")
+        run_log["finished_at"] = datetime.now(timezone.utc).isoformat()
+        _save_run_log(run_log)
+        return run_log
 
     all_created_ids = []
 

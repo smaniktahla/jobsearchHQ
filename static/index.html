@@ -22,16 +22,44 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 .funnel{display:flex;gap:4px;margin-bottom:24px}.funnel-step{flex:1;text-align:center;padding:12px 8px;background:var(--surface);border-radius:var(--radius)}.funnel-step .count{font-size:24px;font-weight:700}.funnel-step .label{font-size:11px;color:var(--text-dim);text-transform:uppercase}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.loading-msg{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;padding:12px}
 .detail-grid{display:grid;grid-template-columns:1fr 320px;gap:20px}@media(max-width:900px){.detail-grid{grid-template-columns:1fr}}
+.mobile-topbar{display:none}
+.sidebar-backdrop{display:none}
+@media(max-width:800px){
+  .mobile-topbar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px}
+  .mobile-topbar .logo{padding:0;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase}
+  .hamburger-btn{background:none;border:none;color:var(--text);cursor:pointer;padding:4px;display:flex}
+  .hamburger-btn svg{width:22px;height:22px}
+  .app{display:block}
+  .sidebar{position:fixed;top:0;left:0;transform:translateX(-100%);transition:transform .2s ease;z-index:60;width:250px;max-width:80vw}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-backdrop.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50}
+  .main{margin-left:0;padding:16px}
+  .stats-row{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .funnel{flex-wrap:wrap}
+  .funnel-step{flex:1 1 30%}
+  h1{font-size:19px}
+}
 .cover-letter{background:var(--surface2);border-radius:var(--radius);padding:16px;margin:12px 0;white-space:pre-wrap;font-size:13px;line-height:1.7}.cl-variant-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin-bottom:8px}
 .follow-up-card{border-left:3px solid var(--orange)}.follow-up-card.overdue{border-left-color:var(--red)}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:center;justify-content:center}.modal-overlay.show{display:flex}.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto}.modal h2{font-size:18px;margin-bottom:16px}
 .contact-info{background:var(--surface2);border-radius:6px;padding:12px;margin-top:8px;font-size:12px}
 .mt-8{margin-top:8px}.mt-16{margin-top:16px}.mb-16{margin-bottom:16px}.flex{display:flex}.gap-8{gap:8px}.gap-16{gap:16px}.items-center{align-items:center}.justify-between{justify-content:space-between}.text-dim{color:var(--text-dim)}.text-sm{font-size:13px}h1{font-size:22px;font-weight:700}h2{font-size:18px;font-weight:600}
+.toggle-switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--green);border-radius:26px;transition:.2s}
+.toggle-slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle-switch input:checked+.toggle-slider{background:var(--red)}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
 </style>
 </head>
 <body>
+<div class="mobile-topbar">
+  <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  <div class="logo">Job Search HQ</div>
+</div>
+<div id="sidebar-backdrop" class="sidebar-backdrop" onclick="closeSidebar()"></div>
 <div class="app">
-<nav class="sidebar">
+<nav class="sidebar" id="sidebar">
   <div class="logo">Job Search HQ</div>
   <div class="nav-item active" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
   <div class="nav-item" data-view="add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Add Job</div>
@@ -40,6 +68,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
   <div class="nav-item" data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Activity<span id="nav-activity-badge" class="nav-badge" style="display:none"></span></div>
+  <div class="nav-item" data-view="archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
   <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
   <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;overflow:hidden">
@@ -53,6 +82,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 <!-- Dashboard -->
 <div id="view-dashboard" class="view active">
   <div class="flex justify-between items-center mb-16"><h1>Dashboard</h1><button class="btn btn-primary" onclick="showView('add')">+ Add Job</button></div>
+  <div id="pause-banner" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div>⏸ Job search is paused — no new jobs are being ingested, parsed, or scored</div><button class="btn btn-warning btn-sm" onclick="showView('settings')">Resume</button></div></div>
   <div id="funnel" class="funnel"></div>
   <div id="stats-row" class="stats-row"></div>
   <div id="followup-alert" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div><strong id="followup-alert-count"></strong> job(s) need follow-up</div><button class="btn btn-warning btn-sm" onclick="showView('followups')">View</button></div></div>
@@ -164,6 +194,19 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <th onclick="sortTracker('ready')" style="cursor:pointer;user-select:none">READY <span id="sort-ready"></span></th>
     <th></th>
   </tr></thead><tbody id="tracker-body"></tbody></table></div>
+</div>
+<!-- Archive -->
+<div id="view-archive" class="view">
+  <div class="flex justify-between items-center mb-16"><h1>Archive</h1>
+    <div class="flex gap-8 items-center">
+      <span id="archive-status" class="text-sm text-dim"></span>
+      <button class="btn btn-ghost btn-sm" onclick="runArchiveNow()">Run Archive Now</button>
+    </div>
+  </div>
+  <p class="text-dim text-sm mb-16">Jobs move here automatically once they're old and either rejected/passed or scored low — they stay on file (so they're never rescraped) but stop loading on the Tracker/Dashboard. Unarchive to bring one back.</p>
+  <div class="card table-wrap"><table><thead><tr>
+    <th>COMPANY</th><th>TITLE</th><th>SCORE</th><th>STATUS</th><th>LAST UPDATED</th><th></th>
+  </tr></thead><tbody id="archive-body"></tbody></table></div>
 </div>
 <!-- Follow-Ups -->
 <div id="view-followups" class="view">
@@ -308,6 +351,22 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 <!-- Settings -->
 <div id="view-settings" class="view">
   <h1 class="mb-16">Settings</h1>
+
+  <!-- Job Search Pause -->
+  <div class="card mb-16">
+    <div class="card-header">Job Search</div>
+    <div class="flex items-center justify-between gap-16 mt-8">
+      <div>
+        <div id="pause-status-label" style="font-weight:600">Job search running</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">Stops LinkedIn/Indeed/etc. ingestion (including LinkedIn job-alert emails), JD parsing, and scoring — both scheduled and manual. Existing jobs, resumes, and applications are unaffected.</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="cfg-search-paused" onchange="togglePause(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div id="pause-save-status" class="text-sm mt-8"></div>
+  </div>
 
   <!-- Account Info -->
   <div class="card mb-16">
@@ -590,12 +649,14 @@ if(new URLSearchParams(window.location.search).get('logged_out')==='1'){window.l
 const API='';let currentJobId=null,allJobs=[],currentJob=null;
 let resumeLabels={director:'Resume 1 — Director',base:'Resume 2 — Base',contract:'Resume 3 — Contract'};
 function resumeLabel(key){return resumeLabels[key]||key||'none'}
-function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity()}
+function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');closeSidebar();if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity();if(n==='archive')loadArchive()}
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
+function toggleSidebar(){document.getElementById('sidebar')?.classList.toggle('open');document.getElementById('sidebar-backdrop')?.classList.toggle('show')}
+function closeSidebar(){document.getElementById('sidebar')?.classList.remove('open');document.getElementById('sidebar-backdrop')?.classList.remove('show')}
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
 async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
 // Dashboard
-async function loadDashboard(){const[stats,jobs]=await Promise.all([api('/api/stats'),api('/api/jobs')]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);updateTrackerCountBadge(stats.total);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';
+async function loadDashboard(){const[stats,jobs,cfg]=await Promise.all([api('/api/stats'),api('/api/jobs'),api('/api/config').catch(()=>null)]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);updateTrackerCountBadge(stats.total);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';if(cfg)updatePauseBanner(!!cfg.job_search_paused);
 document.getElementById('funnel').innerHTML=['new','scored','applied','interview','offer'].map(s=>`<div class="funnel-step"><div class="count">${stats.by_status[s]||0}</div><div class="label">${s}</div></div>`).join('');
 document.getElementById('stats-row').innerHTML=`<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.avg_score}</div><div class="stat-label">Avg Score</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.score_distribution.high_8_10}</div><div class="stat-label">High (8-10)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${stats.score_distribution.mid_5_7}</div><div class="stat-label">Mid (5-7)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--accent)">${stats.ready_to_apply||0}</div><div class="stat-label">Ready to Apply</div></div><div class="stat-card"><div class="stat-value" style="color:var(--orange)">${stats.follow_ups_due}</div><div class="stat-label">Follow-Ups</div></div>`;
 const r=jobs.slice(0,8);document.getElementById('recent-jobs').innerHTML=r.length?`<table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Status</th><th>Follow-Up</th></tr></thead><tbody>${r.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${followUpBadge(j)}</td></tr>`).join('')}</tbody></table>`:'<p class="text-dim text-sm" style="padding:12px">No jobs yet.</p>'}
@@ -926,6 +987,22 @@ function renderTracker(){
   });
   document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="10" class="text-dim">No jobs.</td></tr>';
 }
+// Archive
+async function loadArchive(){
+  const jobs=await api('/api/jobs/archived');
+  document.getElementById('archive-status').textContent=jobs.length+' archived';
+  document.getElementById('archive-body').innerHTML=jobs.length?jobs.map(j=>`<tr><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${j.updated_at?new Date(j.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="unarchiveJob('${j.id}')">Unarchive</button></td></tr>`).join(''):'<tr><td colspan="6" class="text-dim">Nothing archived yet.</td></tr>';
+}
+async function unarchiveJob(id){await api(`/api/jobs/${id}/unarchive`,{method:'POST'});loadArchive()}
+async function runArchiveNow(){
+  document.getElementById('archive-status').textContent='Running…';
+  try{
+    const r=await api('/api/archive/run',{method:'POST'});
+    document.getElementById('archive-status').textContent=`Archived ${r.archived_count} job(s)`;
+  }catch(e){alert(e.message)}
+  loadArchive();
+  loadTracker();
+}
 // Follow-Ups
 async function loadFollowUps(){const d=await api('/api/follow-ups');updateFollowUpBadges(d.due_now.length);document.getElementById('followups-due').innerHTML=d.due_now.length?d.due_now.map(j=>fuCard(j,true)).join(''):'<div class="card text-dim text-sm">No follow-ups due.</div>';document.getElementById('followups-upcoming').innerHTML=d.upcoming.length?d.upcoming.map(j=>fuCard(j,false)).join(''):'<div class="card text-dim text-sm">None upcoming.</div>'}
 function fuCard(j,due){const d=j.days_since_applied||0,c=j.follow_up?.count||0,contact=j.follow_up?.contact_email?` · Contact: ${esc(j.follow_up.contact_email)}`:'';return`<div class="card mb-16 follow-up-card ${due?'overdue':''}" style="cursor:pointer" onclick="showDetail('${j.id}')"><div class="flex justify-between items-center"><div><strong>${esc(j.company)}</strong> — ${esc(j.title)}<div class="text-sm text-dim">Applied ${d}d ago · Sent: ${c}${contact}</div></div><div class="flex gap-8">${due?`<button class="btn btn-success btn-sm" onclick="event.stopPropagation();fuAction('${j.id}','done')">Done</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();fuAction('${j.id}','snooze')">Snooze</button>`:''}</div></div></div>`}
@@ -1227,6 +1304,8 @@ async function saveProfile(btn){
 // Settings
 async function loadSettings(){
   const c=await api('/api/config');
+  document.getElementById('cfg-search-paused').checked=!!c.job_search_paused;
+  updatePauseBanner(!!c.job_search_paused);
 
   // Account card
   const u=window._currentUser||(await api('/api/auth/me').catch(()=>null));
@@ -1311,6 +1390,20 @@ function updateProviderUI(){
   if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
   if(sh)sh.textContent='Default: '+(PROVIDER_STRONG_DEFAULTS[sp]||'');
 }
+async function togglePause(paused){
+  const c=await api('/api/config');
+  c.job_search_paused=paused;
+  await api('/api/config',{method:'PUT',body:c});
+  const s=document.getElementById('pause-save-status');
+  if(s){s.textContent=paused?'⏸ Job search paused':'▶ Job search resumed';s.style.color=paused?'var(--red)':'var(--green)';setTimeout(()=>{if(s)s.textContent=''},3000)}
+  updatePauseBanner(paused);
+}
+function updatePauseBanner(paused){
+  const b=document.getElementById('pause-banner');
+  if(b)b.style.display=paused?'block':'none';
+  const l=document.getElementById('pause-status-label');
+  if(l){l.textContent=paused?'⏸ Job search paused':'▶ Job search running';l.style.color=paused?'var(--red)':'var(--green)'}
+}
 async function saveConfig(){
   const schedSites=[];
   if(document.getElementById('cfg-sched-indeed').checked)schedSites.push('indeed');
@@ -1330,6 +1423,7 @@ async function saveConfig(){
   scheduled_search_results:+document.getElementById('cfg-sched-results').value||25,
   scheduled_search_hours_old:+document.getElementById('cfg-sched-hours').value||24,
   scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
+  job_search_paused:document.getElementById('cfg-search-paused').checked,
   auto_score_new_jobs:document.getElementById('cfg-auto-score').checked,
   auto_generate_above_threshold:document.getElementById('cfg-auto-generate').checked,
   auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7,

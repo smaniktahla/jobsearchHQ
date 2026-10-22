@@ -38,20 +38,10 @@ class JobSearchResult(BaseModel):
     total_scraped: int = 0
 
 
-def find_existing(all_jobs: list[Job], title: str, company: str, url: str) -> Job | None:
-    """Check for duplicate by URL or title+company."""
-    for j in all_jobs:
-        if url and j.url:
-            # Normalize URLs for comparison
-            u1 = url.rstrip("/").lower()
-            u2 = j.url.rstrip("/").lower()
-            if u1 == u2:
-                return j
-        if (title and company and
-                title.lower().strip() == j.title.lower().strip() and
-                company.lower().strip() == j.company.lower().strip()):
-            return j
-    return None
+def find_existing(dedup_index: list[dict], title: str, company: str, url: str) -> dict | None:
+    """Check for duplicate by URL or title+company against the dedup index
+    (covers both active and archived jobs, without loading either)."""
+    return storage.find_in_dedup_index(dedup_index, title, company, url)
 
 
 def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
@@ -98,7 +88,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
     logger.info(f"JobSpy total results: {len(df)}")
 
     result = JobSearchResult(total_scraped=len(df))
-    all_existing = storage.load_all_jobs(user_id) if req.skip_existing else []
+    dedup_index = storage.load_dedup_index(user_id) if req.skip_existing else []
 
     for _, row in df.iterrows():
         try:
@@ -113,10 +103,10 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
 
             # Skip duplicates
             if req.skip_existing:
-                existing = find_existing(all_existing, title, company, job_url)
+                existing = find_existing(dedup_index, title, company, job_url)
                 if existing:
                     result.skipped.append({
-                        "id": existing.id,
+                        "id": existing["id"],
                         "title": title,
                         "company": company,
                         "reason": "duplicate",
@@ -195,7 +185,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
             )
 
             storage.save_job(user_id, job)
-            all_existing.append(job)
+            dedup_index.append(storage.dedup_entry(job))
 
             score_val = None
             # Auto-score if requested and we have a real description

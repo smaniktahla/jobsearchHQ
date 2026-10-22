@@ -145,6 +145,47 @@ def verify_agent_api_key(key: str) -> bool:
     return hmac.compare_digest(key, get_agent_api_key())
 
 
+# ── Digest one-click action tokens ─────────────────────────────────────────────
+# Lets a digest email's Approve/Pass buttons set review_status without requiring
+# the recipient to be logged in. Separate secret from session_secret/agent_api_key
+# so a leaked digest link can't be used to forge a session or agent calls.
+
+def get_digest_action_secret() -> str:
+    cfg = load_system_config()
+    secret = cfg.get("digest_action_secret")
+    if not secret:
+        secret = secrets.token_hex(32)
+        cfg["digest_action_secret"] = secret
+        save_system_config(cfg)
+    return secret
+
+
+def sign_digest_action(user_id: str, job_id: str, action: str, ttl_seconds: int = 14 * 86400) -> str:
+    """action must be 'approve' or 'reject'. Token expires after ttl_seconds (default 14 days)."""
+    expires = int(time.time()) + ttl_seconds
+    payload = f"{user_id}|{job_id}|{action}|{expires}"
+    return _sign(payload, get_digest_action_secret())
+
+
+def verify_digest_action(token: str) -> Optional[dict]:
+    """Verify and decode a digest action token. Returns None if invalid, tampered, or expired."""
+    payload = _unsign(token, get_digest_action_secret())
+    if not payload:
+        return None
+    parts = payload.split("|", 3)
+    if len(parts) != 4:
+        return None
+    user_id, job_id, action, expires = parts
+    if action not in ("approve", "reject"):
+        return None
+    try:
+        if int(expires) < time.time():
+            return None
+    except ValueError:
+        return None
+    return {"user_id": user_id, "job_id": job_id, "action": action}
+
+
 # ── Cookie helpers ─────────────────────────────────────────────────────────────
 
 def _sign(value: str, secret: str) -> str:

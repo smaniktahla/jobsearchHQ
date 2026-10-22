@@ -211,10 +211,13 @@ class Job(BaseModel):
 
     @property
     def ready_to_apply(self) -> bool:
-        """True when the job has a score, generated docs, and hasn't been actioned yet."""
+        """True when the job has a score, generated docs, the user has approved it,
+        and it hasn't been actioned yet. review_status must be explicit APPROVED —
+        score alone is never enough to greenlight an application."""
         return (
             self.score is not None
             and self.score.total >= 5
+            and self.review_status == ReviewStatus.APPROVED
             and self.market_lane != MarketLane.IGNORE
             and bool(self.tailored_resume_docx)
             and bool(self.cover_letters)
@@ -374,6 +377,7 @@ class AppConfig(BaseModel):
     scheduled_search_hours_old: int = 24
     scheduled_search_remote: bool = True
     # --- Automation Pipeline ---
+    job_search_paused: bool = False  # master kill switch: stops ingest, scoring, and generation
     auto_score_new_jobs: bool = False
     auto_generate_above_threshold: bool = False
     auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters

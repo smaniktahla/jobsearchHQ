@@ -23,6 +23,8 @@ from auth import (
     callback_handler,
     logout_handler,
     save_system_config,
+    sign_digest_action,
+    verify_digest_action,
 )
 from pydantic import BaseModel
 from models import (
@@ -37,6 +39,7 @@ import jobspy_search
 import linkedin_intake
 import scoring
 import storage
+import archiving
 import company_research
 import company_site_search
 import ai_router
@@ -70,6 +73,12 @@ def enrich_job(job: Job) -> dict:
     d["days_since_applied"] = job.days_since_applied
     d["ready_to_apply"] = job.ready_to_apply
     return d
+
+
+def require_search_active(user_id: str):
+    """Raise 423 if the user has paused job search (ingest/parse/score are all blocked)."""
+    if storage.load_config(user_id).job_search_paused:
+        raise HTTPException(423, "Job search is paused. Resume it in Settings to continue.")
 
 
 # ── Auth & Setup routes (no auth required) ────────────────────────────────────
@@ -291,6 +300,12 @@ def list_jobs(
 
 # ── Apply Queue (must be before /{job_id} to avoid route collision) ───────────
 
+@app.get("/api/jobs/archived")
+def list_archived_jobs(user: User = Depends(get_current_user)):
+    jobs = storage.load_archived_jobs(user.id)
+    return [enrich_job(j) for j in jobs]
+
+
 @app.get("/api/jobs/apply-queue")
 def get_apply_queue(user: User = Depends(get_current_user)):
     """Pre-filtered list of jobs that are ready_to_apply, sorted by score desc."""
@@ -367,6 +382,7 @@ def search_jobs(
     req: jobspy_search.JobSearchRequest,
     user: User = Depends(get_current_user),
 ):
+    require_search_active(user.id)
     try:
         result = jobspy_search.run_search(req, user.id)
         return result.model_dump()
@@ -427,6 +443,7 @@ def _run_score_all(user_id: str):
 @app.post("/api/jobs/score-all")
 async def score_all_jobs(user: User = Depends(get_current_user)):
     """Kick off background scoring of all new/unscored jobs."""
+    require_search_active(user.id)
     if _score_task["running"]:
         raise HTTPException(409, "Scoring already in progress")
     asyncio.get_event_loop().run_in_executor(None, _run_score_all, user.id)
@@ -529,6 +546,7 @@ async def apply_deal_breakers(user: User = Depends(get_current_user)):
 
 @app.post("/api/jobs/score-batch")
 async def score_batch(request: Request, user: User = Depends(get_current_user)):
+    require_search_active(user.id)
     body = await request.json()
     job_ids = body if isinstance(body, list) else body.get("job_ids", [])
     op_id = activity.start("batch-score", detail=f"{len(job_ids)} job(s) selected")
@@ -636,6 +654,10 @@ def send_scored_digest(request: Request):
         pay = j.pay_range if j.pay_range and "nan" not in j.pay_range.lower() else ""
         analysis = (j.score.raw_analysis[:280] + "...") if j.score and j.score.raw_analysis else ""
         sc = score_color(total)
+        approve_token = sign_digest_action(admin_id, j.id, "approve")
+        reject_token = sign_digest_action(admin_id, j.id, "reject")
+        approve_url = f"{JSHQ_URL}/api/digest-action?token={approve_token}"
+        reject_url = f"{JSHQ_URL}/api/digest-action?token={reject_token}"
         cards_html.append(f"""
         <div style="background:#1a1d27;border:1px solid #2e3347;border-radius:8px;padding:16px 20px;margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
@@ -645,7 +667,11 @@ def send_scored_digest(request: Request):
           <div style="color:#8b8fa3;font-size:13px;margin-bottom:6px;">{j.company}</div>
           {"<div style='color:#4f8ff7;font-size:13px;margin-bottom:6px;'>💰 " + pay + "</div>" if pay else ""}
           {"<div style='color:#c4c8d8;font-size:13px;line-height:1.5;margin-bottom:10px;'>" + analysis + "</div>" if analysis else ""}
-          <a href="{JSHQ_URL}" style="display:inline-block;background:rgba(79,143,247,.15);color:#4f8ff7;border:1px solid rgba(79,143,247,.3);border-radius:6px;padding:5px 14px;font-size:12px;text-decoration:none;">Open in JSHQ →</a>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="{approve_url}" style="display:inline-block;background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3);border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve</a>
+            <a href="{reject_url}" style="display:inline-block;background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;text-decoration:none;">✖ Pass</a>
+            <a href="{JSHQ_URL}" style="display:inline-block;background:rgba(79,143,247,.15);color:#4f8ff7;border:1px solid rgba(79,143,247,.3);border-radius:6px;padding:5px 14px;font-size:12px;text-decoration:none;">Open in JSHQ →</a>
+          </div>
         </div>""")
 
     html_body = f"""<!DOCTYPE html>
@@ -687,6 +713,81 @@ def send_scored_digest(request: Request):
         html_body=html_body if config.email_html else "",
     )
     return {"sent": True, "count": len(eligible), "to": to_addr}
+
+
+# ── Digest one-click actions ───────────────────────────────────────────────────
+# GET renders a confirmation page rather than mutating state directly — email
+# security scanners (Outlook Safe Links, corporate gateways, etc.) often prefetch
+# GET links in emails, which would otherwise silently approve/reject jobs the
+# user never actually looked at. The real state change only happens on POST,
+# which a link-prefetcher won't trigger.
+
+_DIGEST_PAGE_STYLE = "margin:0;padding:40px 16px;background:#0f1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e1e4ed;text-align:center;"
+_DIGEST_CARD_STYLE = "max-width:420px;margin:0 auto;background:#1a1d27;border:1px solid #2e3347;border-radius:10px;padding:28px;"
+
+
+@app.get("/api/digest-action", response_class=HTMLResponse)
+def digest_action_confirm(token: str):
+    decoded = verify_digest_action(token)
+    if not decoded:
+        return HTMLResponse(
+            f'<body style="{_DIGEST_PAGE_STYLE}"><div style="{_DIGEST_CARD_STYLE}">'
+            f'<div style="font-size:16px;font-weight:600;">Link expired or invalid</div>'
+            f'<div style="font-size:13px;color:#8b8fa3;margin-top:8px;">Open Job Search HQ directly to review this job.</div>'
+            f'</div></body>',
+            status_code=400,
+        )
+    job = storage.load_job(decoded["user_id"], decoded["job_id"])
+    if not job:
+        return HTMLResponse(f'<body style="{_DIGEST_PAGE_STYLE}"><div style="{_DIGEST_CARD_STYLE}">Job not found</div></body>', status_code=404)
+
+    is_approve = decoded["action"] == "approve"
+    action_label = "Approve" if is_approve else "Pass on"
+    btn_color = "#34d399" if is_approve else "#f87171"
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="{_DIGEST_PAGE_STYLE}">
+  <div style="{_DIGEST_CARD_STYLE}">
+    <div style="font-size:13px;color:#8b8fa3;margin-bottom:8px;">{job.score.total if job.score else '?'}/10</div>
+    <div style="font-size:18px;font-weight:600;margin-bottom:4px;">{job.title}</div>
+    <div style="font-size:14px;color:#8b8fa3;margin-bottom:24px;">{job.company}</div>
+    <form method="post" action="/api/digest-action?token={token}">
+      <button type="submit" style="background:{btn_color};color:#0f1117;border:none;border-radius:8px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;">
+        Confirm: {action_label}
+      </button>
+    </form>
+  </div>
+</body></html>""")
+
+
+@app.post("/api/digest-action", response_class=HTMLResponse)
+def digest_action_submit(token: str):
+    decoded = verify_digest_action(token)
+    if not decoded:
+        return HTMLResponse(
+            f'<body style="{_DIGEST_PAGE_STYLE}"><div style="{_DIGEST_CARD_STYLE}">Link expired or invalid</div></body>',
+            status_code=400,
+        )
+    job = storage.load_job(decoded["user_id"], decoded["job_id"])
+    if not job:
+        return HTMLResponse(f'<body style="{_DIGEST_PAGE_STYLE}"><div style="{_DIGEST_CARD_STYLE}">Job not found</div></body>', status_code=404)
+
+    is_approve = decoded["action"] == "approve"
+    job.review_status = ReviewStatus.APPROVED if is_approve else ReviewStatus.REJECTED
+    job.updated_at = datetime.now(timezone.utc).isoformat()
+    storage.save_job(decoded["user_id"], job)
+
+    verb = "Approved" if is_approve else "Passed on"
+    icon = "✅" if is_approve else "✖"
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="{_DIGEST_PAGE_STYLE}">
+  <div style="{_DIGEST_CARD_STYLE}">
+    <div style="font-size:32px;margin-bottom:12px;">{icon}</div>
+    <div style="font-size:18px;font-weight:600;">{verb}: {job.title}</div>
+    <div style="font-size:14px;color:#8b8fa3;">{job.company}</div>
+  </div>
+</body></html>""")
 
 
 @app.patch("/api/jobs/{job_id}")
@@ -785,10 +886,40 @@ def remove_job(job_id: str, user: User = Depends(get_current_user)):
     return {"ok": True}
 
 
+# ── Archive ───────────────────────────────────────────────────────────────────
+# Stale jobs (old + rejected/passed/low-scoring) move out of the active jobs/
+# dir so the tracker/dashboard stop paying to load them on every request. They
+# stay on disk under jobs_archive/ and keep a dedup fingerprint, so scrapers
+# never re-import something already looked at and passed on.
+
+@app.post("/api/jobs/{job_id}/archive")
+def archive_one_job(job_id: str, user: User = Depends(get_current_user)):
+    if not storage.archive_job(user.id, job_id):
+        raise HTTPException(404, "Job not found")
+    return {"ok": True}
+
+
+@app.post("/api/jobs/{job_id}/unarchive")
+def unarchive_one_job(job_id: str, user: User = Depends(get_current_user)):
+    if not storage.unarchive_job(user.id, job_id):
+        raise HTTPException(404, "Archived job not found")
+    return {"ok": True}
+
+
+@app.post("/api/archive/run")
+def run_archive_now(
+    max_age_days: int = archiving.DEFAULT_MAX_AGE_DAYS,
+    min_score: int = archiving.DEFAULT_MIN_SCORE,
+    user: User = Depends(get_current_user),
+):
+    return archiving.run_archive_pass(user.id, max_age_days=max_age_days, min_score=min_score)
+
+
 # ── Scoring ───────────────────────────────────────────────────────────────────
 
 @app.post("/api/jobs/{job_id}/score")
 def score_job(job_id: str, user: User = Depends(get_current_user)):
+    require_search_active(user.id)
     job = storage.load_job(user.id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1217,6 +1348,33 @@ def get_agent_log(job_id: str, request: Request):
         }
     }
 
+
+
+@app.post("/api/agent/jobs/{job_id}/application-result")
+def agent_record_application_result(job_id: str, result: ApplicationResult, request: Request):
+    """Agent-auth twin of /api/jobs/{job_id}/application-result — that endpoint requires
+    an OIDC session cookie, which no agent (Codex, dispatch.js, Hermes) can ever hold.
+    Called by an agent after attempting to submit an application."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.update_status(result.status, applied_date=result.applied_at)
+    if result.notes:
+        job.notes = (job.notes + "\n" + result.notes).strip() if job.notes else result.notes
+    if result.portal_url:
+        portal_note = f"Portal: {result.portal_url}"
+        job.follow_up.notes = (
+            job.follow_up.notes + "\n" + portal_note
+        ).strip() if job.follow_up.notes else portal_note
+    if result.error:
+        job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
+    storage.save_job(admin_id, job)
+    return enrich_job(job)
 
 
 @app.patch("/api/agent/jobs/{job_id}/review")
