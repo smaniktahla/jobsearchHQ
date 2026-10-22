@@ -110,17 +110,19 @@ Job description:
         return {}
 
 
-def find_existing_job(all_jobs: list[Job], title: str, company: str, url: str) -> Job | None:
-    for j in all_jobs:
-        if url and j.url and url.rstrip("/") == j.url.rstrip("/"):
-            return j
-        if title.lower() == j.title.lower() and company.lower() == j.company.lower():
-            return j
-    return None
+def find_existing_job(dedup_index: list[dict], title: str, company: str, url: str) -> dict | None:
+    return storage.find_in_dedup_index(dedup_index, title, company, url)
 
 
 def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
-    all_existing = storage.load_all_jobs(user_id)
+    # The browser extension sends this as raw JS-side text; a truncation on
+    # its end can split a surrogate pair and hand us an unpaired one, which
+    # blows up UTF-8 encoding later. Strip any of those before they ever
+    # reach a stored job or a Claude API call.
+    capture.selected_job_description = storage.sanitize_unicode(capture.selected_job_description)
+    capture.job_list_text = storage.sanitize_unicode(capture.job_list_text)
+
+    dedup_index = storage.load_dedup_index(user_id)
     created, skipped, errors = [], [], []
 
     link_lookup = {}
@@ -139,9 +141,9 @@ def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
         if capture.current_job_id:
             job_url = f"https://www.linkedin.com/jobs/view/{capture.current_job_id}/"
 
-        existing = find_existing_job(all_existing, title, company, job_url)
+        existing = find_existing_job(dedup_index, title, company, job_url)
         if existing:
-            skipped.append({"id": existing.id, "title": title, "company": company, "reason": "duplicate"})
+            skipped.append({"id": existing["id"], "title": title, "company": company, "reason": "duplicate"})
         elif title:
             try:
                 job = Job(
@@ -156,7 +158,7 @@ def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
                     notes=f"LinkedIn: {capture.search_query} | {capture.search_url}",
                 )
                 storage.save_job(user_id, job)
-                all_existing.append(job)
+                dedup_index.append(storage.dedup_entry(job))
                 score_val = None
                 if capture.auto_score:
                     try:
@@ -192,9 +194,9 @@ def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
             if not job_url:
                 job_url = link_lookup.get(title_lower, "")
 
-            existing = find_existing_job(all_existing, title, company, job_url)
+            existing = find_existing_job(dedup_index, title, company, job_url)
             if existing:
-                skipped.append({"id": existing.id, "title": title, "company": company, "reason": "duplicate"})
+                skipped.append({"id": existing["id"], "title": title, "company": company, "reason": "duplicate"})
                 continue
 
             raw_jd = "\n".join(part for part in [
@@ -215,7 +217,7 @@ def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
                     notes=f"LinkedIn: {capture.search_query}",
                 )
                 storage.save_job(user_id, job)
-                all_existing.append(job)
+                dedup_index.append(storage.dedup_entry(job))
                 score_val = None
                 if capture.auto_score and len(raw_jd) > 200:
                     try:

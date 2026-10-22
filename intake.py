@@ -15,6 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 import company_site_search
+from storage import sanitize_unicode
 
 
 class IntakeHandler(ABC):
@@ -71,8 +72,10 @@ class URLScrapeHandler(IntakeHandler):
                 tag.decompose()
 
             text = soup.get_text(separator="\n", strip=True)
-            # Truncate to reasonable length
-            text = text[:8000]
+            # Strip any unpaired surrogates before truncating (styled/emoji
+            # Unicode near the cut boundary can otherwise leave a lone
+            # surrogate that later fails to encode to UTF-8)
+            text = sanitize_unicode(text)[:8000]
 
             title_tag = soup.find("title")
             title = title_tag.get_text(strip=True) if title_tag else ""

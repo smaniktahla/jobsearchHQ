@@ -106,7 +106,7 @@ def search_company_sites(
     skip_existing: bool = True,
 ) -> dict:
     result = {"created": [], "skipped": [], "errors": [], "total_scraped": 0}
-    all_existing = storage.load_all_jobs(user_id) if skip_existing else []
+    dedup_index = storage.load_dedup_index(user_id) if skip_existing else []
 
     for site in sites:
         try:
@@ -117,7 +117,7 @@ def search_company_sites(
                 results_wanted=results_wanted,
                 auto_score=auto_score,
                 skip_existing=skip_existing,
-                all_existing=all_existing,
+                dedup_index=dedup_index,
             )
             result["created"].extend(created)
             result["skipped"].extend(skipped)
@@ -140,7 +140,7 @@ def _search_one_site(
     results_wanted: int,
     auto_score: bool,
     skip_existing: bool,
-    all_existing: list[Job],
+    dedup_index: list[dict],
 ) -> tuple[list[dict], list[dict], list[dict], int]:
     created: list[dict] = []
     skipped: list[dict] = []
@@ -171,10 +171,10 @@ def _search_one_site(
                 if not _matches_search(job, search_term):
                     continue
 
-                existing = _find_existing(all_existing, job.title, job.company, job.url) if skip_existing else None
+                existing = _find_existing(dedup_index, job.title, job.company, job.url) if skip_existing else None
                 if existing:
                     skipped.append({
-                        "id": existing.id,
+                        "id": existing["id"],
                         "title": job.title,
                         "company": job.company,
                         "reason": "duplicate",
@@ -198,7 +198,7 @@ def _search_one_site(
                 )
 
                 storage.save_job(user_id, saved)
-                all_existing.append(saved)
+                dedup_index.append(storage.dedup_entry(saved))
 
                 score_val = None
                 if auto_score and len(saved.raw_jd) > 200:
@@ -234,17 +234,8 @@ def _search_one_site(
     return created, skipped, errors, total_scraped
 
 
-def _find_existing(all_jobs: list[Job], title: str, company: str, url: str) -> Job | None:
-    for job in all_jobs:
-        if url and job.url and url.rstrip("/").lower() == job.url.rstrip("/").lower():
-            return job
-        if (
-            title and company
-            and title.lower().strip() == job.title.lower().strip()
-            and company.lower().strip() == job.company.lower().strip()
-        ):
-            return job
-    return None
+def _find_existing(dedup_index: list[dict], title: str, company: str, url: str) -> dict | None:
+    return storage.find_in_dedup_index(dedup_index, title, company, url)
 
 
 def _headers(user_agent: str | None = None) -> dict[str, str]:

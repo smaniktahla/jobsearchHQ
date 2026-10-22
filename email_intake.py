@@ -151,13 +151,8 @@ def fetch_alert_emails(smtp_user: str, smtp_password: str) -> list[dict]:
     return emails
 
 
-def find_existing_job(all_jobs: list[Job], url: str, title: str, company: str) -> Job | None:
-    for j in all_jobs:
-        if url and j.url and url.rstrip("/") == j.url.rstrip("/"):
-            return j
-        if title.lower() == j.title.lower() and company.lower() == j.company.lower():
-            return j
-    return None
+def find_existing_job(dedup_index: list[dict], url: str, title: str, company: str) -> dict | None:
+    return storage.find_in_dedup_index(dedup_index, title, company, url)
 
 
 def process_linkedin_alerts(user_id: str) -> dict:
@@ -167,7 +162,7 @@ def process_linkedin_alerts(user_id: str) -> dict:
         return {"error": "No Gmail credentials configured (smtp_user/smtp_password)"}
 
     raw_emails = fetch_alert_emails(config.smtp_user, config.smtp_password)
-    all_existing = storage.load_all_jobs(user_id)
+    dedup_index = storage.load_dedup_index(user_id)
     created, skipped, errors = [], [], []
 
     for raw in raw_emails:
@@ -182,9 +177,9 @@ def process_linkedin_alerts(user_id: str) -> dict:
             if not title or not company:
                 continue
 
-            existing = find_existing_job(all_existing, url, title, company)
+            existing = find_existing_job(dedup_index, url, title, company)
             if existing:
-                skipped.append({"id": existing.id, "title": title, "company": company, "reason": "duplicate"})
+                skipped.append({"id": existing["id"], "title": title, "company": company, "reason": "duplicate"})
                 continue
 
             raw_jd = "\n".join(part for part in [
@@ -216,7 +211,7 @@ def process_linkedin_alerts(user_id: str) -> dict:
                     job.notes += f" | Auto-rejected: {reason}"
 
                 storage.save_job(user_id, job)
-                all_existing.append(job)
+                dedup_index.append(storage.dedup_entry(job))
                 created.append({"id": job.id, "title": title, "company": company, "rejected": bool(reason)})
             except Exception as e:
                 errors.append({"title": title, "company": company, "error": str(e)})
