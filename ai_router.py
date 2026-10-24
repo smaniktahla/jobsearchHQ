@@ -61,6 +61,13 @@ ENV_KEY_MAP = {
 
 # ── Key & model resolution ─────────────────────────────────────────────────────
 
+class ProviderConfigError(ValueError):
+    """The selected AI provider isn't usable as configured (missing key/URL).
+    Callers surface this as a 400 with a fix-it message, not a 500."""
+
+
+TIER_LABELS = {"fast": "Fast", "strong": "Strong"}
+
 def _resolve_key(provider: str, config) -> str:
     """User config key → env var → raise."""
     field = f"{provider}_api_key"
@@ -71,10 +78,35 @@ def _resolve_key(provider: str, config) -> str:
     env_key = os.environ.get(env_var, "") if env_var else ""
     if env_key.strip():
         return env_key.strip()
-    raise ValueError(
-        f"No API key for '{provider}'. Add it in Settings → AI Provider, "
+    raise ProviderConfigError(
+        f"No API key for '{provider}'. Add it in Settings → AI, "
         f"or set the {env_var or provider.upper() + '_API_KEY'} environment variable."
     )
+
+
+def validate_provider(tier: str, config) -> str:
+    """Pre-flight check for a tier's provider. Returns the provider name, or
+    raises ProviderConfigError naming the tier and the exact setting to fix —
+    so a misconfigured provider fails fast and legibly before any prompt is built."""
+    field = "fast_provider" if tier == "fast" else "strong_provider"
+    provider = getattr(config, field, "anthropic") or "anthropic"
+    label = TIER_LABELS.get(tier, tier)
+    if provider == "ollama":
+        if not (getattr(config, "ollama_url", "") or "").strip():
+            raise ProviderConfigError(
+                f"{label} provider is Local (Ollama/Hermes) but no URL is set. Add one in Settings → AI."
+            )
+        return provider
+    if provider not in ENV_KEY_MAP:
+        raise ProviderConfigError(f"{label} provider '{provider}' is not recognized. Pick one in Settings → AI.")
+    try:
+        _resolve_key(provider, config)
+    except ProviderConfigError as e:
+        raise ProviderConfigError(
+            f"{label} provider is set to {provider} but isn't usable: {e} "
+            f"Or switch the {label} provider to another option in Settings → AI."
+        ) from None
+    return provider
 
 
 def _resolve_model(provider: str, tier: str, config) -> str:
@@ -112,9 +144,11 @@ def _gemini_chat(system: str, user_msg: str, model: str, api_key: str, max_token
     return response.text.strip()
 
 
-def _openai_chat(system: str, user_msg: str, model: str, api_key: str, max_tokens: int) -> str:
+def _openai_chat(system: str, user_msg: str, model: str, api_key: str, max_tokens: int, base_url: str = "") -> str:
     from openai import OpenAI
-    client = OpenAI(api_key=api_key)
+    # base_url lets this provider talk to any OpenAI-compatible server
+    # (llama-server, vLLM, LM Studio) instead of api.openai.com.
+    client = OpenAI(api_key=api_key, base_url=base_url or None)
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -127,7 +161,7 @@ def _openai_chat(system: str, user_msg: str, model: str, api_key: str, max_token
     return resp.choices[0].message.content.strip()
 
 
-def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False) -> str:
+def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False, max_tokens: int = 4000, timeout: int = 120) -> str:
     import requests as req
     # OpenAI-compatible endpoint — works against both real Ollama and a bare
     # llama.cpp llama-server (which only speaks this protocol, not Ollama's
@@ -144,6 +178,7 @@ def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False) ->
         "model": model,
         "messages": messages,
         "stream": False,
+        "max_tokens": max_tokens,
         "chat_template_kwargs": {"enable_thinking": False},
     }
     if json_mode:
@@ -151,7 +186,7 @@ def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False) ->
         # instead of relying on the prompt alone (which local models occasionally
         # violate: unescaped quotes, stray control chars, missing commas).
         payload["response_format"] = {"type": "json_object"}
-    r = req.post(url, json=payload, timeout=120)
+    r = req.post(url, json=payload, timeout=timeout)
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"].strip()
 
@@ -175,8 +210,7 @@ def chat(
     supports it (currently: Ollama). Only pass this when the caller actually
     parses the reply as JSON — it changes the wire format, not just a hint.
     """
-    provider_field = "fast_provider" if tier == "fast" else "strong_provider"
-    provider = getattr(config, provider_field, "anthropic") or "anthropic"
+    provider = validate_provider(tier, config)
 
     model = _resolve_model(provider, tier, config)
     logger.info(f"[ai_router] {provider}/{model} | tier={tier}")
@@ -184,7 +218,9 @@ def chat(
 
     if provider == "ollama":
         _last_model_used[tier] = f"ollama/{getattr(config, 'ollama_model', 'unknown')}"
-        return _ollama_chat(system, user_msg, config, json_mode=json_mode)
+        # Strong-tier jobs (full resume = ~4k tokens) outlast the 120s fast-tier budget on local models.
+        return _ollama_chat(system, user_msg, config, json_mode=json_mode, max_tokens=max_tokens,
+                            timeout=300 if tier == "strong" else 120)
 
     api_key = _resolve_key(provider, config)
 
@@ -193,7 +229,8 @@ def chat(
     elif provider == "gemini":
         return _gemini_chat(system, user_msg, model, api_key, max_tokens)
     elif provider == "openai":
-        return _openai_chat(system, user_msg, model, api_key, max_tokens)
+        return _openai_chat(system, user_msg, model, api_key, max_tokens,
+                            base_url=(getattr(config, "openai_base_url", "") or "").strip())
     else:
         raise ValueError(f"Unknown provider: '{provider}'")
 

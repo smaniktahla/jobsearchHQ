@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,7 @@ from typing import Optional
 import uvicorn
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from auth import (
@@ -59,6 +61,7 @@ from intake import process_intake
 import jd_cleanup
 
 app = FastAPI(title="Job Search HQ", version="2.2")
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 # ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -82,6 +85,19 @@ def enrich_job(job: Job) -> dict:
     d["follow_up_due"] = job.follow_up_due
     d["days_since_applied"] = job.days_since_applied
     d["ready_to_apply"] = job.ready_to_apply
+    return d
+
+
+# Heavy per-job fields the list views never render (raw_jd alone is ~75% of the
+# full /api/jobs payload — 47 of 64 MB at ~5.9k jobs). Detail view fetches them per job.
+_SLIM_DROP = ("raw_jd", "tailored_resume", "cover_letters", "status_history", "notes")
+
+
+def slim_job(d: dict) -> dict:
+    for k in _SLIM_DROP:
+        d.pop(k, None)
+    if isinstance(d.get("score"), dict):
+        d["score"].pop("raw_analysis", None)
     return d
 
 
@@ -399,16 +415,16 @@ def get_agent_key(user: User = Depends(get_current_user)):
 
 # ── Job CRUD ──────────────────────────────────────────────────────────────────
 
-@app.get("/api/jobs")
 def list_jobs(
     status: str | None = None,
     lane: str | None = None,
     min_score: int | None = None,
     has_docs: bool | None = None,
     ready_to_apply: bool | None = None,
+    slim: bool = False,
     user: User = Depends(get_current_user),
 ):
-    jobs = storage.load_all_jobs(user.id)
+    jobs = storage.load_all_jobs(user.id, copy=False)
     if status:
         jobs = [j for j in jobs if j.status == status]
     if lane:
@@ -419,7 +435,42 @@ def list_jobs(
         jobs = [j for j in jobs if bool(j.tailored_resume_docx) == has_docs]
     if ready_to_apply is not None:
         jobs = [j for j in jobs if j.ready_to_apply == ready_to_apply]
+    if slim:
+        return [slim_job(enrich_job(j)) for j in jobs]
     return [enrich_job(j) for j in jobs]
+
+
+# Rendered-response cache for the list views. Keyed on the filters + a fingerprint
+# of the jobs dir + today's date (days_since_applied/follow_up_due are date-derived),
+# so it can never serve data older than the newest file write or the current day.
+_list_cache: dict[tuple, tuple[str, bytes]] = {}
+
+
+@app.get("/api/jobs")
+def list_jobs_cached(
+    request: Request,
+    status: str | None = None,
+    lane: str | None = None,
+    min_score: int | None = None,
+    has_docs: bool | None = None,
+    ready_to_apply: bool | None = None,
+    slim: bool = False,
+    user: User = Depends(get_current_user),
+):
+    key = (user.id, status, lane, min_score, has_docs, ready_to_apply, slim)
+    sig = (storage.jobs_signature(user.id), datetime.now().date().isoformat())
+    hit = _list_cache.get(key)
+    if hit and hit[0] == repr(sig):
+        etag, body = f'W/"{hash((key, repr(sig))) & 0xffffffffffff:x}"', hit[1]
+    else:
+        data = list_jobs(status, lane, min_score, has_docs, ready_to_apply, slim, user)
+        body = json.dumps(data, default=str).encode()
+        etag = f'W/"{hash((key, repr(sig))) & 0xffffffffffff:x}"'
+        _list_cache[key] = (repr(sig), body)
+    headers = {"ETag": etag, "Cache-Control": "private, no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=body, media_type="application/json", headers=headers)
 
 
 # ── Apply Queue (must be before /{job_id} to avoid route collision) ───────────
@@ -1088,6 +1139,9 @@ def generate_tailored_resume(job_id: str, user: User = Depends(get_current_user)
             "docx_path": docx_path,
             "docx_filename": Path(docx_path).name,
         }
+    except ai_router.ProviderConfigError as e:
+        activity.finish(op_id, status="error", detail=str(e)[:200])
+        raise HTTPException(400, str(e))
     except Exception as e:
         activity.finish(op_id, status="error", detail=str(e)[:200])
         raise HTTPException(500, f"Resume generation failed: {str(e)}")
@@ -1139,6 +1193,9 @@ def generate_cover_letters(job_id: str, user: User = Depends(get_current_user)):
         storage.save_job(user.id, job)
         activity.finish(op_id, status="done", detail=f"{len(letters)} variant(s)")
         return [l.model_dump() for l in letters]
+    except ai_router.ProviderConfigError as e:
+        activity.finish(op_id, status="error", detail=str(e)[:200])
+        raise HTTPException(400, str(e))
     except Exception as e:
         activity.finish(op_id, status="error", detail=str(e)[:200])
         raise HTTPException(500, f"Cover letter generation failed: {str(e)}")
@@ -1841,6 +1898,20 @@ def test_ai_provider(tier: str, user: User = Depends(get_current_user)):
         return {"success": True, "model": ai_router.get_last_model(tier), "reply": reply.strip()[:200]}
     except Exception as e:
         raise HTTPException(400, str(e))
+
+
+@app.get("/api/config/ai-status")
+def ai_status(user: User = Depends(get_current_user)):
+    """Per-tier provider health, so Settings can warn before a resume run fails."""
+    config = storage.load_config(user.id)
+    out = {}
+    for tier in ("fast", "strong"):
+        try:
+            ai_router.validate_provider(tier, config)
+            out[tier] = {"ok": True, "message": ""}
+        except ai_router.ProviderConfigError as e:
+            out[tier] = {"ok": False, "message": str(e)}
+    return out
 
 
 @app.get("/api/config")
