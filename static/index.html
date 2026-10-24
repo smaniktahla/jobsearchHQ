@@ -18,6 +18,37 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}.badge-w2{background:rgba(79,143,247,.15);color:var(--accent)}.badge-contract{background:rgba(52,211,153,.15);color:var(--green)}.badge-c2h{background:rgba(251,191,36,.15);color:var(--yellow)}.badge-ignore{background:rgba(139,143,163,.15);color:var(--text-dim)}.badge-new{background:rgba(79,143,247,.15);color:var(--accent)}.badge-scored{background:rgba(251,191,36,.15);color:var(--yellow)}.badge-applied{background:rgba(52,211,153,.15);color:var(--green)}.badge-interview{background:rgba(251,146,60,.15);color:var(--orange)}.badge-offer{background:rgba(52,211,153,.2);color:var(--green)}.badge-rejected{background:rgba(248,113,113,.15);color:var(--red)}.badge-passed{background:rgba(139,143,163,.15);color:var(--text-dim)}.badge-followup{background:rgba(248,113,113,.2);color:var(--red);animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 .score-big{font-size:48px;font-weight:800;text-align:center;padding:20px}.score-high{color:var(--green)}.score-mid{color:var(--yellow)}.score-low{color:var(--red)}.score-bar{display:flex;gap:8px;align-items:center;margin:4px 0}.score-bar-label{width:100px;font-size:12px;color:var(--text-dim);flex-shrink:0}.score-bar-track{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}.score-bar-fill{height:100%;border-radius:4px;transition:width .3s}
 .view{display:none}.view.active{display:block}
+/* settings pages */
+.sx-layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:28px;align-items:start}
+.sx-nav{position:sticky;top:20px;display:flex;flex-direction:column;gap:2px}
+.sx-nav a{padding:9px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:14px;border-left:2px solid transparent;transition:all .15s}
+.sx-nav a:hover{color:var(--text);background:var(--surface)}
+.sx-nav a.active{color:var(--text);background:var(--surface);border-left-color:var(--accent);font-weight:600}
+.sx-head{margin-bottom:18px}.sx-head h2{font-size:20px;margin:0 0 4px}.sx-head p{color:var(--text-dim);font-size:13px;margin:0}
+.sx-savebar{position:sticky;bottom:0;padding:12px 0;background:linear-gradient(transparent,var(--bg) 40%);margin-top:8px}
+.ai-health{font-size:11px;margin-top:6px}.ai-health span{color:var(--yellow)}
+@media(max-width:800px){.sx-layout{grid-template-columns:1fr;gap:14px}.sx-nav{position:static;flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--border)}.sx-nav a{white-space:nowrap;border-left:none;border-bottom:2px solid transparent;border-radius:6px 6px 0 0}.sx-nav a.active{border-bottom-color:var(--accent)}}
+/* loading */
+#topbar{position:fixed;top:0;left:0;right:0;height:3px;z-index:300;overflow:hidden;opacity:0;transition:opacity .25s;pointer-events:none}
+#topbar.on{opacity:1}
+#topbar::before{content:"";position:absolute;top:0;bottom:0;left:0;width:35%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:topslide 1.1s ease-in-out infinite}
+@keyframes topslide{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+.skel{border-radius:6px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 37%,var(--surface2) 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite}
+@keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.skel-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.skel-row .skel{height:14px;flex:1}.skel-row .skel:nth-child(1){flex:.6}.skel-row .skel:nth-child(2){flex:1.4}.skel-row .skel:nth-child(3){flex:.3}
+.busy-overlay{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;background:rgba(15,17,23,.65);backdrop-filter:blur(2px)}
+.busy-overlay.show{display:flex;animation:fadein .2s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.busy-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px 36px;text-align:center;min-width:260px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.busy-ring{position:relative;width:48px;height:48px;margin:0 auto 16px}
+.busy-ring::before,.busy-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid transparent}
+.busy-ring::before{border-top-color:var(--accent);border-right-color:var(--accent);animation:spin .9s linear infinite}
+.busy-ring::after{inset:9px;border-bottom-color:var(--green);animation:spin 1.3s linear infinite reverse}
+#busy-msg{font-weight:600}.busy-sub{margin-top:6px;font-size:12px;color:var(--text-dim);min-height:18px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,20px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:all .25s;z-index:400}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(prefers-reduced-motion:reduce){#topbar::before,.skel,.busy-ring::before,.busy-ring::after{animation-duration:3s}}
+
 .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px}.tab{padding:10px 20px;font-size:13px;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .funnel{display:flex;gap:4px;margin-bottom:24px}.funnel-step{flex:1;text-align:center;padding:12px 8px;background:var(--surface);border-radius:var(--radius)}.funnel-step .count{font-size:24px;font-weight:700}.funnel-step .label{font-size:11px;color:var(--text-dim);text-transform:uppercase}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.loading-msg{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;padding:12px}
@@ -66,7 +97,6 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="nav-item" data-view="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search Boards</div>
   <div class="nav-item" data-view="tracker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Tracker<span id="nav-tracker-count" class="nav-badge" style="display:none;background:var(--surface2);color:var(--text-dim)"></span><span id="nav-followup-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
-  <div class="nav-item" data-view="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Profile</div>
   <div class="nav-item" data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Activity<span id="nav-activity-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
   <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
@@ -82,7 +112,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 <!-- Dashboard -->
 <div id="view-dashboard" class="view active">
   <div class="flex justify-between items-center mb-16"><h1>Dashboard</h1><button class="btn btn-primary" onclick="showView('add')">+ Add Job</button></div>
-  <div id="pause-banner" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div>⏸ Job search is paused — no new jobs are being ingested, parsed, or scored</div><button class="btn btn-warning btn-sm" onclick="showView('settings')">Resume</button></div></div>
+  <div id="pause-banner" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div>⏸ Job search is paused — no new jobs are being ingested, parsed, or scored</div><button class="btn btn-warning btn-sm" onclick="showSettingsPage('automation')">Resume</button></div></div>
   <div id="funnel" class="funnel"></div>
   <div id="stats-row" class="stats-row"></div>
   <div id="followup-alert" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div><strong id="followup-alert-count"></strong> job(s) need follow-up</div><button class="btn btn-warning btn-sm" onclick="showView('followups')">View</button></div></div>
@@ -293,12 +323,22 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   </div>
 </div>
 <!-- Profile -->
-<div id="view-profile" class="view">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-    <h1>My Profile</h1>
-    <button class="btn btn-primary" onclick="saveProfile(this)">Save All</button>
-  </div>
-
+<!-- Settings -->
+<div id="view-settings" class="view">
+  <h1 class="mb-16">Settings</h1>
+  <div class="sx-layout">
+    <nav class="sx-nav" id="sx-nav">
+      <a href="#settings/profile" data-sx="profile" onclick="showSettingsPage('profile');return false">Profile</a>
+      <a href="#settings/resumes" data-sx="resumes" onclick="showSettingsPage('resumes');return false">Resumes</a>
+      <a href="#settings/automation" data-sx="automation" onclick="showSettingsPage('automation');return false">Job Search &amp; Automation</a>
+      <a href="#settings/ai" data-sx="ai" onclick="showSettingsPage('ai');return false">AI</a>
+      <a href="#settings/email" data-sx="email" onclick="showSettingsPage('email');return false">Email &amp; Follow-Up</a>
+      <a href="#settings/account" data-sx="account" onclick="showSettingsPage('account');return false">Account</a>
+      <a href="#settings/admin" data-sx="admin" id="sx-nav-admin" style="display:none" onclick="showSettingsPage('admin');return false">Admin</a>
+    </nav>
+    <div class="sx-body">
+  <section class="sx-page" id="sx-profile" style="display:none">
+    <div class="sx-head"><h2>Profile</h2><p>Personal details, work history and job preferences used in resumes, cover letters, scoring and application packages.</p></div>
   <!-- Personal Info -->
   <div class="card mb-16">
     <div class="card-header">Personal Information</div>
@@ -344,14 +384,27 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <div id="prof-cert-list" style="margin-top:12px"></div>
   </div>
-
-  <button class="btn btn-primary" onclick="saveProfile(this)">Save All</button>
-</div>
-
-<!-- Settings -->
-<div id="view-settings" class="view">
-  <h1 class="mb-16">Settings</h1>
-
+    <div class="card mb-16"><div class="card-header">Pay Targets</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>W2 Salary Min ($)</label><input type="number" id="cfg-w2-min"></div><div class="form-group"><label>W2 Salary Max ($)</label><input type="number" id="cfg-w2-max"></div><div class="form-group"><label>Contract Hourly Min ($)</label><input type="number" id="cfg-hr-min"></div><div class="form-group"><label>Contract Hourly Max ($)</label><input type="number" id="cfg-hr-max"></div></div></div>
+    <div class="card mb-16"><div class="card-header">Deal Breakers</div><div class="form-group mt-8"><label>One per line</label><textarea id="cfg-dealbreakers" rows="4"></textarea></div></div>
+    <div class="card mb-16"><div class="card-header">Preferred Keywords</div><div class="form-group mt-8"><label>Comma-separated</label><input type="text" id="cfg-keywords"></div></div>
+  <div class="sx-savebar"><button class="btn btn-primary" onclick="saveProfilePage(this)">Save Profile</button></div>
+  </section>
+  <section class="sx-page" id="sx-resumes" style="display:none">
+    <div class="sx-head"><h2>Resumes</h2><p>Name your resume variants and upload the source text the tailoring step starts from.</p></div>
+  <div class="card mb-16">
+    <div class="card-header">Resume Names</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px" class="mt-8">
+      <div class="form-group"><label>Resume 1 (key: director)</label><input type="text" id="cfg-label-director" placeholder="Resume 1 — Director"></div>
+      <div class="form-group"><label>Resume 2 (key: base)</label><input type="text" id="cfg-label-base" placeholder="Resume 2 — Base"></div>
+      <div class="form-group"><label>Resume 3 (key: contract)</label><input type="text" id="cfg-label-contract" placeholder="Resume 3 — Contract"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="saveConfig()">Save Names</button>
+  </div>
+  <div id="resume-status" class="mb-16"></div>
+    <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="flex gap-8 items-center mb-16"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('resume-docx-file').click()">Upload .docx File</button><input type="file" id="resume-docx-file" accept=".docx" style="display:none" onchange="uploadResumeDocx(this.files[0])"><span id="resume-docx-status" class="text-sm"></span></div><div class="form-group"><label>Or paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload Text</button></div>
+  </section>
+  <section class="sx-page" id="sx-automation" style="display:none">
+    <div class="sx-head"><h2>Job Search &amp; Automation</h2><p>Pause ingestion, schedule the daily search, and choose what happens to new jobs automatically.</p></div>
   <!-- Job Search Pause -->
   <div class="card mb-16">
     <div class="card-header">Job Search</div>
@@ -367,96 +420,6 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <div id="pause-save-status" class="text-sm mt-8"></div>
   </div>
-
-  <!-- Account Info -->
-  <div class="card mb-16">
-    <div class="card-header">Account</div>
-    <div class="mt-8" style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:baseline;font-size:13px">
-      <span style="color:var(--text-dim)">Signed in as</span>
-      <span id="acct-name" style="font-weight:600"></span>
-      <span style="color:var(--text-dim)">Email</span>
-      <span id="acct-email" style="color:var(--text-dim)"></span>
-      <span style="color:var(--text-dim)">Role</span>
-      <span id="acct-role"></span>
-      <span style="color:var(--text-dim)">User ID</span>
-      <span id="acct-id" style="font-size:11px;color:var(--text-dim);font-family:monospace;word-break:break-all"></span>
-    </div>
-    <div id="acct-admin-note" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(79,143,247,.08);border:1px solid rgba(79,143,247,.2);border-radius:6px;font-size:12px;color:var(--text-dim)">
-      <strong style="color:var(--accent)">You are the admin.</strong>
-      Your User ID above is stored as <code style="font-size:11px;background:var(--surface2);padding:1px 4px;border-radius:3px">admin_user_id</code> in system_config.json.
-      Add users and optional single sign-on in the cards below.
-    </div>
-  </div>
-
-  <!-- Password (local accounts) -->
-  <div class="card mb-16" id="pw-card" style="display:none">
-    <div class="card-header">Change Password</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
-      <div class="form-group"><label>Current password</label><input type="password" id="pw-current" autocomplete="current-password"></div>
-      <div class="form-group"><label>New password (10+ characters)</label><input type="password" id="pw-new" autocomplete="new-password"></div>
-    </div>
-    <button class="btn btn-ghost btn-sm mt-8" onclick="changeOwnPassword()">Update Password</button><span id="pw-status" class="text-sm" style="margin-left:8px"></span>
-  </div>
-
-  <!-- Users (admin) -->
-  <div class="card mb-16" id="users-card" style="display:none">
-    <div class="card-header">Users</div>
-    <div id="users-list" class="mt-8" style="font-size:13px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px">
-      <div class="form-group"><label>Name</label><input type="text" id="nu-name"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="nu-email"></div>
-      <div class="form-group"><label>Temporary password</label><input type="password" id="nu-pass" autocomplete="new-password"></div>
-    </div>
-    <button class="btn btn-ghost btn-sm" onclick="addUser()">Add User</button><span id="users-status" class="text-sm" style="margin-left:8px"></span>
-  </div>
-
-  <!-- SSO (admin, optional) -->
-  <div class="card mb-16" id="sso-card" style="display:none">
-    <div class="card-header">Single Sign-On (optional)</div>
-    <p class="text-sm" style="color:var(--text-dim);margin:8px 0 12px">Add an OpenID Connect provider (Authentik, Keycloak, Auth0…) so people can also sign in with SSO. Local accounts keep working. Clear every field and save to turn SSO off.</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="form-group"><label>Issuer URL</label><input type="url" id="oidc-issuer"></div>
-      <div class="form-group"><label>Redirect URI</label><input type="url" id="oidc-redirect"></div>
-      <div class="form-group"><label>Client ID</label><input type="text" id="oidc-client-id"></div>
-      <div class="form-group"><label>Client Secret</label><input type="password" id="oidc-secret"></div>
-    </div>
-    <button class="btn btn-ghost btn-sm" onclick="saveOidc()">Save SSO Settings</button><span id="oidc-status" class="text-sm" style="margin-left:8px"></span>
-  </div>
-
-  <!-- Applicant Profile -->
-  <div class="card mb-16">
-    <div class="card-header">Applicant Profile</div>
-    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Used in generated resumes, cover letters, and application packages.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
-      <div class="form-group"><label>Full Name</label><input type="text" id="prof-name" placeholder="Your Name"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="prof-email" placeholder="you@example.com"></div>
-      <div class="form-group"><label>Phone</label><input type="tel" id="prof-phone" placeholder="(555) 555-5555"></div>
-      <div class="form-group"><label>Location</label><input type="text" id="prof-location" placeholder="Washington, DC"></div>
-    </div>
-    <div class="flex items-center gap-8 mt-8">
-      <button class="btn btn-ghost btn-sm" onclick="saveProfile(this)">Save Profile</button>
-      <span id="prof-save-status" class="text-sm"></span>
-    </div>
-  </div>
-
-  <div class="card mb-16"><div class="card-header">Pay Targets</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>W2 Salary Min ($)</label><input type="number" id="cfg-w2-min"></div><div class="form-group"><label>W2 Salary Max ($)</label><input type="number" id="cfg-w2-max"></div><div class="form-group"><label>Contract Hourly Min ($)</label><input type="number" id="cfg-hr-min"></div><div class="form-group"><label>Contract Hourly Max ($)</label><input type="number" id="cfg-hr-max"></div></div></div>
-  <div class="card mb-16"><div class="card-header">Email / Follow-Up</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>Follow-Up After (days)</label><input type="number" id="cfg-followup-days"></div><div class="form-group"><label>Notification Email</label><input type="email" id="cfg-followup-email"></div><div class="form-group"><label>Your Gmail Email (login username)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div><div class="form-group"><label>Gmail App Password</label><input type="password" id="cfg-smtp-pass" placeholder="16-character app password"></div><div class="form-group"><label>SMTP Host</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>SMTP Port</label><input type="number" id="cfg-smtp-port" placeholder="587"></div></div><button class="btn btn-ghost btn-sm mt-8" onclick="sendTestEmail()">Send Test Email</button><span id="test-email-status" class="text-sm" style="margin-left:8px"></span><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfg-email-html" style="width:16px;height:16px;accent-color:var(--accent)"><label for="cfg-email-html" style="color:var(--text);font-size:13px;cursor:pointer">Send HTML digest emails (uncheck for plain text)</label></div></div>
-  <div class="card mb-16"><div class="card-header">Deal Breakers</div><div class="form-group mt-8"><label>One per line</label><textarea id="cfg-dealbreakers" rows="4"></textarea></div></div>
-  <div class="card mb-16"><div class="card-header">Preferred Keywords</div><div class="form-group mt-8"><label>Comma-separated</label><input type="text" id="cfg-keywords"></div></div>
-  <button class="btn btn-primary" onclick="saveConfig()">Save Settings</button>
-  <h2 class="mt-16 mb-16">Resume Variants</h2>
-  <div class="card mb-16">
-    <div class="card-header">Resume Names</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px" class="mt-8">
-      <div class="form-group"><label>Resume 1 (key: director)</label><input type="text" id="cfg-label-director" placeholder="Resume 1 — Director"></div>
-      <div class="form-group"><label>Resume 2 (key: base)</label><input type="text" id="cfg-label-base" placeholder="Resume 2 — Base"></div>
-      <div class="form-group"><label>Resume 3 (key: contract)</label><input type="text" id="cfg-label-contract" placeholder="Resume 3 — Contract"></div>
-    </div>
-    <button class="btn btn-ghost btn-sm" onclick="saveConfig()">Save Names</button>
-  </div>
-  <div id="resume-status" class="mb-16"></div>
-  <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="flex gap-8 items-center mb-16"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('resume-docx-file').click()">Upload .docx File</button><input type="file" id="resume-docx-file" accept=".docx" style="display:none" onchange="uploadResumeDocx(this.files[0])"><span id="resume-docx-status" class="text-sm"></span></div><div class="form-group"><label>Or paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload Text</button></div>
-  <h2 class="mt-16 mb-16">Automation</h2>
   <div class="card mb-16" id="scheduler-status-card">
     <div class="card-header">Scheduler Status</div>
     <div id="scheduler-status" class="mt-8" style="font-size:13px;color:var(--text-dim)">Loading...</div>
@@ -516,8 +479,11 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       </div>
     </div>
   </div>
-  <h2 class="mt-16 mb-8">AI Provider</h2>
-  <div class="card mb-16">
+  <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
+  </section>
+  <section class="sx-page" id="sx-ai" style="display:none">
+    <div class="sx-head"><h2>AI</h2><p>Choose which model handles scoring and research (Fast) and resumes and cover letters (Strong).</p></div>
+    <div class="card mb-16">
     <div class="card-header">Provider &amp; API Keys</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Set providers independently — e.g. Gemini (free) for scoring, Anthropic for resumes. If API key is left blank, the system key is used.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch" class="mt-8">
@@ -532,6 +498,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
             <option value="ollama">Local Ollama / Hermes</option>
           </select>
           <div id="fast-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+          <div id="fast-ai-health" class="ai-health"></div>
         </div>
         <div class="form-group" id="fast-anthropic-key-group">
           <label>Fast Provider API Key</label>
@@ -575,6 +542,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
             <option value="ollama">Local Ollama / Hermes</option>
           </select>
           <div id="strong-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
+          <div id="strong-ai-health" class="ai-health"></div>
         </div>
         <div class="form-group" id="strong-anthropic-key-group">
           <label>Strong Provider API Key</label>
@@ -608,10 +576,52 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         </div>
       </div>
     </div>
+    <div class="form-group" style="margin-top:16px;max-width:520px">
+      <label>OpenAI-compatible base URL <span style="color:var(--text-dim);font-weight:normal">(optional — only used when a provider is OpenAI)</span></label>
+      <input type="text" id="cfg-openai-base-url" placeholder="blank = api.openai.com · e.g. http://10.10.10.226:8080/v1">
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Point the OpenAI provider at any OpenAI-compatible server (llama-server, vLLM, LM Studio). Applies to both Fast and Strong.</div>
+    </div>
     <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring) or Local Ollama/Hermes (zero cost), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
   </div>
-  <button class="btn btn-primary" onclick="saveConfig()">Save All Settings</button>
-  <div class="card mt-16">
+  <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
+  </section>
+  <section class="sx-page" id="sx-email" style="display:none">
+    <div class="sx-head"><h2>Email &amp; Follow-Up</h2><p>SMTP credentials for sending applications and digests, and follow-up timing.</p></div>
+    <div class="card mb-16"><div class="card-header">Email / Follow-Up</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>Follow-Up After (days)</label><input type="number" id="cfg-followup-days"></div><div class="form-group"><label>Notification Email</label><input type="email" id="cfg-followup-email"></div><div class="form-group"><label>Your Gmail Email (login username)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div><div class="form-group"><label>Gmail App Password</label><input type="password" id="cfg-smtp-pass" placeholder="16-character app password"></div><div class="form-group"><label>SMTP Host</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>SMTP Port</label><input type="number" id="cfg-smtp-port" placeholder="587"></div></div><button class="btn btn-ghost btn-sm mt-8" onclick="sendTestEmail()">Send Test Email</button><span id="test-email-status" class="text-sm" style="margin-left:8px"></span><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfg-email-html" style="width:16px;height:16px;accent-color:var(--accent)"><label for="cfg-email-html" style="color:var(--text);font-size:13px;cursor:pointer">Send HTML digest emails (uncheck for plain text)</label></div></div>
+    <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
+  <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
+  </section>
+  <section class="sx-page" id="sx-account" style="display:none">
+    <div class="sx-head"><h2>Account</h2><p>Your sign-in details, password, and configuration backup.</p></div>
+  <!-- Account Info -->
+  <div class="card mb-16">
+    <div class="card-header">Account</div>
+    <div class="mt-8" style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:baseline;font-size:13px">
+      <span style="color:var(--text-dim)">Signed in as</span>
+      <span id="acct-name" style="font-weight:600"></span>
+      <span style="color:var(--text-dim)">Email</span>
+      <span id="acct-email" style="color:var(--text-dim)"></span>
+      <span style="color:var(--text-dim)">Role</span>
+      <span id="acct-role"></span>
+      <span style="color:var(--text-dim)">User ID</span>
+      <span id="acct-id" style="font-size:11px;color:var(--text-dim);font-family:monospace;word-break:break-all"></span>
+    </div>
+    <div id="acct-admin-note" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(79,143,247,.08);border:1px solid rgba(79,143,247,.2);border-radius:6px;font-size:12px;color:var(--text-dim)">
+      <strong style="color:var(--accent)">You are the admin.</strong>
+      Your User ID above is stored as <code style="font-size:11px;background:var(--surface2);padding:1px 4px;border-radius:3px">admin_user_id</code> in system_config.json.
+      Manage users and single sign-on on the <a href="#" onclick="showSettingsPage('admin');return false" style="color:var(--accent)">Admin</a> page.
+    </div>
+  </div>
+  <!-- Password (local accounts) -->
+  <div class="card mb-16" id="pw-card" style="display:none">
+    <div class="card-header">Change Password</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8">
+      <div class="form-group"><label>Current password</label><input type="password" id="pw-current" autocomplete="current-password"></div>
+      <div class="form-group"><label>New password (10+ characters)</label><input type="password" id="pw-new" autocomplete="new-password"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm mt-8" onclick="changeOwnPassword()">Update Password</button><span id="pw-status" class="text-sm" style="margin-left:8px"></span>
+  </div>
+    <div class="card mt-16">
     <div class="card-header">Backup &amp; Restore</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Export all settings — including API keys and SMTP password in plain text — to a local file. Keep it somewhere private. Import restores everything from a previous export, overwriting current settings.</div>
     <div class="flex items-center gap-8">
@@ -621,7 +631,35 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <span id="config-import-status" class="text-sm"></span>
     </div>
   </div>
-  <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
+  </section>
+  <section class="sx-page" id="sx-admin" style="display:none">
+    <div class="sx-head"><h2>Admin</h2><p>Users and single sign-on. Only visible to administrators.</p></div>
+  <!-- Users (admin) -->
+  <div class="card mb-16" id="users-card" style="display:none">
+    <div class="card-header">Users</div>
+    <div id="users-list" class="mt-8" style="font-size:13px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px">
+      <div class="form-group"><label>Name</label><input type="text" id="nu-name"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="nu-email"></div>
+      <div class="form-group"><label>Temporary password</label><input type="password" id="nu-pass" autocomplete="new-password"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="addUser()">Add User</button><span id="users-status" class="text-sm" style="margin-left:8px"></span>
+  </div>
+  <!-- SSO (admin, optional) -->
+  <div class="card mb-16" id="sso-card" style="display:none">
+    <div class="card-header">Single Sign-On (optional)</div>
+    <p class="text-sm" style="color:var(--text-dim);margin:8px 0 12px">Add an OpenID Connect provider (Authentik, Keycloak, Auth0…) so people can also sign in with SSO. Local accounts keep working. Clear every field and save to turn SSO off.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="form-group"><label>Issuer URL</label><input type="url" id="oidc-issuer"></div>
+      <div class="form-group"><label>Redirect URI</label><input type="url" id="oidc-redirect"></div>
+      <div class="form-group"><label>Client ID</label><input type="text" id="oidc-client-id"></div>
+      <div class="form-group"><label>Client Secret</label><input type="password" id="oidc-secret"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="saveOidc()">Save SSO Settings</button><span id="oidc-status" class="text-sm" style="margin-left:8px"></span>
+  </div>
+  </section>
+    </div>
+  </div>
 </div>
 <!-- Scheduler Logs Modal -->
 <div id="logs-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
@@ -679,19 +717,49 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div id="confirm-result" style="display:none" class="mt-16"></div>
 </div>
 </div>
+<div id="topbar"></div>
+<div id="busy-overlay" class="busy-overlay" role="status" aria-live="polite"><div class="busy-card"><div class="busy-ring"></div><div id="busy-msg">Working…</div><div id="busy-sub" class="busy-sub"></div></div></div>
+<div id="toast" class="toast" role="status"></div>
 <script>
 if(new URLSearchParams(window.location.search).get('logged_out')==='1'){window.location.replace('/auth/login');}
 const API='';let currentJobId=null,allJobs=[],currentJob=null;
 let resumeLabels={director:'Resume 1 — Director',base:'Resume 2 — Base',contract:'Resume 3 — Contract'};
 function resumeLabel(key){return resumeLabels[key]||key||'none'}
-function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');closeSidebar();if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings')loadSettings();if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity();if(n==='archive')loadArchive()}
+function showView(n){if(n==='profile'){_sxPage='profile';n='settings'}document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');closeSidebar();if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings'){applySettingsPage();loadSettings()}if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity();if(n==='archive')loadArchive()}
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
+// Settings sub-pages
+let _sxPage=null;
+function showSettingsPage(k){
+  if(!document.getElementById('sx-'+k))k='profile';
+  if(k==='admin'&&window._currentUser&&!window._currentUser.is_admin)k='profile';
+  _sxPage=k;
+  if(!document.getElementById('view-settings').classList.contains('active'))showView('settings');
+  else applySettingsPage();
+}
+function applySettingsPage(){
+  let k=_sxPage;
+  if(!k){try{k=localStorage.getItem('sxPage')}catch(e){}}
+  if(!k||!document.getElementById('sx-'+k))k='profile';
+  if(k==='admin'&&window._currentUser&&!window._currentUser.is_admin)k='profile';
+  _sxPage=k;
+  try{localStorage.setItem('sxPage',k)}catch(e){}
+  document.querySelectorAll('.sx-page').forEach(e=>e.style.display=e.id==='sx-'+k?'block':'none');
+  document.querySelectorAll('#sx-nav a').forEach(a=>a.classList.toggle('active',a.dataset.sx===k));
+  if(location.hash!=='#settings/'+k)history.replaceState(null,'','#settings/'+k);
+  window.scrollTo(0,0);
+}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
 function toggleSidebar(){document.getElementById('sidebar')?.classList.toggle('open');document.getElementById('sidebar-backdrop')?.classList.toggle('show')}
 function closeSidebar(){document.getElementById('sidebar')?.classList.remove('open');document.getElementById('sidebar-backdrop')?.classList.remove('show')}
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
-async function api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(res.status===503){window.location.href='/setup';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
+async function _api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(res.status===503){window.location.href='/setup';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
+let _inflight=0,_topTimer=null;
+const _QUIET=/\/status(\?|$)|^\/api\/activity/;
+async function api(path,opts){const q=_QUIET.test(path);if(!q)_busyBar(1);try{return await _api(path,opts)}finally{if(!q)_busyBar(-1)}}
+function _busyBar(d){_inflight+=d;const b=document.getElementById('topbar');if(_inflight>0){if(!_topTimer)_topTimer=setTimeout(()=>b.classList.add('on'),150)}else{_inflight=0;clearTimeout(_topTimer);_topTimer=null;b.classList.remove('on')}}
+function skelRows(n){return Array.from({length:n},()=>'<div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>').join('')}
 // Dashboard
-async function loadDashboard(){const[stats,jobs,cfg]=await Promise.all([api('/api/stats'),api('/api/jobs'),api('/api/config').catch(()=>null)]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);updateTrackerCountBadge(stats.total);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';if(cfg)updatePauseBanner(!!cfg.job_search_paused);
+async function loadDashboard(){const rj=document.getElementById('recent-jobs');if(rj&&!rj.innerHTML.trim())rj.innerHTML=skelRows(5);const[stats,jobs,cfg]=await Promise.all([api('/api/stats'),api('/api/jobs?slim=true'),api('/api/config').catch(()=>null)]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);updateTrackerCountBadge(stats.total);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';if(cfg)updatePauseBanner(!!cfg.job_search_paused);
 document.getElementById('funnel').innerHTML=['new','scored','applied','interview','offer'].map(s=>`<div class="funnel-step"><div class="count">${stats.by_status[s]||0}</div><div class="label">${s}</div></div>`).join('');
 document.getElementById('stats-row').innerHTML=`<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.avg_score}</div><div class="stat-label">Avg Score</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.score_distribution.high_8_10}</div><div class="stat-label">High (8-10)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${stats.score_distribution.mid_5_7}</div><div class="stat-label">Mid (5-7)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--accent)">${stats.ready_to_apply||0}</div><div class="stat-label">Ready to Apply</div></div><div class="stat-card"><div class="stat-value" style="color:var(--orange)">${stats.follow_ups_due}</div><div class="stat-label">Follow-Ups</div></div>`;
 const r=jobs.slice(0,8);document.getElementById('recent-jobs').innerHTML=r.length?`<table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Status</th><th>Follow-Up</th></tr></thead><tbody>${r.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${followUpBadge(j)}</td></tr>`).join('')}</tbody></table>`:'<p class="text-dim text-sm" style="padding:12px">No jobs yet.</p>'}
@@ -978,7 +1046,8 @@ async function cancelScoring(){
 let trackerJobs=[];
 let trackerSort={col:'score',dir:-1};
 async function loadTracker(){
-  let u='/api/jobs';const p=[];
+  const tb=document.getElementById('tracker-body');if(tb&&!tb.innerHTML.trim())tb.innerHTML='<tr><td colspan="7"><div class="loading-msg"><span class="spinner"></span> Loading jobs…</div>'+skelRows(6)+'</td></tr>';
+  let u='/api/jobs';const p=['slim=true'];
   const l=document.getElementById('filter-lane')?.value;
   const s=document.getElementById('filter-status')?.value;
   if(l)p.push('lane='+l);
@@ -1309,7 +1378,9 @@ function removeWorkEntry(i){_profileData.work_experience.splice(i,1);renderWorkL
 function addCert(){_profileData.certifications=_profileData.certifications||[];_profileData.certifications.push('');renderCertList(_profileData.certifications);}
 function removeCert(i){_profileData.certifications.splice(i,1);renderCertList(_profileData.certifications);}
 
+async function saveProfilePage(btn){await saveConfig({silent:true});await saveProfile(btn)}
 async function saveProfile(btn){
+  const orig=btn?btn.textContent:'';
   const payload={
     name:document.getElementById('prof-name').value,
     email:document.getElementById('prof-email').value,
@@ -1332,7 +1403,7 @@ async function saveProfile(btn){
   };
   try{
     await api('/api/profile',{method:'PUT',body:payload});
-    if(btn){btn.textContent='Saved ✓';btn.style.background='var(--green)';setTimeout(()=>{btn.textContent='Save All';btn.style.background='';},2000);}
+    if(btn){btn.textContent='Saved ✓';btn.style.background='var(--green)';setTimeout(()=>{btn.textContent=orig;btn.style.background='';},2000);}
   }catch(e){alert('Save failed: '+e.message);}
 }
 
@@ -1399,6 +1470,8 @@ async function loadSettings(){
     if(noteEl) noteEl.style.display=u.is_admin?'block':'none';
     document.getElementById('pw-card').style.display=u.local?'block':'none';
     ['users-card','sso-card'].forEach(id=>document.getElementById(id).style.display=u.is_admin?'block':'none');
+    document.getElementById('sx-nav-admin').style.display=u.is_admin?'':'none';
+    if(!u.is_admin&&_sxPage==='admin')showSettingsPage('profile');
     if(u.is_admin){loadUsers();loadOidc();}
   }
 
@@ -1439,9 +1512,10 @@ async function loadSettings(){
   document.getElementById('cfg-strong-openai-key').value=c.openai_api_key||'';
   document.getElementById('cfg-strong-ollama-url').value=c.ollama_url||'http://10.10.10.226:8642';
   document.getElementById('cfg-strong-ollama-model').value=c.ollama_model||'gemma4';
+  document.getElementById('cfg-openai-base-url').value=c.openai_base_url||'';
   document.getElementById('cfg-fast-model').value=c.fast_model||'';
   document.getElementById('cfg-strong-model').value=c.strong_model||'';
-  updateProviderUI();
+  updateProviderUI();loadAiHealth();
   document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
   document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
@@ -1468,6 +1542,12 @@ function updateProviderUI(){
   if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
   if(sh)sh.textContent='Default: '+(PROVIDER_STRONG_DEFAULTS[sp]||'');
 }
+async function loadAiHealth(){
+  try{
+    const h=await api('/api/config/ai-status');
+    ['fast','strong'].forEach(t=>{const el=document.getElementById(t+'-ai-health');if(el)el.innerHTML=h[t]&&!h[t].ok?'<span>⚠ '+esc(h[t].message)+'</span>':''});
+  }catch(e){}
+}
 async function togglePause(paused){
   const c=await api('/api/config');
   c.job_search_paused=paused;
@@ -1482,7 +1562,7 @@ function updatePauseBanner(paused){
   const l=document.getElementById('pause-status-label');
   if(l){l.textContent=paused?'⏸ Job search paused':'▶ Job search running';l.style.color=paused?'var(--red)':'var(--green)'}
 }
-async function saveConfig(){
+async function saveConfig(opts){
   const schedSites=[];
   if(document.getElementById('cfg-sched-indeed').checked)schedSites.push('indeed');
   if(document.getElementById('cfg-sched-linkedin').checked)schedSites.push('linkedin');
@@ -1512,14 +1592,15 @@ async function saveConfig(){
   openai_api_key:document.getElementById('cfg-openai-key').value||document.getElementById('cfg-strong-openai-key').value||'',
   ollama_url:document.getElementById('cfg-ollama-url').value||document.getElementById('cfg-strong-ollama-url').value||'http://10.10.10.226:8642',
   ollama_model:document.getElementById('cfg-ollama-model').value||document.getElementById('cfg-strong-ollama-model').value||'gemma4',
+  openai_base_url:document.getElementById('cfg-openai-base-url').value.trim(),
   fast_model:document.getElementById('cfg-fast-model').value||'',
   strong_model:document.getElementById('cfg-strong-model').value||'',
   author_name:document.getElementById('prof-name').value||'',
   author_email:document.getElementById('prof-email').value||'',
   author_phone:document.getElementById('prof-phone').value||'',
-  author_location:document.getElementById('prof-location').value||''}});
+  author_location:''}});
   resumeLabels={director:document.getElementById('cfg-label-director').value||'Resume 1 — Director',base:document.getElementById('cfg-label-base').value||'Resume 2 — Base',contract:document.getElementById('cfg-label-contract').value||'Resume 3 — Contract'};
-  refreshSchedulerStatus();alert('Saved')
+  refreshSchedulerStatus();loadAiHealth();if(!opts?.silent)toast('Settings saved')
 }
 async function importConfig(file){
   if(!file) return;
@@ -1536,8 +1617,8 @@ async function importConfig(file){
   document.getElementById('config-import-file').value='';
   setTimeout(()=>{statusEl.textContent=''},5000);
 }
-async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
-async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');s.textContent='Testing...';s.style.color='var(--text-dim)';try{await saveConfig();const r=await api('/api/config/test-ai-provider?tier='+tier,{method:'POST'});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
+async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig({silent:true});const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
+async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');s.textContent='Testing...';s.style.color='var(--text-dim)';try{await saveConfig({silent:true});const r=await api('/api/config/test-ai-provider?tier='+tier,{method:'POST'});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v,{method:'PUT',body:{content:c}});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 async function uploadResumeDocx(file){
   if(!file) return;
@@ -1719,10 +1800,20 @@ function scoreBar(l,v,m,r){const p=(v/m*100).toFixed(0);const c=p>=75?'var(--gre
 function followUpBadge(j){if(j.follow_up_due)return'<span class="badge badge-followup">Follow Up!</span>';if(j.status==='applied'&&j.days_since_applied!=null)return`<span class="text-dim text-sm">${j.days_since_applied}d</span>`;return'—'}
 function daysAgo(s){if(!s)return'—';return Math.floor((Date.now()-new Date(s).getTime())/864e5)+'d ago'}
 function copyText(b,t){navigator.clipboard.writeText(t);b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)}
-function showLoading(m){document.getElementById('action-loading').style.display='flex';document.getElementById('action-msg').textContent=m}
-function hideLoading(){document.getElementById('action-loading').style.display='none'}
+let _busyTimer=null;
+function showLoading(m){
+  document.getElementById('busy-msg').textContent=m;
+  const sub=document.getElementById('busy-sub'),t0=Date.now();sub.textContent='';
+  document.getElementById('busy-overlay').classList.add('show');
+  clearInterval(_busyTimer);
+  _busyTimer=setInterval(()=>{const sec=Math.floor((Date.now()-t0)/1000);sub.textContent=sec+'s'+(sec>=20?' — AI generation can take a minute or two, especially on local models':'')},1000);
+}
+function hideLoading(){clearInterval(_busyTimer);_busyTimer=null;document.getElementById('busy-overlay').classList.remove('show')}
 // Init
-api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels}).catch(()=>{}).finally(()=>loadDashboard());
+api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels}).catch(()=>{}).finally(()=>{
+  const m=location.hash.match(/^#settings(?:\/(\w+))?/);
+  if(m)showSettingsPage(m[1]||'profile');else loadDashboard();
+});
 api('/api/auth/me').then(u=>{
   window._currentUser=u;
   const nameEl=document.getElementById('nav-user-name');

@@ -390,6 +390,7 @@ class AppConfig(BaseModel):
     anthropic_api_key: str = ""         # falls back to ANTHROPIC_API_KEY env var
     gemini_api_key: str = ""            # falls back to GEMINI_API_KEY env var
     openai_api_key: str = ""            # falls back to OPENAI_API_KEY env var
+    openai_base_url: str = ""           # blank = api.openai.com; set for any OpenAI-compatible server
     fast_model: str = ""                # override default fast model
     strong_model: str = ""              # override default strong model
     ollama_url: str = "http://10.10.10.105:11434"

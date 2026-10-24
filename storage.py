@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import threading
 from pathlib import Path
 from models import Job, AppConfig
 
@@ -81,16 +82,64 @@ def load_job(user_id: str, job_id: str) -> Job | None:
     return Job(**json.loads(path.read_text()))
 
 
-def load_all_jobs(user_id: str, include_archived: bool = False) -> list[Job]:
+# Parsed-job cache. Self-validating: every call re-stats the jobs dir (cheap) and
+# re-parses only files whose (mtime, size) changed, so writes from any path —
+# save_job, archive/unarchive, delete, other processes — are picked up with no
+# explicit invalidation to forget.
+_jobs_cache: dict[str, dict[str, tuple[tuple[int, int], Job]]] = {}
+_jobs_cache_lock = threading.Lock()
+
+
+def _scan_job_files(d: Path) -> dict[str, tuple[int, int]]:
+    out = {}
+    with os.scandir(d) as it:
+        for e in it:
+            if e.name.endswith(".json"):
+                st = e.stat()
+                out[e.name] = (st.st_mtime_ns, st.st_size)
+    return out
+
+
+def jobs_signature(user_id: str) -> tuple:
+    """Cheap fingerprint of the active-jobs dir; changes whenever any job file does."""
+    ensure_user_dirs(user_id)
+    files = _scan_job_files(get_user_dir(user_id) / "jobs")
+    return (len(files), max((v[0] for v in files.values()), default=0), sum(v[0] ^ v[1] for v in files.values()))
+
+
+def _load_active_cached(user_id: str, copy: bool = True) -> list[Job]:
+    d = get_user_dir(user_id) / "jobs"
+    files = _scan_job_files(d)
+    with _jobs_cache_lock:
+        cache = _jobs_cache.setdefault(user_id, {})
+        for name in [n for n in cache if n not in files]:
+            del cache[name]
+        for name, key in files.items():
+            hit = cache.get(name)
+            if hit and hit[0] == key:
+                continue
+            try:
+                cache[name] = (key, Job(**json.loads((d / name).read_text())))
+            except Exception:
+                cache.pop(name, None)
+        ordered = sorted(cache.items(), key=lambda kv: kv[1][0][0], reverse=True)
+        # Deep copies: many callers mutate jobs (scoring loops etc.); never let
+        # an unsaved mutation leak into the shared cache.
+        if not copy:
+            return [j for _, (_, j) in ordered]
+        return [j.model_copy(deep=True) for _, (_, j) in ordered]
+
+
+def load_all_jobs(user_id: str, include_archived: bool = False, copy: bool = True) -> list[Job]:
     """Load active jobs (the tracker/dashboard hot path). Pass include_archived=True
     only for views that specifically need archived jobs too (e.g. an Archive tab) —
     the whole point of archiving is to keep this off the common path."""
     ensure_user_dirs(user_id)
-    dirs = [get_user_dir(user_id) / "jobs"]
-    if include_archived:
-        dirs.append(get_archive_dir(user_id))
+    if not include_archived:
+        # copy=False: shared cache objects — strictly read-only callers only.
+        return _load_active_cached(user_id, copy)
     entries = []
-    for d in dirs:
+    for d in (get_user_dir(user_id) / "jobs", get_archive_dir(user_id)):
         for f in d.glob("*.json"):
             entries.append(f)
     entries.sort(key=lambda p: p.stat().st_mtime, reverse=True)
