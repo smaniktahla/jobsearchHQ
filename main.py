@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -59,6 +60,7 @@ import activity
 import scheduler
 from intake import process_intake
 import jd_cleanup
+import job_liveness
 
 app = FastAPI(title="Job Search HQ", version="2.2")
 app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -1052,6 +1054,34 @@ def refresh_job_from_url(job_id: str, user: User = Depends(get_current_user)):
     job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
+
+
+@app.post("/api/jobs/{job_id}/check-posting")
+def check_posting(job_id: str, user: User = Depends(get_current_user)):
+    """Re-check whether this job's posting is still open."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.url.strip():
+        raise HTTPException(400, "Job has no URL to check")
+    job_liveness.check_job(job)
+    storage.save_job(user.id, job)
+    return enrich_job(job)
+
+
+@app.post("/api/jobs/check-postings")
+def check_postings_now(user: User = Depends(get_current_user)):
+    """Kick off a background open/closed pass over due tracker jobs."""
+    if job_liveness.run_status(user.id).get("running"):
+        return job_liveness.run_status(user.id)
+    limit = storage.load_config(user.id).posting_check_batch
+    threading.Thread(target=job_liveness.run_pass, args=(user.id, limit), daemon=True).start()
+    return {"running": True, "started": True}
+
+
+@app.get("/api/jobs/check-postings/status")
+def check_postings_status(user: User = Depends(get_current_user)):
+    return job_liveness.run_status(user.id)
 
 
 @app.delete("/api/jobs/{job_id}")

@@ -199,6 +199,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <span id="cleanup-jds-status" class="text-sm"></span>
       <input type="text" id="tracker-search" placeholder="Search company or title..." oninput="renderTracker()" style="width:220px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
+      <select id="filter-posting" onchange="renderTracker()" style="width:auto"><option value="">All Postings</option><option value="open">Open</option><option value="closed">Closed</option><option value="unchecked">Unchecked / Unknown</option></select>
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="ready_to_apply">Ready to Apply</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
     </div>
   </div>
@@ -246,7 +247,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </div>
 <!-- Job Detail -->
 <div id="view-detail" class="view">
-  <div class="flex items-center gap-8 mb-16"><button class="btn btn-ghost btn-sm" onclick="showView('tracker')">&larr; Back</button><h1 id="detail-title"></h1></div>
+  <div class="flex items-center gap-8 mb-16"><button class="btn btn-ghost btn-sm" onclick="showView('tracker')">&larr; Back</button><h1 id="detail-title"></h1><span id="detail-posting" class="text-sm" style="margin-left:8px"></span><button class="btn btn-ghost btn-sm" id="btn-check-posting" onclick="checkPosting()" style="margin-left:auto">Check if still open</button></div>
   <div class="detail-grid">
     <div>
       <div class="card mb-16">
@@ -461,6 +462,20 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="form-group">
         <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-top:20px"><input type="checkbox" id="cfg-sched-remote" checked style="width:auto"> Remote Only</label>
       </div>
+    </div>
+  </div>
+  <div class="card mb-16">
+    <div class="card-header">Posting Checks</div>
+    <div class="mt-8" style="display:flex;flex-direction:column;gap:12px">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="cfg-posting-enabled" style="width:auto"> Nightly check (6 AM ET) whether tracked postings are still open, and mark closed ones
+      </label>
+      <div class="form-group" style="max-width:260px;margin-left:28px">
+        <label>Max postings per run</label>
+        <input type="number" id="cfg-posting-batch" min="10" max="2000" value="300" style="width:100px">
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Highest-scoring and never-checked first. Applied/interview/offer/rejected/passed jobs are skipped. Open postings re-check weekly, unclear ones every 2 weeks, closed ones never. Closed jobs drop out of Ready to Apply.</div>
+      </div>
+      <div class="flex items-center gap-8"><button class="btn btn-ghost btn-sm" onclick="runPostingCheck()">Check postings now</button><span id="posting-run-status" class="text-sm text-dim"></span></div>
     </div>
   </div>
   <div class="card mb-16">
@@ -1075,7 +1090,9 @@ function renderTracker(){
     if(el)el.textContent=trackerSort.col===c?(trackerSort.dir===1?'▲':'▼'):'';
   });
   const q=(document.getElementById('tracker-search')?.value||'').toLowerCase();
-  const filtered=q?trackerJobs.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)):trackerJobs;
+  const pf=document.getElementById('filter-posting')?.value||'';
+  const base=pf?trackerJobs.filter(j=>pf==='unchecked'?(j.posting_status!=='open'&&j.posting_status!=='closed'):j.posting_status===pf):trackerJobs;
+  const filtered=q?base.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)):base;
   const jobs=[...filtered].sort((a,b)=>{
     const d=trackerSort.dir;
     switch(trackerSort.col){
@@ -1089,7 +1106,7 @@ function renderTracker(){
       default: return 0;
     }
   });
-  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="10" class="text-dim">No jobs.</td></tr>';
+  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}${postingBadge(j)}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="10" class="text-dim">No jobs.</td></tr>';
 }
 // Archive
 async function loadArchive(){
@@ -1114,7 +1131,7 @@ async function fuAction(id,a){await api(`/api/jobs/${id}/${a==='done'?'mark-foll
 async function sendDigest(){try{const r=await api('/api/follow-ups/send-digest',{method:'POST'});alert(r.sent?`Sent! (${r.count})`:'No follow-ups due.')}catch(e){alert(e.message)}}
 // Job Detail
 async function showDetail(id){currentJobId=id;const j=await api('/api/jobs/'+id);currentJob=j;showView('detail');
-document.getElementById('detail-title').textContent=j.title||'(Untitled)';document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
+document.getElementById('detail-title').textContent=j.title||'(Untitled)';renderDetailPosting(j);document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
 renderResearch(j.research);
 const ai=document.getElementById('detail-applied-info');
 const appliedBtn=document.getElementById('btn-applied');
@@ -1498,6 +1515,8 @@ async function loadSettings(){
   document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
   document.getElementById('cfg-sched-remote').checked=c.scheduled_search_remote!==false;
   document.getElementById('cfg-auto-score').checked=!!c.auto_score_new_jobs;
+  document.getElementById('cfg-posting-enabled').checked=c.posting_check_enabled!==false;
+  document.getElementById('cfg-posting-batch').value=c.posting_check_batch||300;
   document.getElementById('cfg-fast-provider').value=c.fast_provider||'anthropic';
   document.getElementById('cfg-strong-provider').value=c.strong_provider||'anthropic';
   // Fast provider keys
@@ -1542,6 +1561,25 @@ function updateProviderUI(){
   if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
   if(sh)sh.textContent='Default: '+(PROVIDER_STRONG_DEFAULTS[sp]||'');
 }
+let _postingPoll=null;
+async function runPostingCheck(){
+  await saveConfig({silent:true});
+  await api('/api/jobs/check-postings',{method:'POST'});
+  pollPostingCheck();
+}
+function pollPostingCheck(){
+  clearInterval(_postingPoll);
+  const el=document.getElementById('posting-run-status');
+  const tick=async()=>{
+    try{
+      const s=await api('/api/jobs/check-postings/status');
+      if(s.running){el.innerHTML='<span class="spinner"></span> Checked '+s.done+' of '+s.total+' — '+s.closed+' closed, '+s.open+' open';return}
+      clearInterval(_postingPoll);
+      el.textContent=s.finished_at?`Done: ${s.done} checked — ${s.closed} closed, ${s.open} open, ${s.unknown} unclear`:'';
+    }catch(e){clearInterval(_postingPoll)}
+  };
+  tick();_postingPoll=setInterval(tick,2000);
+}
 async function loadAiHealth(){
   try{
     const h=await api('/api/config/ai-status');
@@ -1583,6 +1621,8 @@ async function saveConfig(opts){
   scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
   job_search_paused:document.getElementById('cfg-search-paused').checked,
   auto_score_new_jobs:document.getElementById('cfg-auto-score').checked,
+  posting_check_enabled:document.getElementById('cfg-posting-enabled').checked,
+  posting_check_batch:+document.getElementById('cfg-posting-batch').value||300,
   auto_generate_above_threshold:document.getElementById('cfg-auto-generate').checked,
   auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7,
   fast_provider:document.getElementById('cfg-fast-provider').value||'anthropic',
@@ -1794,6 +1834,23 @@ function esc(s){const d=document.createElement('div');d.textContent=s||'';return
 function escAttr(s){return(s||'').replace(/`/g,'\\`').replace(/\$/g,'\\$')}
 function laneBadge(l){const m={w2_sniper:['W2 Sniper','w2'],contract:['Contract','contract'],contract_to_hire:['C2H','c2h'],ignore:['Ignore','ignore']};const[a,c]=m[l]||['—','ignore'];return`<span class="badge badge-${c}">${a}</span>`}
 function laneLabel(l){return{w2_sniper:'W2 Sniper',contract:'Contract',contract_to_hire:'C2H',ignore:'Ignore'}[l]||l}
+function renderDetailPosting(j){
+  const el=document.getElementById('detail-posting');if(!el)return;
+  const when=j.posting_checked_at?new Date(j.posting_checked_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const map={open:['var(--green)','● Posting open'],closed:['var(--red)','● Posting closed'],unknown:['var(--yellow)','● Posting status unclear']};
+  const m=map[j.posting_status];
+  el.innerHTML=m?`<span style="color:${m[0]}">${m[1]}</span> <span class="text-dim">${esc(j.posting_reason||'')}${when?' · checked '+when:''}</span>`:'<span class="text-dim">Posting not checked yet</span>';
+}
+async function checkPosting(){
+  if(!currentJobId)return;const b=document.getElementById('btn-check-posting');b.disabled=true;showLoading('Checking whether the posting is still open...');
+  try{const j=await api('/api/jobs/'+currentJobId+'/check-posting',{method:'POST'});currentJob=j;renderDetailPosting(j);toast('Posting '+(j.posting_status||'checked'))}
+  catch(e){alert(e.message)}finally{b.disabled=false;hideLoading()}
+}
+function postingBadge(j){
+  if(j.posting_status==='closed')return` <span class="badge" style="background:rgba(248,113,113,.15);color:var(--red)" title="${esc(j.posting_reason||'')}">closed</span>`;
+  if(j.posting_status==='open')return` <span class="badge" style="background:rgba(52,211,153,.12);color:var(--green)" title="${esc(j.posting_reason||'')}">open</span>`;
+  return'';
+}
 function statusBadge(s){return`<span class="badge badge-${s}">${s}</span>`}
 function scoreColor(t){const c=t>=8?'var(--green)':t>=5?'var(--yellow)':'var(--red)';return`<strong style="color:${c}">${t}/10</strong>`}
 function scoreBar(l,v,m,r){const p=(v/m*100).toFixed(0);const c=p>=75?'var(--green)':p>=50?'var(--yellow)':'var(--red)';return`<div class="score-bar"><div class="score-bar-label">${l} (${v}/${m})</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${p}%;background:${c}"></div></div></div><div style="font-size:11px;color:var(--text-dim);margin:0 0 8px 108px">${esc(r)}</div>`}
