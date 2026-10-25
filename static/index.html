@@ -164,7 +164,9 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       </div>
       <div class="form-group">
         <div class="flex gap-16" style="margin-top:20px">
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-remote" checked style="width:auto"> Remote Only</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-remote" checked style="width:auto" onchange="workModeToggle('search',this)"> Remote only</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-hybrid" style="width:auto" onchange="workModeToggle('search',this)"> Hybrid</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-onsite" style="width:auto" onchange="workModeToggle('search',this)"> In-person</label>
           <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-linkedin-desc" checked style="width:auto"> Fetch LinkedIn Descriptions (slower)</label>
           <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="search-autoscore" style="width:auto"> Auto-Score (uses Claude API)</label>
         </div>
@@ -460,7 +462,13 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="form-group"><label>Results Per Board</label><input type="number" id="cfg-sched-results" value="25" style="width:100px"></div>
       <div class="form-group"><label>Posted Within (hours)</label><input type="number" id="cfg-sched-hours" value="24" style="width:100px"></div>
       <div class="form-group">
-        <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-top:20px"><input type="checkbox" id="cfg-sched-remote" checked style="width:auto"> Remote Only</label>
+        <label>Work arrangement</label>
+        <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-remote" checked style="width:auto" onchange="workModeToggle('cfg-sched',this)"> Remote only</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-hybrid" style="width:auto" onchange="workModeToggle('cfg-sched',this)"> Hybrid</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="cfg-sched-onsite" style="width:auto" onchange="workModeToggle('cfg-sched',this)"> In-person</label>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Remote only is exclusive. Pick Hybrid and/or In-person for non-remote roles; none checked = any arrangement.</div>
       </div>
     </div>
   </div>
@@ -873,6 +881,7 @@ async function runSearch(){
     results_wanted:+document.getElementById('search-results').value||25,
     hours_old:+document.getElementById('search-hours').value||72,
     is_remote:document.getElementById('search-remote').checked,
+    work_modes:workModes('search'),
     job_type:document.getElementById('search-jobtype').value,
     distance:+document.getElementById('search-distance').value||50,
     linkedin_fetch_description:document.getElementById('search-linkedin-desc').checked,
@@ -1519,6 +1528,8 @@ async function loadSettings(){
   document.getElementById('cfg-sched-results').value=c.scheduled_search_results||25;
   document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
   document.getElementById('cfg-sched-remote').checked=c.scheduled_search_remote!==false;
+  document.getElementById('cfg-sched-hybrid').checked=!!c.scheduled_search_hybrid;
+  document.getElementById('cfg-sched-onsite').checked=!!c.scheduled_search_onsite;
   document.getElementById('cfg-auto-score').checked=!!c.auto_score_new_jobs;
   document.getElementById('cfg-tracking-min').value=c.tracking_min_score??8;
   document.getElementById('cfg-posting-enabled').checked=c.posting_check_enabled!==false;
@@ -1566,6 +1577,16 @@ function updateProviderUI(){
   const sh=document.getElementById('strong-model-hint');
   if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
   if(sh)sh.textContent='Default: '+(PROVIDER_STRONG_DEFAULTS[sp]||'');
+}
+// Work arrangement: "Remote only" is exclusive of Hybrid / In-person.
+function workModeToggle(prefix,el){
+  const r=document.getElementById(prefix+'-remote'),h=document.getElementById(prefix+'-hybrid'),o=document.getElementById(prefix+'-onsite');
+  if(el===r&&r.checked){h.checked=false;o.checked=false}
+  else if(el!==r&&el.checked){r.checked=false}
+}
+function workModes(prefix){
+  if(document.getElementById(prefix+'-remote').checked)return['remote'];
+  return[['hybrid',prefix+'-hybrid'],['onsite',prefix+'-onsite']].filter(([,id])=>document.getElementById(id).checked).map(([m])=>m);
 }
 let _postingPoll=null;
 async function runPostingCheck(){
@@ -1625,6 +1646,8 @@ async function saveConfig(opts){
   scheduled_search_results:+document.getElementById('cfg-sched-results').value||25,
   scheduled_search_hours_old:+document.getElementById('cfg-sched-hours').value||24,
   scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
+  scheduled_search_hybrid:document.getElementById('cfg-sched-hybrid').checked,
+  scheduled_search_onsite:document.getElementById('cfg-sched-onsite').checked,
   job_search_paused:document.getElementById('cfg-search-paused').checked,
   auto_score_new_jobs:document.getElementById('cfg-auto-score').checked,
   tracking_min_score:+document.getElementById('cfg-tracking-min').value||8,
