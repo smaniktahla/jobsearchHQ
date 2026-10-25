@@ -25,6 +25,7 @@ import email_intake
 import docx_builder
 import jd_cleanup
 import archiving
+import job_liveness
 from models import AppConfig, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,15 @@ def start_scheduler():
     )
     logger.info("Scheduled daily job archive at 05:00 ET")
 
+    sched.add_job(
+        _run_posting_check_all_users,
+        trigger=CronTrigger(hour=6, minute=0),
+        id="daily_posting_check",
+        name="Daily Posting Open/Closed Check (all users)",
+        replace_existing=True,
+    )
+    logger.info("Scheduled daily posting liveness check at 06:00 ET")
+
     # Walk all user dirs and re-apply their schedules
     users_dir = Path("/app/data/users")
     if not users_dir.exists():
@@ -159,6 +169,23 @@ def _run_jd_cleanup_all_users():
             )
         except Exception as e:
             logger.error(f"JD cleanup failed for {user_dir.name}: {e}")
+
+
+def _run_posting_check_all_users():
+    """Nightly sweep: verify tracked postings are still open, mark closed ones."""
+    users_dir = Path("/app/data/users")
+    if not users_dir.exists():
+        return
+    for user_dir in users_dir.iterdir():
+        if not user_dir.is_dir():
+            continue
+        try:
+            config = storage.load_config(user_dir.name)
+            if not config.posting_check_enabled or config.job_search_paused:
+                continue
+            job_liveness.run_pass(user_dir.name, config.posting_check_batch)
+        except Exception as e:
+            logger.error(f"Posting check failed for {user_dir.name}: {e}")
 
 
 def _run_archive_all_users():

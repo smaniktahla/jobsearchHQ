@@ -163,6 +163,11 @@ class Job(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status_history: list[dict] = []
+    # Posting liveness (see job_liveness.py) — independent of the application workflow status
+    posting_status: str = ""        # "" = never checked | "open" | "closed" | "unknown"
+    posting_reason: str = ""
+    posting_checked_at: str = ""
+    posting_closed_at: str = ""
 
     def update_status(self, new_status: JobStatus, applied_date: str = ""):
         self.status_history.append({
@@ -219,6 +224,7 @@ class Job(BaseModel):
             and self.score.total >= 5
             and self.review_status == ReviewStatus.APPROVED
             and self.market_lane != MarketLane.IGNORE
+            and self.posting_status != "closed"
             and bool(self.tailored_resume_docx)
             and bool(self.cover_letters)
             and self.status not in (
@@ -380,6 +386,8 @@ class AppConfig(BaseModel):
     job_search_paused: bool = False  # master kill switch: stops ingest, scoring, and generation
     auto_score_new_jobs: bool = False
     auto_generate_above_threshold: bool = False
+    posting_check_enabled: bool = True   # nightly open/closed check of tracked job postings
+    posting_check_batch: int = 300       # max postings checked per run
     auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters
     # --- AI Provider ---
     # fast_provider: scoring, metadata, research (cheap/free tasks)
