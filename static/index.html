@@ -465,15 +465,20 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
   </div>
   <div class="card mb-16">
-    <div class="card-header">Posting Checks</div>
+    <div class="card-header">Tracking &amp; Posting Checks</div>
     <div class="mt-8" style="display:flex;flex-direction:column;gap:12px">
+      <div class="form-group" style="max-width:420px">
+        <label>Keep tracking jobs scoring at least</label>
+        <input type="number" id="cfg-tracking-min" min="1" max="10" value="8" style="width:80px">
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Scored jobs below this are archived nightly (after 3 days) so the Tracker stays fast. They stay in Archive and are never re-imported. Only jobs at or above it get open/closed checks. Applied, interview and offer jobs are never archived.</div>
+      </div>
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
         <input type="checkbox" id="cfg-posting-enabled" style="width:auto"> Nightly check (6 AM ET) whether tracked postings are still open, and mark closed ones
       </label>
       <div class="form-group" style="max-width:260px;margin-left:28px">
         <label>Max postings per run</label>
         <input type="number" id="cfg-posting-batch" min="10" max="2000" value="300" style="width:100px">
-        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Highest-scoring and never-checked first. Applied/interview/offer/rejected/passed jobs are skipped. Open postings re-check weekly, unclear ones every 2 weeks, closed ones never. Closed jobs drop out of Ready to Apply.</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Never-checked first, then highest score. Applied/interview/offer/rejected/passed jobs are skipped. Open postings re-check weekly, unclear ones every 2 weeks, closed ones never. Closed jobs drop out of Ready to Apply.</div>
       </div>
       <div class="flex items-center gap-8"><button class="btn btn-ghost btn-sm" onclick="runPostingCheck()">Check postings now</button><span id="posting-run-status" class="text-sm text-dim"></span></div>
     </div>
@@ -1515,6 +1520,7 @@ async function loadSettings(){
   document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
   document.getElementById('cfg-sched-remote').checked=c.scheduled_search_remote!==false;
   document.getElementById('cfg-auto-score').checked=!!c.auto_score_new_jobs;
+  document.getElementById('cfg-tracking-min').value=c.tracking_min_score??8;
   document.getElementById('cfg-posting-enabled').checked=c.posting_check_enabled!==false;
   document.getElementById('cfg-posting-batch').value=c.posting_check_batch||300;
   document.getElementById('cfg-fast-provider').value=c.fast_provider||'anthropic';
@@ -1621,6 +1627,7 @@ async function saveConfig(opts){
   scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
   job_search_paused:document.getElementById('cfg-search-paused').checked,
   auto_score_new_jobs:document.getElementById('cfg-auto-score').checked,
+  tracking_min_score:+document.getElementById('cfg-tracking-min').value||8,
   posting_check_enabled:document.getElementById('cfg-posting-enabled').checked,
   posting_check_batch:+document.getElementById('cfg-posting-batch').value||300,
   auto_generate_above_threshold:document.getElementById('cfg-auto-generate').checked,

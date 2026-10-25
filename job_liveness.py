@@ -152,8 +152,10 @@ def check_job(job: Job) -> bool:
     return True
 
 
-def _due(job: Job, now: datetime) -> bool:
+def _due(job: Job, now: datetime, min_score: int = 0) -> bool:
     if not job.url.strip() or job.status in SKIP_STATUSES or job.posting_status == "closed":
+        return False
+    if job.score is None or job.score.total < min_score:
         return False
     if not job.posting_checked_at:
         return True
@@ -167,7 +169,8 @@ def _due(job: Job, now: datetime) -> bool:
 
 def due_jobs(user_id: str, limit: int) -> list[Job]:
     now = datetime.now(timezone.utc)
-    jobs = [j for j in storage.load_all_jobs(user_id, copy=False) if _due(j, now)]
+    min_score = storage.load_config(user_id).tracking_min_score
+    jobs = [j for j in storage.load_all_jobs(user_id, copy=False) if _due(j, now, min_score)]
     # never-checked first, then highest score, so the best leads are verified soonest
     jobs.sort(key=lambda j: (bool(j.posting_checked_at), -(j.score.total if j.score else -1)))
     return jobs[:limit]
