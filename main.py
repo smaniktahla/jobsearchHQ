@@ -1114,7 +1114,7 @@ def unarchive_one_job(job_id: str, user: User = Depends(get_current_user)):
 @app.post("/api/archive/run")
 def run_archive_now(
     max_age_days: int = archiving.DEFAULT_MAX_AGE_DAYS,
-    min_score: int = archiving.DEFAULT_MIN_SCORE,
+    min_score: int | None = None,
     user: User = Depends(get_current_user),
 ):
     return archiving.run_archive_pass(user.id, max_age_days=max_age_days, min_score=min_score)

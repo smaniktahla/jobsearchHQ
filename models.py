@@ -386,6 +386,7 @@ class AppConfig(BaseModel):
     job_search_paused: bool = False  # master kill switch: stops ingest, scoring, and generation
     auto_score_new_jobs: bool = False
     auto_generate_above_threshold: bool = False
+    tracking_min_score: int = 8          # jobs scoring below this are archived and not live-checked
     posting_check_enabled: bool = True   # nightly open/closed check of tracked job postings
     posting_check_batch: int = 300       # max postings checked per run
     auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters
