@@ -381,7 +381,9 @@ class AppConfig(BaseModel):
     scheduled_search_location: str = "Washington, DC"
     scheduled_search_results: int = 25
     scheduled_search_hours_old: int = 24
-    scheduled_search_remote: bool = True
+    scheduled_search_remote: bool = True    # "Remote only" — exclusive of hybrid/onsite
+    scheduled_search_hybrid: bool = False
+    scheduled_search_onsite: bool = False
     # --- Automation Pipeline ---
     job_search_paused: bool = False  # master kill switch: stops ingest, scoring, and generation
     auto_score_new_jobs: bool = False

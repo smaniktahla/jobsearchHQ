@@ -4,6 +4,7 @@ Scrapes LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter for job postings.
 """
 
 import logging
+import re
 import math
 from datetime import datetime
 from pydantic import BaseModel
@@ -23,12 +24,33 @@ class JobSearchRequest(BaseModel):
     results_wanted: int = 25
     hours_old: int = 72
     is_remote: bool = True
+    # Work arrangement filter: subset of "remote" | "hybrid" | "onsite". Empty = fall back to
+    # is_remote (legacy). ["remote"] alone means remote-only and is pushed down to the boards;
+    # any other selection searches wide and filters results by detected arrangement.
+    work_modes: list[str] = []
     job_type: str = ""  # fulltime, parttime, contract, internship, or empty for all
     distance: int = 50
     linkedin_fetch_description: bool = True
     country_indeed: str = "USA"
     auto_score: bool = False  # score jobs with full descriptions
     skip_existing: bool = True
+
+
+def modes_from_flags(remote_only: bool, hybrid: bool, onsite: bool) -> list[str]:
+    """Settings checkboxes -> work_modes. Remote-only is exclusive of the others."""
+    if remote_only:
+        return ["remote"]
+    return [m for m, on in (("hybrid", hybrid), ("onsite", onsite)) if on]
+
+
+def detect_work_mode(title: str, location: str, description: str, is_remote_flag: bool) -> str:
+    """Best-effort arrangement from what the boards give us. 'remote' only comes from the
+    board flag or title/location (descriptions mention 'remote' in unrelated ways)."""
+    if re.search(r"\bhybrid\b", f"{title} {location} {description[:3000]}", re.I):
+        return "hybrid"
+    if is_remote_flag or re.search(r"\bremote\b", f"{title} {location}", re.I):
+        return "remote"
+    return "onsite"
 
 
 class JobSearchResult(BaseModel):
@@ -47,6 +69,7 @@ def find_existing(dedup_index: list[dict], title: str, company: str, url: str) -
 def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
     """Execute a JobSpy search and import results into the job tracker."""
 
+    remote_only = req.work_modes == ["remote"] or (not req.work_modes and req.is_remote)
     # Build scrape_jobs kwargs
     kwargs = {
         "site_name": req.sites,
@@ -54,7 +77,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
         "location": req.location,
         "results_wanted": req.results_wanted,
         "hours_old": req.hours_old,
-        "is_remote": req.is_remote,
+        "is_remote": remote_only,
         "distance": req.distance,
         "country_indeed": req.country_indeed,
         "linkedin_fetch_description": req.linkedin_fetch_description,
@@ -63,7 +86,7 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
 
     # Google Jobs needs its own search term with location baked in
     if "google" in req.sites:
-        remote_str = " remote" if req.is_remote else ""
+        remote_str = " remote" if remote_only else ""
         kwargs["google_search_term"] = f"{req.search_term}{remote_str} jobs near {req.location}"
 
     if req.job_type:
@@ -111,6 +134,14 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
                         "company": company,
                         "reason": "duplicate",
                     })
+                    continue
+
+            # Work-arrangement filter (remote-only is already enforced by the boards)
+            if req.work_modes and not remote_only:
+                _c = str(row.get("city", "") or ""); _st = str(row.get("state", "") or "")
+                mode = detect_work_mode(title, f"{_c} {_st}", description, bool(row.get("is_remote", False)))
+                if mode not in req.work_modes:
+                    result.skipped.append({"id": "", "title": title, "company": company, "reason": f"work mode: {mode}"})
                     continue
 
             # Build location string

@@ -365,6 +365,8 @@ def run_daily_pipeline(user_id: str) -> dict:
                 results_wanted=config.scheduled_search_results,
                 hours_old=config.scheduled_search_hours_old,
                 is_remote=config.scheduled_search_remote,
+                work_modes=jobspy_search.modes_from_flags(
+                    config.scheduled_search_remote, config.scheduled_search_hybrid, config.scheduled_search_onsite),
                 linkedin_fetch_description=True,
                 skip_existing=True,
             )
