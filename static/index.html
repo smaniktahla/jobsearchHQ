@@ -396,7 +396,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="sx-savebar"><button class="btn btn-primary" onclick="saveProfilePage(this)">Save Profile</button></div>
   </section>
   <section class="sx-page" id="sx-resumes" style="display:none">
-    <div class="sx-head"><h2>Resumes</h2><p>Name your resume variants and upload the source text the tailoring step starts from.</p></div>
+    <div class="sx-head"><h2>Resumes</h2><p>Name your resume variants and upload the source text the tailoring step starts from. A tailored resume starts from the variant the scorer recommends for that job (shown on the job), with Full Employment History always supplied as extra background.</p></div>
   <div class="card mb-16">
     <div class="card-header">Resume Names</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px" class="mt-8">
@@ -1576,7 +1576,7 @@ async function loadSettings(){
   document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
   loadResumeTemplate();
-  const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div class="flex items-center gap-8" style="margin:4px 0"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${resumeLabel(k)}</strong> <span class="text-dim">(${k})</span>: ${v.loaded?v.length+' chars':'Not loaded'}</div>`).join('');
+  const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div style="margin:4px 0"><div class="flex items-center gap-8"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${resumeLabel(k)}</strong> <span class="text-dim">(${k})</span>: ${v.loaded?v.length+' chars':'Not loaded'}${v.loaded?` <button class="btn btn-ghost btn-sm" id="resume-view-btn-${k}" onclick="toggleResumeView('${k}')">View</button>`:''}</div><pre id="resume-view-${k}" style="display:none;white-space:pre-wrap;max-height:420px;overflow:auto;margin:8px 0 12px;padding:12px;font:12px/1.5 inherit;border:1px solid var(--border);border-radius:8px;background:var(--surface2)"></pre></div>`).join('');
   refreshSchedulerStatus()
 }
 const PROVIDER_FAST_DEFAULTS={anthropic:'claude-haiku-4-5-20251001',gemini:'gemini-2.0-flash',openai:'gpt-4o-mini',ollama:'your ollama model'};
@@ -1728,6 +1728,15 @@ async function uploadResumeDocx(file){
     statusEl.textContent='Failed: '+e.message;statusEl.style.color='var(--red)';
   }
   document.getElementById('resume-docx-file').value='';
+}
+// View an uploaded resume's stored text
+async function toggleResumeView(k){
+  const box=document.getElementById('resume-view-'+k),btn=document.getElementById('resume-view-btn-'+k);
+  if(!box) return;
+  if(box.style.display!=='none'){box.style.display='none';btn.textContent='View';return}
+  box.textContent='Loading...';box.style.display='block';btn.textContent='Hide';
+  try{const r=await api('/api/resumes/'+k+'/text');box.textContent=r.content||'(empty)'}
+  catch(e){box.textContent='Failed to load: '+e.message}
 }
 // Resume template
 async function loadResumeTemplate(){
