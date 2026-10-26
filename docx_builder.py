@@ -135,6 +135,12 @@ def add_job_meta(doc, org, dates=""):
     return p
 
 
+def _resume_filename(company: str, title: str) -> str:
+    safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
+    safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
+    return f"Salil Maniktahla - {safe_title} - {safe_company}.docx"
+
+
 def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", company: str = "", title: str = "") -> str:
     """
     Parse tailored resume text and generate a formatted .docx file.
@@ -143,6 +149,20 @@ def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", com
     import storage as _storage
     out_dir = _storage.get_generated_dir(user_id) if user_id else GENERATED_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # A user-uploaded template takes over formatting; fall back to the built-in layout on any error.
+    if user_id:
+        import resume_template
+        if resume_template.has_template(user_id):
+            try:
+                return resume_template.render(
+                    tailored_text, user_id, out_dir / _resume_filename(company, title)
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Resume template render failed for user %s; using default layout", user_id
+                )
 
     doc = Document()
 
@@ -304,10 +324,7 @@ def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", com
         i += 1
 
     # Save
-    safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
-    safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
-    filename = f"Salil Maniktahla - {safe_title} - {safe_company}.docx"
-    filepath = out_dir / filename
+    filepath = out_dir / _resume_filename(company, title)
     doc.save(str(filepath))
 
     return str(filepath)
