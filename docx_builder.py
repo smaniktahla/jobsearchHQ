@@ -164,6 +164,9 @@ def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", com
                     "Resume template render failed for user %s; using default layout", user_id
                 )
 
+    import resume_template
+    contact_segments = resume_template.contact_segments(_storage.load_config(user_id)) if user_id else []
+
     doc = Document()
 
     # Page setup - US Letter with narrow margins
@@ -236,10 +239,15 @@ def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", com
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p.paragraph_format.space_before = Pt(1.5)
                 p.paragraph_format.space_after = Pt(0)
-                run = p.add_run(line)
-                run.font.name = "Calibri"
-                run.font.size = Pt(8.5)
-                run.font.color.rgb = MEDIUM
+                def _contact_fmt(run):
+                    run.font.name = "Calibri"
+                    run.font.size = Pt(8.5)
+                    run.font.color.rgb = MEDIUM
+
+                if contact_segments:
+                    resume_template.add_contact_runs(p, contact_segments, _contact_fmt, sep=" · ")
+                else:
+                    _contact_fmt(p.add_run(line))
                 in_header = False
             else:
                 in_header = False

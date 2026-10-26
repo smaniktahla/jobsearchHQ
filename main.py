@@ -371,6 +371,8 @@ def agent_get_profile(request: Request):
         "zip": config.author_zip,
         "linkedin": config.author_linkedin,
         "website": config.author_website,
+        "github": config.author_github,
+        "portfolio": config.author_portfolio,
         "work_experience": [w.model_dump() for w in config.work_experience],
         "education": config.education.model_dump(),
         "certifications": config.certifications,
@@ -397,6 +399,8 @@ def agent_update_profile(data: ProfileUpdate, request: Request):
     if data.zip is not None: config.author_zip = data.zip
     if data.linkedin is not None: config.author_linkedin = data.linkedin
     if data.website is not None: config.author_website = data.website
+    if data.github is not None: config.author_github = data.github
+    if data.portfolio is not None: config.author_portfolio = data.portfolio
     if data.work_experience is not None: config.work_experience = data.work_experience
     if data.education is not None: config.education = data.education
     if data.certifications is not None: config.certifications = data.certifications
@@ -1953,7 +1957,7 @@ def get_config(user: User = Depends(get_current_user)):
 def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     # Settings' form only edits name/email/phone/location directly (preserve
     # only when left blank, same as before). Every other profile field —
-    # address/city/state/zip/linkedin/website/work history/education/
+    # address/city/state/zip/linkedin/github/website/portfolio/work history/education/
     # certifications — belongs to /api/profile and isn't present in this
     # form at all, so it must always be carried over here or a plain
     # "Save All Settings" click silently wipes it back to defaults.
@@ -1968,6 +1972,8 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     config.author_zip      = existing.author_zip
     config.author_linkedin = existing.author_linkedin
     config.author_website  = existing.author_website
+    config.author_github   = existing.author_github
+    config.author_portfolio = existing.author_portfolio
     config.work_experience = existing.work_experience
     config.education       = existing.education
     config.certifications  = existing.certifications
@@ -2016,6 +2022,8 @@ def get_profile(user: User = Depends(get_current_user)):
         "zip": config.author_zip,
         "linkedin": config.author_linkedin,
         "website": config.author_website,
+        "github": config.author_github,
+        "portfolio": config.author_portfolio,
         "work_experience": [w.model_dump() for w in config.work_experience],
         "education": config.education.model_dump(),
         "certifications": config.certifications,
@@ -2035,6 +2043,8 @@ def update_profile(data: ProfileUpdate, user: User = Depends(get_current_user)):
     if data.zip is not None: config.author_zip = data.zip
     if data.linkedin is not None: config.author_linkedin = data.linkedin
     if data.website is not None: config.author_website = data.website
+    if data.github is not None: config.author_github = data.github
+    if data.portfolio is not None: config.author_portfolio = data.portfolio
     if data.work_experience is not None: config.work_experience = data.work_experience
     if data.education is not None: config.education = data.education
     if data.certifications is not None: config.certifications = data.certifications

@@ -218,14 +218,74 @@ def _rpr_of(p, plain: bool = False):
 
 
 # ── Text → blocks ──────────────────────────────────────────────────────────────
-# Mirrors the line heuristics in docx_builder.generate_resume_docx so the same
-# LLM output is understood either way.
+# Mirrors the line heuristics in docx_builder.generate_resume_docx for the older
+# "Title / Org · dates" shape, and also understands the three-line job header
+# the tailoring step emits ("Title", "Org", "2021 – Present" in either order).
+
+_MONTH = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?"
+DATE_RANGE = re.compile(
+    rf"^(?:{_MONTH}\s+)?\d{{4}}\s*[–—-]\s*(?:(?:{_MONTH}\s+)?\d{{4}}|Present|Current)$", re.I
+)
+TITLE_WORDS = re.compile(
+    r"\b(manager|analyst|architect|director|consultant|consulting|founder|co-founder|engineer|lead|"
+    r"partner|strategist|officer|developer|scientist|specialist|president|ceo|cto|cfo|vp|head|"
+    r"associate|administrator|coordinator|designer|advisor|owner|principal|intern|executive)\b",
+    re.I,
+)
+
+
+def _split_org_title(a: str, b: str) -> tuple[str, str]:
+    """Two header lines in unknown order -> (org, title)."""
+    ta, tb = bool(TITLE_WORDS.search(a)), bool(TITLE_WORDS.search(b))
+    if ta and not tb:
+        return b, a
+    if tb and not ta:
+        return a, b
+    if ta and tb:
+        if a.isupper() and not b.isupper():
+            return a, b
+        if b.isupper() and not a.isupper():
+            return b, a
+    return b, a
+
+
+def _job_header(lines: list[str], i: int):
+    """If lines[i:] opens with 'L1 [, L2], DATE-RANGE' return (title, org, dates, lines_used)."""
+    group = []
+    for j in range(i, min(i + 3, len(lines))):
+        s = lines[j].strip()
+        if not s or s[0] in "•-*" or len(s) > 90:
+            return None
+        group.append(s)
+        if DATE_RANGE.match(s):
+            break
+    else:
+        return None
+    if len(group) < 2 or not DATE_RANGE.match(group[-1]):
+        return None
+    first = group[0]
+    if first.upper().rstrip(":") in KNOWN_SECTIONS or DATE_RANGE.match(first):
+        return None
+    dates = group[-1]
+    if len(group) == 2:
+        return "", first, dates, 2
+    org, title = _split_org_title(first, group[1])
+    return title, org, dates, 3
+
 
 def parse_blocks(text: str) -> list[tuple]:
     lines = text.strip().split("\n")
     blocks: list[tuple] = []
     i = 0
     in_header = True
+    in_job = False
+    bullet_base = None  # indent of the first bullet in the current run
+
+    def next_nonempty(k):
+        while k < len(lines) and not lines[k].strip():
+            k += 1
+        return lines[k] if k < len(lines) else ""
+
     while i < len(lines):
         raw = lines[i]
         line = raw.strip()
@@ -233,32 +293,43 @@ def parse_blocks(text: str) -> list[tuple]:
             i += 1
             continue
 
-        is_section = (
-            (line.isupper() and len(line) > 3 and line[0] not in "•-*")
-            or line.upper().rstrip(":") in KNOWN_SECTIONS
-        )
-
         if in_header and not blocks:
             blocks.append(("name", line))
             i += 1
             continue
         if in_header and len(blocks) == 1:
             in_header = False
-            if "·" in line or "@" in line or "linkedin" in line.lower():
+            if any(c in line for c in ("·", "•", "@", "|")) or "linkedin" in line.lower():
                 blocks.append(("contact", line))
                 i += 1
                 continue
-
         in_header = False
-
-        if is_section:
-            blocks.append(("section", line.rstrip(":")))
-            i += 1
-            continue
 
         if line[0] in "•-*":
             indent = len(raw) - len(raw.lstrip())
-            blocks.append(("sub" if indent >= 2 else "bullet", line.lstrip("•-* ").strip()))
+            if bullet_base is None:
+                bullet_base = indent
+            kind = "sub" if indent >= bullet_base + 2 else "bullet"
+            blocks.append((kind, line.lstrip("•-* ").strip()))
+            i += 1
+            continue
+        bullet_base = None
+
+        header = _job_header(lines, i)
+        if header:
+            title, org, dates, used = header
+            blocks.append(("job", title, org, dates))
+            in_job = True
+            i += used
+            continue
+
+        is_section = (
+            (line.isupper() and len(line) > 3)
+            or line.upper().rstrip(":") in KNOWN_SECTIONS
+        )
+        if is_section:
+            blocks.append(("section", line.rstrip(":")))
+            in_job = False
             i += 1
             continue
 
@@ -284,6 +355,7 @@ def parse_blocks(text: str) -> list[tuple]:
                 if m:
                     org, dates = next_line[:m.start()].rstrip(" ·–—,"), m.group(1).strip()
             blocks.append(("job", line, org, dates))
+            in_job = True
             i += 2
             continue
 
@@ -293,9 +365,77 @@ def parse_blocks(text: str) -> list[tuple]:
             i += 1
             continue
 
-        blocks.append(("body", line))
+        # Short heading directly above bullets (e.g. a skills category)
+        nxt = next_nonempty(i + 1).strip()
+        if len(line) < 60 and not line.endswith(".") and nxt[:1] in ("•", "-", "*") and not in_job:
+            blocks.append(("label", line))
+        elif blocks and blocks[-1][0] in ("contact", "name"):
+            blocks.append(("tagline", line))
+        elif in_job:
+            blocks.append(("bullet", line))
+        else:
+            blocks.append(("body", line))
         i += 1
     return blocks
+
+
+# ── Contact line from profile ─────────────────────────────────────────────────
+
+def _normalize_url(url: str) -> str:
+    url = url.strip()
+    return url if re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I) else "https://" + url
+
+
+def _display_url(url: str) -> str:
+    return re.sub(r"^(?:https?://)?(?:www\.)?", "", url.strip(), flags=re.I).rstrip("/")
+
+
+def contact_segments(config) -> list[tuple[str, str | None]]:
+    """Contact line pieces from the profile as (text, url-or-None); empty if nothing is set."""
+    segs: list[tuple[str, str | None]] = []
+    loc = ", ".join(x for x in (config.author_city, config.author_state) if x) or config.author_location
+    if loc:
+        segs.append((loc, None))
+    if config.author_email:
+        segs.append((config.author_email, "mailto:" + config.author_email))
+    if config.author_phone:
+        segs.append((config.author_phone, None))
+    for url in (config.author_linkedin, config.author_github, config.author_website, config.author_portfolio):
+        if url and url.strip():
+            segs.append((_display_url(url), _normalize_url(url)))
+    return segs
+
+
+def _add_hyperlink(p: Paragraph, url: str, text: str, fmt):
+    """Append an external hyperlink run to p; fmt(run) applies the base formatting."""
+    from docx.oxml import OxmlElement
+    from docx.shared import RGBColor
+    from docx.text.run import Run
+
+    r_id = p.part.relate_to(url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), r_id)
+    r = OxmlElement("w:r")
+    link.append(r)
+    p._p.append(link)
+    run = Run(r, p)
+    fmt(run)
+    run.text = text
+    run.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+    run.font.underline = True
+    return run
+
+
+def add_contact_runs(p: Paragraph, segments, fmt, sep: str = " | "):
+    """Write contact segments into p, hyperlinking the ones that have a URL."""
+    for n, (text, url) in enumerate(segments):
+        if n:
+            fmt(p.add_run(sep))
+        if url:
+            _add_hyperlink(p, url, text, fmt)
+        else:
+            run = p.add_run(text)
+            fmt(run)
 
 
 # ── Rendering ──────────────────────────────────────────────────────────────────
@@ -319,7 +459,7 @@ class _Builder:
             role = chain.get(role) or "bullet"
         return role
 
-    def _new(self, role: str, right_tab: bool = False) -> Paragraph:
+    def _new(self, role: str, right_tab: bool = False, bulleted: bool = True) -> Paragraph:
         role = self._fallback(role)
         proto = self.protos[role]
         el = copy.deepcopy(proto._p)
@@ -328,38 +468,43 @@ class _Builder:
                 el.remove(child)
         self._sect.addprevious(el)
         p = Paragraph(el, proto._parent)
+        if not bulleted and p._p.pPr is not None and p._p.pPr.numPr is not None:
+            p._p.pPr.remove(p._p.pPr.numPr)
         if right_tab:
             p.paragraph_format.tab_stops.clear_all()
             p.paragraph_format.tab_stops.add_tab_stop(Twips(self.width), WD_TAB_ALIGNMENT.RIGHT)
         p._role = role
         return p
 
+    def _fmt(self, p: Paragraph, bold=None, italic=None, scale=None):
+        """Returns fmt(run): the prototype's run formatting for p's role, plus overrides."""
+        rpr = self._rpr.get(p._role)
+
+        def fmt(run):
+            if rpr is not None:
+                new = copy.deepcopy(rpr)
+                if scale is not None:
+                    for tag in ("w:sz", "w:szCs"):
+                        el = new.find(qn(tag))
+                        if el is not None:
+                            el.set(qn("w:val"), str(max(18, int(int(el.get(qn("w:val"))) * scale))))
+                run._r.insert(0, new)
+            if bold is not None:
+                run.bold = bold
+            if italic is not None:
+                run.italic = italic
+
+        return fmt
+
     def _run(self, p: Paragraph, text: str, bold=None, italic=None):
         run = p.add_run(text)
-        rpr = self._rpr.get(p._role)
-        if rpr is not None:
-            run._r.insert(0, copy.deepcopy(rpr))
-        if bold is not None:
-            run.bold = bold
-        if italic is not None:
-            run.italic = italic
+        self._fmt(p, bold, italic)(run)
         return run
 
-    def _fit_to_line(self, run, text: str):
-        """Shrink a one-line run (contact info) so it doesn't wrap, down to a 9pt floor."""
-        # Templates' sample contact lines sit near the edge, and the real font may be wider, so keep ~15% slack.
-        sample = int(0.85 * (len(self.protos["contact"].text) or len(text)))
-        if len(text) <= sample:
-            return
-        rpr = run._r.rPr
-        sz = rpr.find(qn("w:sz")) if rpr is not None else None
-        if sz is None:
-            return
-        half_pts = max(18, int(int(sz.get(qn("w:val"))) * sample / len(text)))
-        sz.set(qn("w:val"), str(half_pts))
-        cs = rpr.find(qn("w:szCs"))
-        if cs is not None:
-            cs.set(qn("w:val"), str(half_pts))
+    def _contact_scale(self, total_len: int):
+        """Shrink factor so a one-line contact block doesn't wrap (templates' sample lines sit near the edge)."""
+        sample = int(0.85 * (len(self.protos["contact"].text) or total_len))
+        return sample / total_len if total_len > sample else None
 
     def spacer(self):
         if "spacer" in self.protos:
@@ -367,18 +512,24 @@ class _Builder:
 
     def add(self, block: tuple):
         kind = block[0]
-        if kind in ("name", "contact", "section", "body"):
-            text = block[1]
-            if kind == "contact":
-                text = re.sub(r"\s*·\s*", " | ", text)
-            p = self._new({"body": "bullet"}.get(kind, kind))
-            if kind == "body":  # un-numbered plain line: reuse bullet formatting without the bullet
-                num = p._p.pPr.numPr
-                if num is not None:
-                    p._p.pPr.remove(num)
-            run = self._run(p, text)
-            if kind == "contact":
-                self._fit_to_line(run, text)
+        if kind in ("name", "section"):
+            self._run(self._new(kind), block[1])
+        elif kind == "contact":
+            text = re.sub(r"\s*[·•]\s*", " | ", block[1])
+            p = self._new("contact")
+            run = p.add_run(text)
+            self._fmt(p, scale=self._contact_scale(len(text)))(run)
+        elif kind == "contact_links":
+            segments = block[1]
+            p = self._new("contact")
+            total = sum(len(t) for t, _ in segments) + 3 * (len(segments) - 1)
+            add_contact_runs(p, segments, self._fmt(p, scale=self._contact_scale(total)))
+        elif kind == "body":
+            self._run(self._new("bullet", bulleted=False), block[1])
+        elif kind == "label":
+            self._run(self._new("bullet", bulleted=False), block[1], bold=True)
+        elif kind == "tagline":
+            self._run(self._new("title"), block[1], italic=True)
         elif kind in ("bullet", "sub"):
             self._run(self._new(kind), block[1])
         elif kind == "skill":
@@ -392,8 +543,8 @@ class _Builder:
             if dates:
                 self._run(p, "\t", bold=True)
                 self._run(p, dates, bold=True)
-            p = self._new("title")
-            self._run(p, title, italic=True)
+            if title:
+                self._run(self._new("title"), title, italic=True)
         elif kind == "subheader":
             _, title, dates = block
             p = self._new("title", right_tab=True)
@@ -403,11 +554,22 @@ class _Builder:
                 self._run(p, dates, italic=True)
 
 
+def apply_profile_contact(blocks: list[tuple], segments) -> list[tuple]:
+    """Replace the model's contact line with one built from the profile (so links are real)."""
+    if not segments:
+        return blocks
+    blocks = [b for b in blocks if b[0] != "contact"]
+    at = 1 if blocks and blocks[0][0] == "name" else 0
+    return blocks[:at] + [("contact_links", segments)] + blocks[at:]
+
+
 def render(tailored_text: str, user_id: str, out_path: Path) -> str:
     """Build a resume from the user's template. Returns out_path."""
     b = _Builder(template_path(user_id))
+    blocks = parse_blocks(tailored_text)
+    blocks = apply_profile_contact(blocks, contact_segments(storage.load_config(user_id)))
     prev = None
-    for block in parse_blocks(tailored_text):
+    for block in blocks:
         kind = block[0]
         if kind == "section" and prev is not None:
             b.spacer()

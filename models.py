@@ -300,6 +300,8 @@ class ProfileUpdate(BaseModel):
     zip: str = ""
     linkedin: str = ""
     website: str = ""
+    github: str = ""
+    portfolio: str = ""
     work_experience: list[WorkExperience] | None = None
     education: Education | None = None
     certifications: list[str] | None = None
@@ -336,6 +338,8 @@ class AppConfig(BaseModel):
     timezone: str = ""
     author_linkedin: str = ""
     author_website: str = ""
+    author_github: str = ""
+    author_portfolio: str = ""
     work_experience: list[WorkExperience] = []
     education: Education = Education()
     certifications: list[str] = []
