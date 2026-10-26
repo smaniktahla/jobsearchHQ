@@ -273,6 +273,38 @@ def _job_header(lines: list[str], i: int):
     return title, org, dates, 3
 
 
+# "Title | Company    Sep 2021 - Present": a header line that ends in a date range
+DATE_TAIL = re.compile(
+    rf"(?:^|\s)((?:{_MONTH}\s+)?\d{{4}}\s*[–—-]\s*(?:(?:{_MONTH}\s+)?\d{{4}}|Present|Current))$", re.I
+)
+PHONE = re.compile(r"\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}")
+DOMAIN = re.compile(r"\b[\w-]+\.(?:com|dev|io|net|org|me|co|ai|us|edu)\b|linkedin|github|https?://", re.I)
+
+
+def _is_contact_line(line: str) -> bool:
+    return "@" in line or bool(PHONE.search(line)) or bool(DOMAIN.search(line))
+
+
+def _dated_header(line: str):
+    """'Title | Company    Sep 2021 - Present' -> (title, org, dates), else None."""
+    m = DATE_TAIL.search(line)
+    if not m or len(line) > 150:
+        return None
+    left = line[:m.start()].rstrip(" \t|·–—,")
+    if not left or (" | " not in left and len(left.split()) > 12):
+        return None  # a sentence that happens to end in a date range
+    if " | " in left:
+        title, org = (x.strip() for x in left.split(" | ", 1))
+        return title, org, m.group(1)
+    return "", left, m.group(1)
+
+
+def _is_location(line: str) -> bool:
+    if len(line) > 45 or line.endswith(".") or len(line.split()) > 6 or DATE_TAIL.search(line):
+        return False
+    return "," in line or bool(re.search(r"\b(area|remote|hybrid|on-?site)$", line, re.I))
+
+
 def parse_blocks(text: str) -> list[tuple]:
     lines = text.strip().split("\n")
     blocks: list[tuple] = []
@@ -290,20 +322,28 @@ def parse_blocks(text: str) -> list[tuple]:
         raw = lines[i]
         line = raw.strip()
         if not line:
+            if blocks:
+                in_header = False
             i += 1
             continue
 
-        if in_header and not blocks:
+        if not blocks:
             blocks.append(("name", line))
             i += 1
             continue
-        if in_header and len(blocks) == 1:
-            in_header = False
-            if any(c in line for c in ("·", "•", "@", "|")) or "linkedin" in line.lower():
+
+        # Header region: everything between the name and the first blank line / section heading
+        if in_header:
+            if line.isupper() and len(line) > 3 and not _is_contact_line(line):
+                in_header = False
+            elif _is_contact_line(line):
                 blocks.append(("contact", line))
                 i += 1
                 continue
-        in_header = False
+            else:
+                blocks.append(("tagline", line))
+                i += 1
+                continue
 
         if line[0] in "•-*":
             indent = len(raw) - len(raw.lstrip())
@@ -314,6 +354,19 @@ def parse_blocks(text: str) -> list[tuple]:
             i += 1
             continue
         bullet_base = None
+
+        dated = _dated_header(line)
+        if dated:
+            title, org, dates = dated
+            location = ""
+            nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+            if nxt and _is_location(nxt):
+                location = nxt
+                i += 1
+            blocks.append(("job", title, org, dates, location))
+            in_job = True
+            i += 1
+            continue
 
         header = _job_header(lines, i)
         if header:
@@ -359,7 +412,9 @@ def parse_blocks(text: str) -> list[tuple]:
             i += 2
             continue
 
-        if ":" in line and len(line.split(":")[0]) < 25:
+        # "Category: description" (skills, competencies) -> bullet with a bold label
+        head = line.split(":", 1)[0]
+        if ":" in line and len(head) < 45 and len(head.split()) <= 6 and not re.search(r"[.!?]", head):
             label, value = line.split(":", 1)
             blocks.append(("skill", label, value.strip()))
             i += 1
@@ -369,8 +424,6 @@ def parse_blocks(text: str) -> list[tuple]:
         nxt = next_nonempty(i + 1).strip()
         if len(line) < 60 and not line.endswith(".") and nxt[:1] in ("•", "-", "*") and not in_job:
             blocks.append(("label", line))
-        elif blocks and blocks[-1][0] in ("contact", "name"):
-            blocks.append(("tagline", line))
         elif in_job:
             blocks.append(("bullet", line))
         else:
@@ -539,14 +592,19 @@ class _Builder:
             self._run(p, block[1] + ": ", bold=True)
             self._run(p, block[2], bold=False)
         elif kind == "job":
-            _, title, org, dates = block
+            title, org, dates = block[1:4]
+            location = block[4] if len(block) > 4 else ""
             p = self._new("org", right_tab=True)
             self._run(p, org, bold=True)
             if dates:
                 self._run(p, "\t", bold=True)
                 self._run(p, dates, bold=True)
-            if title:
-                self._run(self._new("title"), title, italic=True)
+            if title or location:
+                p = self._new("title", right_tab=bool(location))
+                self._run(p, title, italic=True)
+                if location:
+                    self._run(p, "\t", italic=True)
+                    self._run(p, location, italic=True)
         elif kind == "subheader":
             _, title, dates = block
             p = self._new("title", right_tab=True)
@@ -569,7 +627,10 @@ def render(tailored_text: str, user_id: str, out_path: Path) -> str:
     """Build a resume from the user's template. Returns out_path."""
     b = _Builder(template_path(user_id))
     blocks = parse_blocks(tailored_text)
-    blocks = apply_profile_contact(blocks, contact_segments(storage.load_config(user_id)))
+    config = storage.load_config(user_id)
+    blocks = apply_profile_contact(blocks, contact_segments(config))
+    if config.author_name and blocks and blocks[0][0] == "name":
+        blocks[0] = ("name", config.author_name)
     prev = None
     for block in blocks:
         kind = block[0]
