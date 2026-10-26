@@ -301,6 +301,15 @@ def save_resume_text(user_id: str, variant: str, content: str) -> None:
     path.write_text(content)
 
 
+def delete_resume_text(user_id: str, variant: str) -> bool:
+    """Remove a stored resume variant. Returns False if there was nothing to delete."""
+    path = get_user_dir(user_id) / "resumes" / f"{variant}.txt"
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
 # ── Generated document paths ───────────────────────────────────────────────────
 
 def get_generated_dir(user_id: str) -> Path:
