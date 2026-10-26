@@ -531,19 +531,13 @@ class _Builder:
         p._role = role
         return p
 
-    def _fmt(self, p: Paragraph, bold=None, italic=None, scale=None):
+    def _fmt(self, p: Paragraph, bold=None, italic=None):
         """Returns fmt(run): the prototype's run formatting for p's role, plus overrides."""
         rpr = self._rpr.get(p._role)
 
         def fmt(run):
             if rpr is not None:
-                new = copy.deepcopy(rpr)
-                if scale is not None:
-                    for tag in ("w:sz", "w:szCs"):
-                        el = new.find(qn(tag))
-                        if el is not None:
-                            el.set(qn("w:val"), str(max(18, int(int(el.get(qn("w:val"))) * scale))))
-                run._r.insert(0, new)
+                run._r.insert(0, copy.deepcopy(rpr))
             if bold is not None:
                 run.bold = bold
             if italic is not None:
@@ -556,11 +550,6 @@ class _Builder:
         self._fmt(p, bold, italic)(run)
         return run
 
-    def _contact_scale(self, total_len: int):
-        """Shrink factor so a one-line contact block doesn't wrap (templates' sample lines sit near the edge)."""
-        sample = int(0.85 * (len(self.protos["contact"].text) or total_len))
-        return sample / total_len if total_len > sample else None
-
     def spacer(self):
         if "spacer" in self.protos:
             self._new("spacer")
@@ -571,14 +560,18 @@ class _Builder:
             self._run(self._new(kind), block[1])
         elif kind == "contact":
             text = re.sub(r"\s*[·•]\s*", " | ", block[1])
-            p = self._new("contact")
-            run = p.add_run(text)
-            self._fmt(p, scale=self._contact_scale(len(text)))(run)
+            self._run(self._new("contact"), text)
         elif kind == "contact_links":
-            segments = block[1]
             p = self._new("contact")
-            total = sum(len(t) for t, _ in segments) + 3 * (len(segments) - 1)
-            add_contact_runs(p, segments, self._fmt(p, scale=self._contact_scale(total)))
+            fmt = self._fmt(p)
+            details = [sg for sg in block[1] if not sg[1] or sg[1].startswith("mailto:")]
+            links = [sg for sg in block[1] if sg[1] and not sg[1].startswith("mailto:")]
+            add_contact_runs(p, details, fmt)
+            if details and links:
+                br = p.add_run()
+                fmt(br)
+                br.add_break()
+            add_contact_runs(p, links, fmt)
         elif kind == "body":
             self._run(self._new("bullet", bulleted=False), block[1])
         elif kind == "label":
