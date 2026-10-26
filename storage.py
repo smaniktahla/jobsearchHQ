@@ -66,8 +66,13 @@ def save_job(user_id: str, job: Job) -> None:
     ensure_user_dirs(user_id)
     job.user_id = user_id
     data = sanitize_unicode(job.model_dump())
-    for field, value in data.items():
-        setattr(job, field, value)
+    # Copy the sanitized values back onto the caller's job, as typed objects: model_dump()
+    # flattens nested models (follow_up, score, ...) to dicts, and assigning those directly
+    # left callers holding a Job whose follow_up/score were plain dicts, so the endpoint's
+    # enrich_job(job) crashed right after the file was written.
+    clean = Job(**data)
+    for field in data:
+        setattr(job, field, getattr(clean, field))
     path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
     path.write_text(json.dumps(data, indent=2))
     update_dedup_index(user_id, job, archived=False)
