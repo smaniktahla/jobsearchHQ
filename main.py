@@ -2058,10 +2058,13 @@ def list_resumes(user: User = Depends(get_current_user)):
     result = {}
     for v in variants:
         text = storage.load_resume_text(user.id, v)
+        original = storage.load_resume_original(user.id, v)
         result[v] = {
             "loaded": bool(text),
             "length": len(text),
             "preview": text[:200] + "..." if len(text) > 200 else text,
+            "has_original": bool(original),
+            "original_filename": original[1] if original else "",
         }
     return result
 
@@ -2073,6 +2076,7 @@ async def upload_resume(variant: str, request: Request, user: User = Depends(get
     body = await request.json()
     content = body.get("content", "")
     storage.save_resume_text(user.id, variant, content)
+    storage.delete_resume_original(user.id, variant)  # pasted text replaces any uploaded file
     return {"ok": True, "variant": variant, "length": len(content)}
 
 
@@ -2084,7 +2088,9 @@ async def upload_resume_docx(variant: str, user: User = Depends(get_current_user
     if not file.filename.lower().endswith(".docx"):
         raise HTTPException(400, "Only .docx files are supported")
     import tempfile
-    data = await file.read()
+    data = await file.read(10 * 1024 * 1024 + 1)
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(400, "File is too large (10 MB max)")
     with tempfile.NamedTemporaryFile(suffix=".docx") as tmp:
         tmp.write(data)
         tmp.flush()
@@ -2095,7 +2101,23 @@ async def upload_resume_docx(variant: str, user: User = Depends(get_current_user
     if not content.strip():
         raise HTTPException(400, "No text found in that .docx file")
     storage.save_resume_text(user.id, variant, content)
+    storage.save_resume_original(user.id, variant, data, file.filename)
     return {"ok": True, "variant": variant, "length": len(content)}
+
+
+@app.get("/api/resumes/{variant}/original")
+def download_resume_original(variant: str, user: User = Depends(get_current_user)):
+    """Download the .docx this variant was last uploaded from."""
+    if variant not in ["director", "base", "contract", "full_history"]:
+        raise HTTPException(400, "Invalid variant")
+    original = storage.load_resume_original(user.id, variant)
+    if not original:
+        raise HTTPException(404, "No original file stored for that resume (it was pasted, or uploaded before files were kept)")
+    path, name = original
+    return FileResponse(
+        path, filename=name,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
 
 
 # ── Resume template (user-uploaded layout for tailored resumes) ─────────────

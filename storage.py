@@ -307,12 +307,49 @@ def save_resume_text(user_id: str, variant: str, content: str) -> None:
 
 
 def delete_resume_text(user_id: str, variant: str) -> bool:
-    """Remove a stored resume variant. Returns False if there was nothing to delete."""
+    """Remove a stored resume variant (text and original file). Returns False if there was nothing to delete."""
     path = get_user_dir(user_id) / "resumes" / f"{variant}.txt"
+    had_original = delete_resume_original(user_id, variant)
     if not path.exists():
-        return False
+        return had_original
     path.unlink()
     return True
+
+
+# The original uploaded .docx, kept so it can be downloaded again. Only present when the
+# variant was last set by a .docx upload; pasting new text removes it (it would no longer match).
+
+def _resume_original_paths(user_id: str, variant: str) -> tuple[Path, Path]:
+    base = get_user_dir(user_id) / "resumes"
+    return base / f"{variant}.original.docx", base / f"{variant}.original.json"
+
+
+def save_resume_original(user_id: str, variant: str, data: bytes, filename: str) -> None:
+    ensure_user_dirs(user_id)
+    docx_path, meta_path = _resume_original_paths(user_id, variant)
+    docx_path.write_bytes(data)
+    meta_path.write_text(json.dumps({"filename": Path(filename).name}))
+
+
+def load_resume_original(user_id: str, variant: str) -> tuple[Path, str] | None:
+    """(path, original filename) of the stored upload, or None."""
+    docx_path, meta_path = _resume_original_paths(user_id, variant)
+    if not docx_path.exists():
+        return None
+    name = f"{variant}.docx"
+    try:
+        name = json.loads(meta_path.read_text()).get("filename") or name
+    except Exception:
+        pass
+    return docx_path, name
+
+
+def delete_resume_original(user_id: str, variant: str) -> bool:
+    docx_path, meta_path = _resume_original_paths(user_id, variant)
+    existed = docx_path.exists()
+    docx_path.unlink(missing_ok=True)
+    meta_path.unlink(missing_ok=True)
+    return existed
 
 
 # ── Generated document paths ───────────────────────────────────────────────────
