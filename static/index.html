@@ -199,7 +199,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <button class="btn btn-ghost btn-sm" onclick="applyDealBreakers()" title="Re-apply deal breaker rules to all scored jobs without re-scoring">Fix Deal Breakers</button>
       <button class="btn btn-ghost btn-sm" id="btn-cleanup-jds" onclick="cleanupJunkJDs()" title="Re-scrape jobs whose saved description looks broken (login walls, dead postings, thin stubs)">Clean Up Junk JDs</button>
       <span id="cleanup-jds-status" class="text-sm"></span>
-      <input type="text" id="tracker-search" placeholder="Search company or title..." oninput="renderTracker()" style="width:220px">
+      <input type="text" id="tracker-search" placeholder="Search company, title, or job ID..." oninput="renderTracker()" style="width:260px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
       <select id="filter-posting" onchange="renderTracker()" style="width:auto"><option value="">All Postings</option><option value="open">Open</option><option value="closed">Closed</option><option value="unchecked">Unchecked / Unknown</option></select>
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="ready_to_apply">Ready to Apply</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
@@ -1106,7 +1106,7 @@ function renderTracker(){
   const q=(document.getElementById('tracker-search')?.value||'').toLowerCase();
   const pf=document.getElementById('filter-posting')?.value||'';
   const base=pf?trackerJobs.filter(j=>pf==='unchecked'?(j.posting_status!=='open'&&j.posting_status!=='closed'):j.posting_status===pf):trackerJobs;
-  const filtered=q?base.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)):base;
+  const filtered=q?base.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)||(j.id||'').toLowerCase().includes(q)):base;
   const jobs=[...filtered].sort((a,b)=>{
     const d=trackerSort.dir;
     switch(trackerSort.col){
