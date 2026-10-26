@@ -2140,6 +2140,16 @@ def preview_resume_template(user: User = Depends(get_current_user)):
     return FileResponse(out, filename="template_preview.docx")
 
 
+@app.delete("/api/resumes/{variant}")
+def delete_resume(variant: str, user: User = Depends(get_current_user)):
+    """Delete a stored resume variant's text."""
+    if variant not in ["director", "base", "contract", "full_history"]:
+        raise HTTPException(400, "Invalid variant")
+    if not storage.delete_resume_text(user.id, variant):
+        raise HTTPException(404, "That resume is not loaded")
+    return {"ok": True, "variant": variant}
+
+
 @app.get("/api/resumes/{variant}/text")
 def get_resume_text(variant: str, user: User = Depends(get_current_user)):
     """Get full resume text for a variant."""
