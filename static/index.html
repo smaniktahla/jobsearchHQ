@@ -403,6 +403,17 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <button class="btn btn-ghost btn-sm" onclick="saveConfig()">Save Names</button>
   </div>
+  <div class="card mb-16">
+    <div class="card-header">Resume Template</div>
+    <div class="text-sm mt-8 mb-16" style="color:var(--text-dim)">Upload a .docx whose layout you like. Tailored resumes copy its fonts, headings, bullets and spacing; its sample text is discarded. Without one, the built-in layout is used.</div>
+    <div class="flex gap-8 items-center mb-16">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('resume-template-file').click()">Upload Template (.docx)</button>
+      <input type="file" id="resume-template-file" accept=".docx" style="display:none" onchange="uploadResumeTemplate(this.files[0])">
+      <a class="btn btn-ghost btn-sm" id="resume-template-preview" href="/api/resume-template/preview" style="display:none">Download Sample</a>
+      <button class="btn btn-ghost btn-sm" id="resume-template-remove" onclick="removeResumeTemplate()" style="display:none">Remove</button>
+    </div>
+    <div id="resume-template-status" class="text-sm"></div>
+  </div>
   <div id="resume-status" class="mb-16"></div>
     <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="flex gap-8 items-center mb-16"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('resume-docx-file').click()">Upload .docx File</button><input type="file" id="resume-docx-file" accept=".docx" style="display:none" onchange="uploadResumeDocx(this.files[0])"><span id="resume-docx-status" class="text-sm"></span></div><div class="form-group"><label>Or paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload Text</button></div>
   </section>
@@ -1555,6 +1566,7 @@ async function loadSettings(){
   document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
   document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
+  loadResumeTemplate();
   const r=await api('/api/resumes');document.getElementById('resume-status').innerHTML=Object.entries(r).map(([k,v])=>`<div class="flex items-center gap-8" style="margin:4px 0"><span style="color:${v.loaded?'var(--green)':'var(--red)'}">●</span><strong>${resumeLabel(k)}</strong> <span class="text-dim">(${k})</span>: ${v.loaded?v.length+' chars':'Not loaded'}</div>`).join('');
   refreshSchedulerStatus()
 }
@@ -1707,6 +1719,39 @@ async function uploadResumeDocx(file){
     statusEl.textContent='Failed: '+e.message;statusEl.style.color='var(--red)';
   }
   document.getElementById('resume-docx-file').value='';
+}
+// Resume template
+async function loadResumeTemplate(){
+  const el=document.getElementById('resume-template-status');
+  if(!el) return;
+  try{
+    const t=await api('/api/resume-template');
+    const on=!!t.loaded;
+    document.getElementById('resume-template-preview').style.display=on?'':'none';
+    document.getElementById('resume-template-remove').style.display=on?'':'none';
+    el.style.color=on?'var(--green)':'var(--text-dim)';
+    el.textContent=on?`● ${t.filename} — used for all new tailored resumes`:'No template uploaded — using the built-in layout';
+  }catch(e){el.textContent=''}
+}
+async function uploadResumeTemplate(file){
+  if(!file) return;
+  const el=document.getElementById('resume-template-status');
+  el.textContent='Uploading...';el.style.color='var(--text-dim)';
+  try{
+    const fd=new FormData();fd.append('file',file);
+    const res=await fetch('/api/resume-template',{method:'PUT',body:fd});
+    if(res.status===401){window.location.href='/auth/login';return}
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}
+    await loadResumeTemplate();
+  }catch(e){
+    el.textContent='Failed: '+e.message;el.style.color='var(--red)';
+  }
+  document.getElementById('resume-template-file').value='';
+}
+async function removeResumeTemplate(){
+  if(!confirm('Remove your resume template? New tailored resumes will use the built-in layout.')) return;
+  await api('/api/resume-template',{method:'DELETE'});
+  loadResumeTemplate();
 }
 // Scheduler / Automation
 async function refreshSchedulerStatus(){

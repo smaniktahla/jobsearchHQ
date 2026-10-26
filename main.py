@@ -2088,6 +2088,48 @@ async def upload_resume_docx(variant: str, user: User = Depends(get_current_user
     return {"ok": True, "variant": variant, "length": len(content)}
 
 
+# ── Resume template (user-uploaded layout for tailored resumes) ─────────────
+
+@app.get("/api/resume-template")
+def get_resume_template(user: User = Depends(get_current_user)):
+    import resume_template
+    return resume_template.template_info(user.id)
+
+
+@app.put("/api/resume-template")
+async def upload_resume_template(user: User = Depends(get_current_user), file: UploadFile = File(...)):
+    """Upload a .docx whose layout tailored resumes should copy."""
+    import resume_template
+    data = await file.read(resume_template.MAX_TEMPLATE_BYTES + 1)
+    try:
+        return resume_template.save_template(user.id, data, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"Could not read template: {e}")
+
+
+@app.delete("/api/resume-template")
+def delete_resume_template(user: User = Depends(get_current_user)):
+    import resume_template
+    resume_template.delete_template(user.id)
+    return {"ok": True}
+
+
+@app.get("/api/resume-template/preview")
+def preview_resume_template(user: User = Depends(get_current_user)):
+    """Render sample resume content through the user's template."""
+    import resume_template
+    if not resume_template.has_template(user.id):
+        raise HTTPException(404, "No resume template uploaded")
+    out = storage.get_generated_dir(user.id) / "template_preview.docx"
+    try:
+        resume_template.render_sample(user.id, out)
+    except Exception as e:
+        raise HTTPException(500, f"Template render failed: {e}")
+    return FileResponse(out, filename="template_preview.docx")
+
+
 @app.get("/api/resumes/{variant}/text")
 def get_resume_text(variant: str, user: User = Depends(get_current_user)):
     """Get full resume text for a variant."""
