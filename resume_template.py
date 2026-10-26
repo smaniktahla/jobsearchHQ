@@ -463,11 +463,13 @@ class _Builder:
         role = self._fallback(role)
         proto = self.protos[role]
         el = copy.deepcopy(proto._p)
+        for attr in [a for a in el.attrib if a.endswith("}paraId") or a.endswith("}textId")]:
+            del el.attrib[attr]
         for child in list(el):
             if child.tag != qn("w:pPr"):
                 el.remove(child)
         self._sect.addprevious(el)
-        p = Paragraph(el, proto._parent)
+        p = Paragraph(el, self.doc._body)
         if not bulleted and p._p.pPr is not None and p._p.pPr.numPr is not None:
             p._p.pPr.remove(p._p.pPr.numPr)
         if right_tab:
@@ -578,7 +580,18 @@ def render(tailored_text: str, user_id: str, out_path: Path) -> str:
         b.add(block)
         prev = kind
     b.doc.save(str(out_path))
+    _check_relationships(out_path)
     return str(out_path)
+
+
+def _check_relationships(path: Path) -> None:
+    """Raise if document.xml references a relationship id that isn't in its .rels (Word calls that corrupt)."""
+    with zipfile.ZipFile(path) as z:
+        used = set(re.findall(r'r:(?:id|embed|link)="([^"]+)"', z.read("word/document.xml").decode("utf8")))
+        defined = set(re.findall(r'Id="([^"]+)"', z.read("word/_rels/document.xml.rels").decode("utf8")))
+    missing = used - defined
+    if missing:
+        raise ValueError(f"unresolved relationships in generated resume: {sorted(missing)}")
 
 
 def render_sample(user_id: str, out_path: Path) -> str:
