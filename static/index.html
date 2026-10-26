@@ -341,7 +341,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </nav>
     <div class="sx-body">
   <section class="sx-page" id="sx-profile" style="display:none">
-    <div class="sx-head"><h2>Profile</h2><p>Personal details, work history and job preferences used in resumes, cover letters, scoring and application packages.</p></div>
+    <div class="sx-head"><h2>Profile</h2><p>Personal details, links (LinkedIn, GitHub, website — hyperlinked in every resume's contact line), work history and job preferences used in resumes, cover letters, scoring and application packages.</p></div>
   <!-- Personal Info -->
   <div class="card mb-16">
     <div class="card-header">Personal Information</div>
@@ -350,6 +350,9 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div><label class="label">Email</label><input class="input" id="prof-email" type="email" placeholder="email@example.com"></div>
       <div><label class="label">Phone</label><input class="input" id="prof-phone" placeholder="555-555-5555"></div>
       <div><label class="label">LinkedIn URL</label><input class="input" id="prof-linkedin" placeholder="https://linkedin.com/in/..."></div>
+      <div><label class="label">GitHub URL</label><input class="input" id="prof-github" placeholder="https://github.com/..."></div>
+      <div><label class="label">Website</label><input class="input" id="prof-website" placeholder="https://example.com"></div>
+      <div><label class="label">Portfolio / Other Link</label><input class="input" id="prof-portfolio" placeholder="https://..."></div>
       <div><label class="label">Address</label><input class="input" id="prof-address" placeholder="Street address"></div>
       <div><label class="label">City</label><input class="input" id="prof-city" placeholder="City"></div>
       <div><label class="label">State</label><input class="input" id="prof-state" placeholder="VA"></div>
@@ -1365,6 +1368,9 @@ async function loadProfile(){
     document.getElementById('prof-email').value = p.email||'';
     document.getElementById('prof-phone').value = p.phone||'';
     document.getElementById('prof-linkedin').value = p.linkedin||'';
+    document.getElementById('prof-github').value = p.github||'';
+    document.getElementById('prof-website').value = p.website||'';
+    document.getElementById('prof-portfolio').value = p.portfolio||'';
     document.getElementById('prof-address').value = p.address||'';
     document.getElementById('prof-city').value = p.city||'';
     document.getElementById('prof-state').value = p.state||'';
@@ -1428,6 +1434,9 @@ async function saveProfile(btn){
     email:document.getElementById('prof-email').value,
     phone:document.getElementById('prof-phone').value,
     linkedin:document.getElementById('prof-linkedin').value,
+    github:document.getElementById('prof-github').value,
+    website:document.getElementById('prof-website').value,
+    portfolio:document.getElementById('prof-portfolio').value,
     address:document.getElementById('prof-address').value,
     city:document.getElementById('prof-city').value,
     state:document.getElementById('prof-state').value,
