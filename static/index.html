@@ -525,6 +525,13 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <input type="number" id="cfg-auto-threshold" value="7" min="1" max="10" style="width:80px">
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Jobs scoring at or above this get auto-generated resume + 3 cover letter variants</div>
       </div>
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;margin-top:10px">
+        <input type="checkbox" id="cfg-auto-approve" style="width:auto"> Auto-approve jobs for JobPilot once resume &amp; cover letters exist
+      </label>
+      <div class="form-group" style="max-width:460px;margin-left:28px">
+        <label>Auto-approve at score &ge; <input type="number" id="cfg-auto-approve-threshold" value="9" min="1" max="10" style="width:70px"> &nbsp; max per day <input type="number" id="cfg-auto-approve-cap" value="25" min="1" style="width:70px"></label>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Sets the job to Approved, which makes it ready to apply. Ignore-lane, closed and already-decided jobs are skipped; reject a job to keep it out. You get one summary email per run.</div>
+      </div>
       <div style="margin-left:28px;font-size:13px">
         <div class="mr-msg text-dim">Checking for scored jobs without a tailored resume…</div>
         <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
@@ -1630,6 +1637,9 @@ async function loadSettings(){
   updateProviderUI();loadAiHealth();
   document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
   document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
+  document.getElementById('cfg-auto-approve').checked=!!c.auto_approve_enabled;
+  document.getElementById('cfg-auto-approve-threshold').value=c.auto_approve_threshold||9;
+  document.getElementById('cfg-auto-approve-cap').value=c.auto_approve_daily_cap||25;
   refreshMissingResumes();
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
   loadResumeTemplate();
@@ -1734,6 +1744,9 @@ async function saveConfig(opts){
   posting_check_batch:+document.getElementById('cfg-posting-batch').value||300,
   auto_generate_above_threshold:document.getElementById('cfg-auto-generate').checked,
   auto_generate_threshold:+document.getElementById('cfg-auto-threshold').value||7,
+  auto_approve_enabled:document.getElementById('cfg-auto-approve').checked,
+  auto_approve_threshold:+document.getElementById('cfg-auto-approve-threshold').value||9,
+  auto_approve_daily_cap:+document.getElementById('cfg-auto-approve-cap').value||25,
   fast_provider:document.getElementById('cfg-fast-provider').value||'anthropic',
   strong_provider:document.getElementById('cfg-strong-provider').value||'anthropic',
   anthropic_api_key:document.getElementById('cfg-anthropic-key').value||document.getElementById('cfg-strong-anthropic-key').value||'',
