@@ -202,6 +202,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <input type="text" id="tracker-search" placeholder="Search company, title, or job ID..." oninput="renderTracker()" style="width:260px">
       <select id="filter-lane" onchange="loadTracker()" style="width:auto"><option value="">All Lanes</option><option value="w2_sniper">W2 Sniper</option><option value="contract">Contract</option><option value="contract_to_hire">C2H</option><option value="ignore">Ignore</option></select>
       <select id="filter-posting" onchange="renderTracker()" style="width:auto"><option value="">All Postings</option><option value="open">Open</option><option value="closed">Closed</option><option value="unchecked">Unchecked / Unknown</option></select>
+      <select id="filter-docs" onchange="renderTracker()" style="width:auto" title="Required documents"><option value="">All Docs</option><option value="complete">Resume + cover letters</option><option value="missing_resume">Missing resume</option><option value="missing_letters">Missing cover letters</option><option value="missing_any">Missing any</option></select>
       <select id="filter-status" onchange="loadTracker()" style="width:auto"><option value="">All Statuses</option><option value="ready_to_apply">Ready to Apply</option><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select>
     </div>
   </div>
@@ -224,6 +225,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <th onclick="sortTracker('added')" style="cursor:pointer;user-select:none">ADDED <span id="sort-added"></span></th>
     <th>APPLIED</th>
     <th>FOLLOW-UP</th>
+    <th title="R = tailored resume file, CL = cover letters">DOCS</th>
     <th onclick="sortTracker('ready')" style="cursor:pointer;user-select:none">READY <span id="sort-ready"></span></th>
     <th></th>
   </tr></thead><tbody id="tracker-body"></tbody></table></div>
@@ -254,8 +256,8 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div>
       <div class="card mb-16">
         <div class="flex justify-between items-center">
-          <div><div class="text-dim text-sm" id="detail-company"></div><div class="text-dim text-sm" id="detail-meta"></div><div class="text-dim text-sm" id="detail-applied-info"></div></div>
-          <div class="flex gap-8"><select id="detail-resume-lane" onchange="setResumeLane()" style="width:auto" title="Which resume lane this job uses"></select><select id="detail-status" onchange="updateJobStatus()" style="width:auto"><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select></div>
+          <div><div class="text-dim text-sm" id="detail-company"></div><div class="text-dim text-sm" id="detail-meta"></div><div class="text-dim text-sm" id="detail-applied-info"></div><div class="text-sm" id="detail-ready-info" style="margin-top:4px"></div></div>
+          <div class="flex gap-8"><button class="btn btn-ghost btn-sm" id="detail-approve" onclick="toggleApproval()" title="Approved + tailored resume + cover letters = ready for JobPilot">Approve for JobPilot</button><select id="detail-resume-lane" onchange="setResumeLane()" style="width:auto" title="Which resume lane this job uses"></select><select id="detail-status" onchange="updateJobStatus()" style="width:auto"><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select></div>
         </div>
       </div>
       <div class="card mb-16" id="score-section" style="display:none"><div class="card-header">Score Breakdown</div><div id="score-breakdown"></div></div>
@@ -1123,6 +1125,9 @@ async function cancelScoring(){
   setTimeout(()=>{document.getElementById('scoring-progress-bar').style.display='none';},2000);
 }
 // Tracker
+function docsBadge(j){
+  const b=(ok,t)=>`<span style="font-size:10px;margin-right:4px;color:var(--${ok?'green':'text-dim'})">${t}${ok?'✓':'✗'}</span>`;
+  return b(j.has_resume,'R')+b(j.has_cover_letters,'CL');}
 let trackerJobs=[];
 let trackerSort={col:'score',dir:-1};
 async function loadTracker(){
@@ -1157,7 +1162,9 @@ function renderTracker(){
   const q=(document.getElementById('tracker-search')?.value||'').toLowerCase();
   const pf=document.getElementById('filter-posting')?.value||'';
   const base=pf?trackerJobs.filter(j=>pf==='unchecked'?(j.posting_status!=='open'&&j.posting_status!=='closed'):j.posting_status===pf):trackerJobs;
-  const filtered=q?base.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)||(j.id||'').toLowerCase().includes(q)):base;
+  const df=document.getElementById('filter-docs')?.value||'';
+  const dbase=df?base.filter(j=>df==='complete'?(j.has_resume&&j.has_cover_letters):df==='missing_resume'?!j.has_resume:df==='missing_letters'?!j.has_cover_letters:(!j.has_resume||!j.has_cover_letters)):base;
+  const filtered=q?dbase.filter(j=>(j.company||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)||(j.id||'').toLowerCase().includes(q)):dbase;
   const jobs=[...filtered].sort((a,b)=>{
     const d=trackerSort.dir;
     switch(trackerSort.col){
@@ -1171,7 +1178,7 @@ function renderTracker(){
       default: return 0;
     }
   });
-  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}${postingBadge(j)}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="10" class="text-dim">No jobs.</td></tr>';
+  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}${postingBadge(j)}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.market_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${docsBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':(j.review_status==='approved'?'<span class="text-dim" style="font-size:10px">Approved</span>':'—')}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="11" class="text-dim">No jobs.</td></tr>';
 }
 // Archive
 async function loadArchive(){
@@ -1196,7 +1203,7 @@ async function fuAction(id,a){await api(`/api/jobs/${id}/${a==='done'?'mark-foll
 async function sendDigest(){try{const r=await api('/api/follow-ups/send-digest',{method:'POST'});alert(r.sent?`Sent! (${r.count})`:'No follow-ups due.')}catch(e){alert(e.message)}}
 // Job Detail
 async function showDetail(id){currentJobId=id;const j=await api('/api/jobs/'+id);currentJob=j;showView('detail');
-document.getElementById('detail-title').textContent=j.title||'(Untitled)';renderDetailPosting(j);document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;renderResumeLaneSelect(j);document.getElementById('detail-jd').textContent=j.raw_jd;
+document.getElementById('detail-title').textContent=j.title||'(Untitled)';renderDetailPosting(j);document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;renderResumeLaneSelect(j);renderReadiness(j);document.getElementById('detail-jd').textContent=j.raw_jd;
 renderResearch(j.research);
 const ai=document.getElementById('detail-applied-info');
 const appliedBtn=document.getElementById('btn-applied');
@@ -1251,6 +1258,26 @@ async function scoreCurrentJob(){
 async function generateTailoredResume(){if(!currentJobId)return;document.getElementById('btn-resume').disabled=true;showLoading('Generating tailored resume + .docx...');try{await api('/api/jobs/'+currentJobId+'/tailored-resume',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-resume').disabled=false;hideLoading()}}
 async function generateCoverLetters(){if(!currentJobId)return;document.getElementById('btn-cover').disabled=true;showLoading('Generating cover letters...');try{await api('/api/jobs/'+currentJobId+'/cover-letters',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-cover').disabled=false;hideLoading()}}
 function copyTailoredResume(){navigator.clipboard.writeText(document.getElementById('tailored-resume-content').textContent)}
+function renderReadiness(j){
+  const info=document.getElementById('detail-ready-info'),btn=document.getElementById('detail-approve');
+  if(!info||!btn)return;
+  const why=[];
+  if(!j.score||j.score.total<5)why.push('score below 5');
+  if(j.review_status!=='approved')why.push('not approved');
+  if(j.market_lane==='ignore')why.push('ignore lane');
+  if(j.posting_status==='closed')why.push('posting closed');
+  if(!j.has_resume)why.push('no tailored resume');
+  if(!j.has_cover_letters)why.push('no cover letters');
+  if(['applied','interview','offer','rejected','passed'].includes(j.status))why.push('status is '+j.status);
+  info.textContent=j.ready_to_apply?'✓ Ready for JobPilot':'Not ready for JobPilot: '+why.join(', ');
+  info.style.color=j.ready_to_apply?'var(--green)':'';
+  btn.textContent=j.review_status==='approved'?'Approved ✓ (undo)':'Approve for JobPilot';
+  btn.dataset.approved=j.review_status==='approved'?'1':'';}
+async function toggleApproval(){
+  if(!currentJobId)return;
+  const next=document.getElementById('detail-approve').dataset.approved?'pending':'approved';
+  try{await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{review_status:next}})}catch(e){alert(e.message)}
+  await showDetail(currentJobId);}
 function renderResumeLaneSelect(j){
   const el=document.getElementById('detail-resume-lane');if(!el)return;
   const auto=j.resume_lane_auto?resumeLabel(j.resume_lane_auto):'none';

@@ -489,7 +489,9 @@ def run_daily_pipeline(user_id: str) -> dict:
     # intake, re-score). Capped so one run can't spend unbounded credits; the rest wait a day.
     if config.auto_generate_above_threshold:
         try:
-            res = backfill.generate_missing(user_id, config.auto_generate_threshold, BACKFILL_PER_RUN)
+            # With auto-approve on, fill at least as many jobs per night as may be approved per day.
+            per_run = max(BACKFILL_PER_RUN, config.auto_approve_daily_cap) if config.auto_approve_enabled else BACKFILL_PER_RUN
+            res = backfill.generate_missing(user_id, config.auto_generate_threshold, per_run)
             run_log["backfilled"] = res["generated"]
             run_log["errors"].extend(f"Backfill {e}" for e in res["errors"])
             logger.info(f"[{user_id}] Backfilled {len(res['generated'])} resumes, {res['remaining']} remaining")
