@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import os
 import threading
@@ -1920,18 +1921,23 @@ def test_email(user: User = Depends(get_current_user)):
 
 @app.post("/api/config/test-ai-provider")
 def test_ai_provider(tier: str, user: User = Depends(get_current_user)):
-    if tier not in ("fast", "strong"):
-        raise HTTPException(400, "tier must be 'fast' or 'strong'")
+    if tier not in ("fast", "strong", "batch"):
+        raise HTTPException(400, "tier must be 'fast', 'strong' or 'batch'")
     config = storage.load_config(user.id)
+    if tier == "batch" and not (config.batch_ollama_url or "").strip():
+        raise HTTPException(400, "No batch server URL is set. Enter one above to test it.")
     try:
-        reply = ai_router.chat(
-            system="You are a connectivity test.",
-            user_msg="Reply with exactly one word: OK",
-            tier=tier,
-            config=config,
-            max_tokens=10,
-        )
-        return {"success": True, "model": ai_router.get_last_model(tier), "reply": reply.strip()[:200]}
+        # "batch" exercises the batch route (strong-tier call, batch mode) the way a backfill would.
+        with (ai_router.batch_mode() if tier == "batch" else contextlib.nullcontext()):
+            reply = ai_router.chat(
+                system="You are a connectivity test.",
+                user_msg="Reply with exactly one word: OK",
+                tier="strong" if tier == "batch" else tier,
+                config=config,
+                max_tokens=10,
+            )
+        model = ai_router.get_last_model("strong" if tier == "batch" else tier)
+        return {"success": True, "model": model, "reply": reply.strip()[:200]}
     except Exception as e:
         raise HTTPException(400, str(e))
 
