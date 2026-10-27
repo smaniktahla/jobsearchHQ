@@ -404,6 +404,10 @@ class AppConfig(BaseModel):
     posting_check_enabled: bool = True   # nightly open/closed check of tracked job postings
     posting_check_batch: int = 300       # max postings checked per run
     auto_generate_threshold: int = 7  # score >= this triggers resume + cover letters
+    # Approve (=> ready to apply) scored jobs whose resume + cover letters exist. Off by default.
+    auto_approve_enabled: bool = False
+    auto_approve_threshold: int = 9
+    auto_approve_daily_cap: int = 25
     # --- AI Provider ---
     # fast_provider: scoring, metadata, research (cheap/free tasks)
     # strong_provider: resumes, cover letters, LinkedIn messages (quality tasks)

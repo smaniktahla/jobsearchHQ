@@ -27,6 +27,7 @@ import jd_cleanup
 import archiving
 import job_liveness
 import ai_router
+import auto_approve
 import backfill
 from models import AppConfig, JobStatus
 
@@ -495,6 +496,14 @@ def run_daily_pipeline(user_id: str) -> dict:
         except Exception as e:
             logger.error(f"[{user_id}] Resume backfill failed: {e}")
             run_log["errors"].append(f"Backfill: {e}")
+
+    # ── Step 5: Auto-approve jobs whose documents are ready (opt-in) ───────────
+    try:
+        res = auto_approve.run(user_id, config)
+        run_log["auto_approved"] = res["approved"]
+    except Exception as e:
+        logger.error(f"[{user_id}] Auto-approve failed: {e}")
+        run_log["errors"].append(f"Auto-approve: {e}")
 
     run_log["finished_at"] = datetime.now(timezone.utc).isoformat()
     _save_run_log(run_log)

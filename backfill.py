@@ -12,6 +12,7 @@ from pathlib import Path
 import ai_router
 import docx_builder
 import scoring
+import auto_approve
 import storage
 from models import JobStatus, MarketLane
 
@@ -123,6 +124,7 @@ def start_background(user_id: str, threshold: int, limit: int | None = None) -> 
         try:
             with ai_router.batch_mode():
                 generate_missing(user_id, threshold, limit)
+            auto_approve.run(user_id)  # resumes just landed; approve jobs that are now complete
         except Exception as e:
             logger.error(f"[{user_id}] Resume backfill crashed: {e}", exc_info=True)
 
