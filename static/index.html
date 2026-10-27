@@ -631,6 +631,10 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div class="form-group" style="flex:2;min-width:240px"><label>Batch server URL</label><input type="text" id="cfg-batch-url" placeholder="blank = off · e.g. http://10.10.10.105:8081"></div>
         <div class="form-group" style="flex:1;min-width:160px"><label>Batch model</label><input type="text" id="cfg-batch-model" placeholder="same as Ollama model"></div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="testAIProvider('batch')">Test Batch Server</button>
+        <span id="test-batch-provider-status" class="text-sm"></span>
+      </div>
     </div>
     <div class="form-group" style="margin-top:16px;max-width:520px">
       <label>OpenAI-compatible base URL <span style="color:var(--text-dim);font-weight:normal">(optional — only used when a provider is OpenAI)</span></label>
