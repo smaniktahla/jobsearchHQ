@@ -58,6 +58,7 @@ import company_site_search
 import ai_router
 import activity
 import scheduler
+import backfill
 from intake import process_intake
 import jd_cleanup
 import job_liveness
@@ -2318,6 +2319,27 @@ def scheduler_run_now(user: User = Depends(get_current_user)):
         return result
     except Exception as e:
         raise HTTPException(500, f"Pipeline failed: {str(e)}")
+
+
+@app.get("/api/resumes/missing")
+def missing_resumes(threshold: int | None = None, user: User = Depends(get_current_user)):
+    """Scored jobs at/above the threshold (default: the auto-generate threshold) with no tailored resume."""
+    if threshold is None:
+        threshold = storage.load_config(user.id).auto_generate_threshold
+    return backfill.summarize(user.id, threshold)
+
+
+@app.post("/api/resumes/generate-missing")
+async def generate_missing_resumes(request: Request, user: User = Depends(get_current_user)):
+    """Start generating the missing resumes in the background; poll GET /api/resumes/missing."""
+    body = await request.json() if (await request.body()) else {}
+    threshold = int(body.get("threshold") or storage.load_config(user.id).auto_generate_threshold)
+    limit = body.get("limit")
+    try:
+        backfill.start_background(user.id, threshold, int(limit) if limit else None)
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+    return {"started": True, "threshold": threshold}
 
 
 @app.get("/api/scheduler/logs")
