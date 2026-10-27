@@ -590,6 +590,7 @@ _score_task: dict = {
 }
 
 
+@ai_router.batch_mode()
 def _run_score_all(user_id: str):
     import logging
     log = logging.getLogger(__name__)
