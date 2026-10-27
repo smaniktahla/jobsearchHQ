@@ -509,7 +509,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div class="card-header">Auto-Processing Pipeline</div>
     <div class="mt-8" style="display:flex;flex-direction:column;gap:12px">
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
-        <input type="checkbox" id="cfg-auto-score" style="width:auto"> Automatically score new jobs (uses your configured AI provider)
+        <input type="checkbox" id="cfg-auto-score" style="width:auto"> Automatically score new jobs (if you're using a subscription API, this uses API credits)
       </label>
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
         <input type="checkbox" id="cfg-auto-generate" style="width:auto"> Generate resume &amp; cover letters for jobs above threshold
@@ -1859,13 +1859,13 @@ async function stopMissingResumes(){
 async function generateMissingResumes(){
   const r=await api('/api/resumes/missing');
   if(!r.count)return refreshMissingResumes();
-  if(!confirm(`Generate tailored resumes for ${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold}? This runs on your configured local server and can take a long time.`))return;
+  if(!confirm(`Generate tailored resumes for ${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold}? If you're using subscription APIs (Anthropic, Gemini, OpenAI) for this task, you will use API credits. On a local model it costs nothing but can take hours.`))return;
   document.querySelectorAll('.mr-btn').forEach(b=>b.disabled=true);
   try{await api('/api/resumes/generate-missing',{method:'POST',body:{threshold:r.threshold}})}
   catch(e){alert('Could not start: '+e.message)}
   refreshMissingResumes();}
 async function runPipelineNow(){
-  if(!confirm('Run the full search → score → generate pipeline now? This may use significant Claude API credits.'))return;
+  if(!confirm('Run the full search → score → generate pipeline now? If you're using subscription APIs for these tasks, you will use API credits (a full run can use a lot); on a local model it costs nothing.'))return;
   const el=document.getElementById('pipeline-running');
   el.style.display='flex';
   document.getElementById('pipeline-msg').textContent='Running pipeline... this may take several minutes';
