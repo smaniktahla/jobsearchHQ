@@ -18,9 +18,11 @@ web_search_chat() always uses Anthropic — Claude's server_tool_use web_search
 is not available on other providers.
 """
 
+import contextvars
 import logging
 import os
 import re
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +193,32 @@ def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False, ma
     return r.json()["choices"][0]["message"]["content"].strip()
 
 
+# ── Batch routing ──────────────────────────────────────────────────────────────
+
+_in_batch: contextvars.ContextVar[bool] = contextvars.ContextVar("ai_router_batch", default=False)
+
+
+@contextmanager
+def batch_mode():
+    """Mark LLM calls made inside (or in a function decorated with this) as large slow batch work.
+
+    When the user's config sets batch_ollama_url, those calls go to that local server instead of
+    the configured fast/strong provider. Context-local, so set it inside the thread doing the work.
+    """
+    token = _in_batch.set(True)
+    try:
+        yield
+    finally:
+        _in_batch.reset(token)
+
+
+class _BatchTarget:
+    """Config view that points the Ollama call at the batch server."""
+    def __init__(self, config):
+        self.ollama_url = config.batch_ollama_url
+        self.ollama_model = config.batch_ollama_model or config.ollama_model
+
+
 # ── Public interface ───────────────────────────────────────────────────────────
 
 def chat(
@@ -210,6 +238,14 @@ def chat(
     supports it (currently: Ollama). Only pass this when the caller actually
     parses the reply as JSON — it changes the wire format, not just a hint.
     """
+    if _in_batch.get() and (getattr(config, "batch_ollama_url", "") or "").strip():
+        target = _BatchTarget(config)
+        logger.info(f"[ai_router] batch -> {target.ollama_url} {target.ollama_model} | tier={tier}")
+        _last_model_used[tier] = f"ollama/{target.ollama_model} (batch)"
+        # The batch server is typically a busier or slower box: allow a longer budget than interactive.
+        return _ollama_chat(system, user_msg, target, json_mode=json_mode, max_tokens=max_tokens,
+                            timeout=600 if tier == "strong" else 240)
+
     provider = validate_provider(tier, config)
 
     model = _resolve_model(provider, tier, config)

@@ -509,7 +509,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div class="card-header">Auto-Processing Pipeline</div>
     <div class="mt-8" style="display:flex;flex-direction:column;gap:12px">
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
-        <input type="checkbox" id="cfg-auto-score" style="width:auto"> Automatically score new jobs (uses Claude API credits)
+        <input type="checkbox" id="cfg-auto-score" style="width:auto"> Automatically score new jobs (uses your configured AI provider)
       </label>
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
         <input type="checkbox" id="cfg-auto-generate" style="width:auto"> Generate resume &amp; cover letters for jobs above threshold
@@ -622,6 +622,14 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
           <button class="btn btn-primary btn-sm" onclick="testAIProvider('strong')">Test Strong Provider</button>
           <span id="test-strong-provider-status" class="text-sm"></span>
         </div>
+      </div>
+    </div>
+    <div class="card mb-16" style="margin-top:16px">
+      <div class="card-header">Batch jobs (large, slow runs)</div>
+      <div style="font-size:12px;color:var(--text-dim);margin:8px 0 12px">Score-all, the resume backfill and the daily pipeline send their model calls to this local server instead of the Fast/Strong providers above, so a big queue doesn't tie up the server you use interactively. Leave the URL blank to use the providers above for everything.</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div class="form-group" style="flex:2;min-width:240px"><label>Batch server URL</label><input type="text" id="cfg-batch-url" placeholder="blank = off · e.g. http://10.10.10.105:8081"></div>
+        <div class="form-group" style="flex:1;min-width:160px"><label>Batch model</label><input type="text" id="cfg-batch-model" placeholder="same as Ollama model"></div>
       </div>
     </div>
     <div class="form-group" style="margin-top:16px;max-width:520px">
@@ -1575,6 +1583,8 @@ async function loadSettings(){
   document.getElementById('cfg-strong-ollama-url').value=c.ollama_url||'http://10.10.10.226:8642';
   document.getElementById('cfg-strong-ollama-model').value=c.ollama_model||'gemma4';
   document.getElementById('cfg-openai-base-url').value=c.openai_base_url||'';
+  document.getElementById('cfg-batch-url').value=c.batch_ollama_url||'';
+  document.getElementById('cfg-batch-model').value=c.batch_ollama_model||'';
   document.getElementById('cfg-fast-model').value=c.fast_model||'';
   document.getElementById('cfg-strong-model').value=c.strong_model||'';
   updateProviderUI();loadAiHealth();
@@ -1691,6 +1701,8 @@ async function saveConfig(opts){
   ollama_url:document.getElementById('cfg-ollama-url').value||document.getElementById('cfg-strong-ollama-url').value||'http://10.10.10.226:8642',
   ollama_model:document.getElementById('cfg-ollama-model').value||document.getElementById('cfg-strong-ollama-model').value||'gemma4',
   openai_base_url:document.getElementById('cfg-openai-base-url').value.trim(),
+  batch_ollama_url:document.getElementById('cfg-batch-url').value.trim(),
+  batch_ollama_model:document.getElementById('cfg-batch-model').value.trim(),
   fast_model:document.getElementById('cfg-fast-model').value||'',
   strong_model:document.getElementById('cfg-strong-model').value||'',
   author_name:document.getElementById('prof-name').value||'',

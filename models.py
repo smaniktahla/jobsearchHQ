@@ -410,3 +410,7 @@ class AppConfig(BaseModel):
     strong_model: str = ""              # override default strong model
     ollama_url: str = "http://10.10.10.105:11434"
     ollama_model: str = "gemma4:e4b"
+    # Large slow runs (score-all, resume backfill, daily pipeline) go here when batch_ollama_url is
+    # set, so a big queue doesn't occupy the interactive local server. Blank = no split.
+    batch_ollama_url: str = ""
+    batch_ollama_model: str = ""

@@ -26,6 +26,7 @@ import docx_builder
 import jd_cleanup
 import archiving
 import job_liveness
+import ai_router
 import backfill
 from models import AppConfig, JobStatus
 
@@ -301,6 +302,7 @@ def run_pipeline_now(user_id: str) -> dict:
     return run_daily_pipeline(user_id=user_id)
 
 
+@ai_router.batch_mode()
 def run_daily_pipeline(user_id: str) -> dict:
     """
     The main automated pipeline for a single user:
