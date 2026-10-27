@@ -90,6 +90,9 @@ def enrich_job(job: Job) -> dict:
     d["follow_up_due"] = job.follow_up_due
     d["days_since_applied"] = job.days_since_applied
     d["ready_to_apply"] = job.ready_to_apply
+    # Computed here because slim list responses drop cover_letters / tailored_resume.
+    d["has_resume"] = bool(job.tailored_resume_docx) and Path(job.tailored_resume_docx).exists()
+    d["has_cover_letters"] = bool(job.cover_letters)
     return d
 
 
@@ -1043,6 +1046,11 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
             raise HTTPException(400, "resume_lane_override must be blank or one of: " + ", ".join(lanes.LANE_KEYS))
         job.resume_lane_override = data.resume_lane_override
     if data.notes is not None: job.notes = data.notes
+    if data.review_status is not None and data.review_status != job.review_status:
+        job.review_status = data.review_status
+        job.agent_log.append(AgentEvent(
+            event_type=AgentEventType.RESOLVE, success=True,
+            notes=f"review status set to {data.review_status.value} in the UI"))
     if data.status is not None:
         job.update_status(data.status, applied_date=data.applied_at or "")
     elif data.applied_at is not None:

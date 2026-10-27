@@ -271,6 +271,7 @@ class JobUpdate(BaseModel):
     status: Optional[JobStatus] = None
     market_lane: Optional[MarketLane] = None
     resume_lane_override: Optional[str] = None
+    review_status: Optional[ReviewStatus] = None
     gut_interest: Optional[int] = None
     notes: Optional[str] = None
     applied_at: Optional[str] = None
