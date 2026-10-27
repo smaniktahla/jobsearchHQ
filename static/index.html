@@ -255,7 +255,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="card mb-16">
         <div class="flex justify-between items-center">
           <div><div class="text-dim text-sm" id="detail-company"></div><div class="text-dim text-sm" id="detail-meta"></div><div class="text-dim text-sm" id="detail-applied-info"></div></div>
-          <div class="flex gap-8"><select id="detail-status" onchange="updateJobStatus()" style="width:auto"><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select></div>
+          <div class="flex gap-8"><select id="detail-resume-lane" onchange="setResumeLane()" style="width:auto" title="Which resume lane this job uses"></select><select id="detail-status" onchange="updateJobStatus()" style="width:auto"><option value="new">New</option><option value="scored">Scored</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="passed">Passed</option></select></div>
         </div>
       </div>
       <div class="card mb-16" id="score-section" style="display:none"><div class="card-header">Score Breakdown</div><div id="score-breakdown"></div></div>
@@ -405,6 +405,12 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="form-group"><label>Resume 3 (key: contract)</label><input type="text" id="cfg-label-contract" placeholder="Resume 3 — Contract"></div>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="saveConfig()">Save Names</button>
+  </div>
+  <div class="card mb-16">
+    <div class="card-header">Resume Lanes</div>
+    <div class="text-sm mt-8 mb-16" style="color:var(--text-dim)">Each resume is a lane. Describe what kind of job it is for. The scorer puts every job in the lane that fits best, and JobPilot gets that lane's resume: the tailored one if it exists, otherwise your uploaded original. You can override the lane on any job.</div>
+    <div id="resume-lanes-body" class="text-sm">Loading…</div>
+    <div class="flex gap-8 items-center mt-8"><button class="btn btn-ghost btn-sm" onclick="saveResumeLanes()">Save Lane Descriptions</button><span id="resume-lanes-status" class="text-sm"></span></div>
   </div>
   <div class="card mb-16">
     <div class="card-header">Resume Template</div>
@@ -1177,7 +1183,7 @@ async function fuAction(id,a){await api(`/api/jobs/${id}/${a==='done'?'mark-foll
 async function sendDigest(){try{const r=await api('/api/follow-ups/send-digest',{method:'POST'});alert(r.sent?`Sent! (${r.count})`:'No follow-ups due.')}catch(e){alert(e.message)}}
 // Job Detail
 async function showDetail(id){currentJobId=id;const j=await api('/api/jobs/'+id);currentJob=j;showView('detail');
-document.getElementById('detail-title').textContent=j.title||'(Untitled)';renderDetailPosting(j);document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;document.getElementById('detail-jd').textContent=j.raw_jd;
+document.getElementById('detail-title').textContent=j.title||'(Untitled)';renderDetailPosting(j);document.getElementById('detail-company').textContent=j.company||'';const metaParts=[j.pay_range,j.source].filter(Boolean);if(j.url){metaParts.push(`<a href="${j.url.startsWith('http')?esc(j.url):'https://'+esc(j.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(j.url)}</a>`)}document.getElementById('detail-meta').innerHTML=metaParts.join(' · ');document.getElementById('detail-status').value=j.status;renderResumeLaneSelect(j);document.getElementById('detail-jd').textContent=j.raw_jd;
 renderResearch(j.research);
 const ai=document.getElementById('detail-applied-info');
 const appliedBtn=document.getElementById('btn-applied');
@@ -1187,7 +1193,7 @@ if(j.applied_at){const d=j.days_since_applied||0;ai.innerHTML=`Applied ${new Dat
 const fu=document.getElementById('detail-followup-card');const showFu=j.follow_up_due||(j.follow_up?.due_at&&(j.status==='applied'||j.status==='interview'));fu.style.display=showFu?'block':'none';if(showFu){fu.className='card mb-16 follow-up-card'+(j.follow_up_due?' overdue':'');const dd=j.follow_up?.due_at?new Date(j.follow_up.due_at).toLocaleDateString():'Not set';document.getElementById('detail-followup-info').innerHTML=j.follow_up_due?`<span style="color:var(--red)">⚠ Overdue!</span> Due: ${dd}`:`Next: ${dd}`;
 const ci=document.getElementById('detail-contact-info');if(j.follow_up?.contact_email||j.follow_up?.contact_name||j.follow_up?.extracted_emails?.length){let cih=`<div class="contact-info">`;if(j.follow_up.contact_name||j.follow_up.contact_email){cih+=`<strong>Contact:</strong> ${esc(j.follow_up.contact_name||'')} ${j.follow_up.contact_email?`&lt;${esc(j.follow_up.contact_email)}&gt;`:''}${j.follow_up.contact_phone?` · ${esc(j.follow_up.contact_phone)}`:''}<br>`}if(j.follow_up.notes)cih+=`<em>${esc(j.follow_up.notes)}</em><br>`;if(j.follow_up.extracted_emails?.length)cih+=`<div class="mt-8" style="font-size:11px"><strong>Emails:</strong> ${j.follow_up.extracted_emails.map(e=>`<button class="btn btn-ghost btn-sm" onclick="setContactEmail('${esc(e)}')" style="font-size:10px;padding:2px 6px">${esc(e)}</button>`).join(' ')}</div>`;if(j.follow_up.extracted_links?.length)cih+=`<div class="mt-8" style="font-size:11px"><strong>Links:</strong> ${j.follow_up.extracted_links.map(u=>`<a href="${u.startsWith('http')?esc(u):'https://'+esc(u)}" target="_blank" style="color:var(--accent);font-size:10px;margin-right:8px">${esc(u)}</a>`).join('')}</div>`;cih+='</div>';ci.innerHTML=cih}else ci.innerHTML=''}
 const hs=!!j.score;['score-section','score-summary','gut-section','flags-section'].forEach(id=>document.getElementById(id).style.display=hs?'block':'none');document.getElementById('btn-cover').disabled=!hs;document.getElementById('btn-resume').disabled=!hs;document.getElementById('btn-email').disabled=!(hs||j.cover_letters?.length);document.getElementById('btn-score').textContent=hs?'Re-Score':'Score This Job';
-if(hs){const s=j.score;const cls=s.total>=8?'score-high':s.total>=5?'score-mid':'score-low';document.getElementById('score-total').className='score-big '+cls;document.getElementById('score-total').textContent=s.total+'/10';document.getElementById('score-lane-badge').className='badge badge-'+(s.recommended_lane==='w2_sniper'?'w2':s.recommended_lane==='contract_to_hire'?'c2h':s.recommended_lane);document.getElementById('score-lane-badge').textContent=laneLabel(s.recommended_lane);document.getElementById('score-resume-badge').className='badge badge-scored';document.getElementById('score-resume-badge').textContent='→ '+resumeLabel(s.recommended_resume);document.getElementById('score-analysis').textContent=s.raw_analysis;document.getElementById('score-breakdown').innerHTML=[scoreBar('Skills',s.skills_match,4,s.skills_rationale),scoreBar('Scope',s.scope_impact,3,s.scope_rationale),scoreBar('Pay',s.pay_alignment,2,s.pay_rationale),scoreBar('Gut',s.gut_interest,1,'Your assessment')].join('');document.getElementById('gut-0').className=s.gut_interest===0?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';document.getElementById('gut-1').className=s.gut_interest===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';let fh='';if(s.bullshit_flag)fh+=`<div style="color:var(--red);margin:8px 0">⚠ ${esc(s.bullshit_reason)}</div>`;if(s.red_flags?.length)fh+=`<div class="mt-8"><strong>Red Flags:</strong><ul style="margin:4px 0 0 16px">${s.red_flags.map(f=>`<li class="text-sm">${esc(f)}</li>`).join('')}</ul></div>`;if(s.keyword_gaps?.length)fh+=`<div class="mt-8"><strong>Gaps:</strong><ul style="margin:4px 0 0 16px">${s.keyword_gaps.map(g=>`<li class="text-sm">${esc(g)}</li>`).join('')}</ul></div>`;document.getElementById('flags-content').innerHTML=fh||'<p class="text-dim text-sm">None</p>'}
+if(hs){const s=j.score;const cls=s.total>=8?'score-high':s.total>=5?'score-mid':'score-low';document.getElementById('score-total').className='score-big '+cls;document.getElementById('score-total').textContent=s.total+'/10';document.getElementById('score-lane-badge').className='badge badge-'+(s.recommended_lane==='w2_sniper'?'w2':s.recommended_lane==='contract_to_hire'?'c2h':s.recommended_lane);document.getElementById('score-lane-badge').textContent=laneLabel(s.recommended_lane);document.getElementById('score-resume-badge').className='badge badge-scored';document.getElementById('score-resume-badge').textContent='→ '+resumeLabel(j.resume_lane||s.recommended_resume);document.getElementById('score-analysis').textContent=s.raw_analysis;document.getElementById('score-breakdown').innerHTML=[scoreBar('Skills',s.skills_match,4,s.skills_rationale),scoreBar('Scope',s.scope_impact,3,s.scope_rationale),scoreBar('Pay',s.pay_alignment,2,s.pay_rationale),scoreBar('Gut',s.gut_interest,1,'Your assessment')].join('');document.getElementById('gut-0').className=s.gut_interest===0?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';document.getElementById('gut-1').className=s.gut_interest===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';let fh='';if(s.bullshit_flag)fh+=`<div style="color:var(--red);margin:8px 0">⚠ ${esc(s.bullshit_reason)}</div>`;if(s.red_flags?.length)fh+=`<div class="mt-8"><strong>Red Flags:</strong><ul style="margin:4px 0 0 16px">${s.red_flags.map(f=>`<li class="text-sm">${esc(f)}</li>`).join('')}</ul></div>`;if(s.keyword_gaps?.length)fh+=`<div class="mt-8"><strong>Gaps:</strong><ul style="margin:4px 0 0 16px">${s.keyword_gaps.map(g=>`<li class="text-sm">${esc(g)}</li>`).join('')}</ul></div>`;document.getElementById('flags-content').innerHTML=fh||'<p class="text-dim text-sm">None</p>'}
 const hr=!!j.tailored_resume;document.getElementById('tailored-resume-section').style.display=hr?'block':'none';if(hr){document.getElementById('tailored-resume-content').textContent=j.tailored_resume;const dl=document.getElementById('docx-download-link');if(j.tailored_resume_docx){dl.style.display='inline-flex';dl.href=`/api/jobs/${j.id}/download-resume`}else dl.style.display='none'}
 const hc=j.cover_letters?.length>0;document.getElementById('cover-letters-section').style.display=hc?'block':'none';if(hc)document.getElementById('cover-letters-content').innerHTML=j.cover_letters.map(cl=>`<div class="cl-variant-label mt-16">${esc(cl.variant)}</div><div class="cover-letter">${esc(cl.content)}</div><div class="flex gap-8">${cl.docx_path?`<a href="/api/jobs/${j.id}/cover-letters/${cl.id}/download" class="btn btn-success btn-sm" style="text-decoration:none" download>Download .docx</a>`:''}<button class="btn btn-ghost btn-sm" onclick="copyText(this,\`${escAttr(cl.content)}\`)">Copy</button></div>`).join('');
 const he=j.emails?.length>0;document.getElementById('email-history-section').style.display=he?'block':'none';if(he)document.getElementById('email-history-content').innerHTML=j.emails.map(e=>`<div style="border-left:2px solid ${e.direction==='sent'?'var(--accent)':'var(--green)'};padding:8px 12px;margin:8px 0"><div class="text-sm"><strong>${e.direction==='sent'?'Sent':'Received'}</strong> · ${new Date(e.sent_at).toLocaleDateString()}</div><div class="text-dim text-sm">${e.subject?esc(e.subject):''}</div></div>`).join('')}
@@ -1232,6 +1238,30 @@ async function scoreCurrentJob(){
 async function generateTailoredResume(){if(!currentJobId)return;document.getElementById('btn-resume').disabled=true;showLoading('Generating tailored resume + .docx...');try{await api('/api/jobs/'+currentJobId+'/tailored-resume',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-resume').disabled=false;hideLoading()}}
 async function generateCoverLetters(){if(!currentJobId)return;document.getElementById('btn-cover').disabled=true;showLoading('Generating cover letters...');try{await api('/api/jobs/'+currentJobId+'/cover-letters',{method:'POST'});await showDetail(currentJobId)}catch(e){alert(e.message)}finally{document.getElementById('btn-cover').disabled=false;hideLoading()}}
 function copyTailoredResume(){navigator.clipboard.writeText(document.getElementById('tailored-resume-content').textContent)}
+function renderResumeLaneSelect(j){
+  const el=document.getElementById('detail-resume-lane');if(!el)return;
+  const auto=j.resume_lane_auto?resumeLabel(j.resume_lane_auto):'none';
+  el.innerHTML=`<option value="">Lane: auto (${esc(auto)})</option>`+['director','base','contract'].map(k=>`<option value="${k}">${esc(resumeLabel(k))}</option>`).join('');
+  el.value=j.resume_lane_override||''}
+async function setResumeLane(){
+  if(!currentJobId)return;
+  try{await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{resume_lane_override:document.getElementById('detail-resume-lane').value}})}
+  catch(e){alert('Could not set the lane: '+e.message)}
+  await showDetail(currentJobId)}
+async function loadResumeLanes(){
+  const body=document.getElementById('resume-lanes-body');if(!body)return;
+  try{
+    const r=await api('/api/resume-lanes');
+    body.innerHTML=r.lanes.map(l=>`<div class="form-group" style="margin-bottom:14px">
+      <label><strong>${esc(l.label)}</strong> <span class="text-dim">· key ${esc(l.key)} · ${l.loaded?`${l.jobs} job${l.jobs===1?'':'s'}${l.has_original?' · original .docx stored':''}`:'no resume uploaded yet (this lane is not used)'}</span></label>
+      <textarea id="lane-desc-${l.key}" rows="2" placeholder="${esc(l.default_description)}">${esc(l.description===l.default_description?'':l.description)}</textarea></div>`).join('')
+      +(r.unassigned?`<div class="text-dim">${r.unassigned} job${r.unassigned===1?'':'s'} have no lane (no resume uploaded or ignored).</div>`:'');
+  }catch(e){body.textContent='Could not load lanes: '+e.message}}
+async function saveResumeLanes(){
+  const st=document.getElementById('resume-lanes-status');st.textContent='Saving…';st.style.color='var(--text-dim)';
+  const descriptions={};['director','base','contract'].forEach(k=>{const el=document.getElementById('lane-desc-'+k);if(el)descriptions[k]=el.value});
+  try{await api('/api/resume-lanes',{method:'PUT',body:{descriptions}});st.textContent='✓ Saved. New scores use these descriptions; existing jobs keep their lane until re-scored.';st.style.color='var(--green)';loadResumeLanes()}
+  catch(e){st.textContent='✕ '+e.message;st.style.color='var(--red)'}}
 async function updateJobStatus(){if(!currentJobId)return;await api('/api/jobs/'+currentJobId,{method:'PATCH',body:{status:document.getElementById('detail-status').value}});await showDetail(currentJobId)}
 async function refreshCurrentJobFromUrl(){
   if(!currentJobId)return;
@@ -1597,6 +1627,7 @@ async function loadSettings(){
   refreshMissingResumes();
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
   loadResumeTemplate();
+  loadResumeLanes();
   await renderResumeStatus();
   refreshSchedulerStatus()
 }

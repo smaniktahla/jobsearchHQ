@@ -147,6 +147,7 @@ class Job(BaseModel):
     raw_jd: str = ""
     pay_range: str = ""
     market_lane: MarketLane = MarketLane.CONTRACT
+    resume_lane_override: str = ""   # manual resume lane (director/base/contract); blank = use the scorer's
     status: JobStatus = JobStatus.NEW
     score: Optional[ScoreBreakdown] = None
     cover_letters: list[CoverLetter] = []
@@ -265,6 +266,7 @@ class JobUpdate(BaseModel):
     pay_range: Optional[str] = None
     status: Optional[JobStatus] = None
     market_lane: Optional[MarketLane] = None
+    resume_lane_override: Optional[str] = None
     gut_interest: Optional[int] = None
     notes: Optional[str] = None
     applied_at: Optional[str] = None
@@ -356,6 +358,8 @@ class AppConfig(BaseModel):
         "base": "Resume 2 — Base",
         "contract": "Resume 3 — Contract",
     }
+    # What each resume lane is for (see lanes.py); blank entries fall back to the built-in descriptions.
+    resume_lane_descriptions: dict[str, str] = {}
     deal_breakers: list[str] = [
         "must relocate",
         "on-site only outside DC metro",
