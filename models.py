@@ -3,6 +3,7 @@ from typing import Optional
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 import uuid
+from pathlib import Path
 
 
 def _aware(dt: datetime) -> datetime:
@@ -232,6 +233,9 @@ class Job(BaseModel):
                 JobStatus.APPLIED, JobStatus.INTERVIEW,
                 JobStatus.OFFER, JobStatus.REJECTED, JobStatus.PASSED
             )
+            # Last, so the disk check only runs for jobs that pass everything else: a recorded path
+            # whose file is gone (moved/deleted) doesn't count as having a tailored resume.
+            and Path(self.tailored_resume_docx).exists()
         )
 
 

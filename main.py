@@ -1462,7 +1462,7 @@ def get_job_package(job_id: str, request: Request):
     if not job:
         raise HTTPException(404, "Job not found")
     base = f"/api/agent/jobs/{job_id}"
-    choice = _agent_resume_choice(admin_id, job, render=False)
+    choice = _agent_resume_choice(admin_id, job)
     return {
         "job": {
             "id": job.id,
@@ -1542,30 +1542,19 @@ def agent_trigger_job_research(job_id: str, request: Request):
     return {"job_id": job_id, "researched": True}
 
 
-def _agent_resume_choice(admin_id: str, job: Job, render: bool) -> dict:
-    """Pick the resume for a job: the tailored one, else the job's lane's uploaded original, else a
-    .docx rendered from the lane's text. With render=False only reports which would be used."""
+def _agent_resume_choice(admin_id: str, job: Job) -> dict:
+    """The resume JobPilot gets for a job: its tailored resume, or nothing. A job with no tailored resume
+    is not ready to apply (Job.ready_to_apply), so there is deliberately no fallback to an untailored one."""
     config = storage.load_config(admin_id)
     lane, lane_source = lanes.resolve(job, admin_id)
-    out = {"lane": lane, "lane_label": lanes.label(config, lane) if lane else "", "lane_source": lane_source,
-           "source": "none", "path": None}
-    if job.tailored_resume_docx and Path(job.tailored_resume_docx).exists():
-        out.update(source="tailored", path=job.tailored_resume_docx)
-    elif lane:
-        original = storage.load_resume_original(admin_id, lane)
-        if original:
-            out.update(source="lane_original", path=str(original[0]))
-        elif storage.load_resume_text(admin_id, lane):
-            out["source"] = "lane_text"
-            if render:
-                out["path"] = docx_builder.generate_resume_docx(
-                    storage.load_resume_text(admin_id, lane), job.id, admin_id, job.company, job.title)
-    return out
+    has = bool(job.tailored_resume_docx) and Path(job.tailored_resume_docx).exists()
+    return {"lane": lane, "lane_label": lanes.label(config, lane) if lane else "", "lane_source": lane_source,
+            "source": "tailored" if has else "none", "path": job.tailored_resume_docx if has else None}
 
 
 @app.get("/api/agent/jobs/{job_id}/resume")
 def agent_get_job_resume(job_id: str, request: Request):
-    """Which resume JobPilot will get for this job and why (lane, and whether it is tailored)."""
+    """The job's resume lane (which uploaded resume its tailored resume is built from) and whether a tailored resume exists."""
     key = request.headers.get("X-API-Key", "")
     if not key or not verify_agent_api_key(key):
         raise HTTPException(401, "Invalid or missing API key")
@@ -1573,19 +1562,18 @@ def agent_get_job_resume(job_id: str, request: Request):
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    choice = _agent_resume_choice(admin_id, job, render=False)
+    choice = _agent_resume_choice(admin_id, job)
     return {
         "job_id": job_id, "lane": choice["lane"], "lane_label": choice["lane_label"],
         "lane_source": choice["lane_source"], "resume_source": choice["source"],
-        "available": choice["source"] != "none",
+        "available": choice["source"] == "tailored",
         "download": f"/api/agent/jobs/{job_id}/resume/download",
     }
 
 
 @app.get("/api/agent/jobs/{job_id}/resume/download")
 def download_agent_resume(job_id: str, request: Request):
-    """Download the resume .docx for a job. Called by dispatch.js. Tailored if one exists, otherwise the
-    job's lane's uploaded resume (X-Resume-Source says which)."""
+    """Download the tailored resume .docx for a job. Called by dispatch.js. 404 if the job has none."""
     key = request.headers.get("X-API-Key", "")
     if not key or not verify_agent_api_key(key):
         raise HTTPException(401, "Invalid or missing API key")
@@ -1593,9 +1581,9 @@ def download_agent_resume(job_id: str, request: Request):
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    choice = _agent_resume_choice(admin_id, job, render=True)
+    choice = _agent_resume_choice(admin_id, job)
     if not choice["path"]:
-        raise HTTPException(404, "No resume available: nothing tailored for this job and no resume uploaded for its lane")
+        raise HTTPException(404, "No tailored resume found for this job")
     return FileResponse(
         choice["path"], filename=f"resume_{job.company}_{job.id}.docx",
         headers={"X-Resume-Lane": choice["lane"], "X-Resume-Source": choice["source"]},
