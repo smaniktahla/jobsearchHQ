@@ -26,6 +26,7 @@ import docx_builder
 import jd_cleanup
 import archiving
 import job_liveness
+import backfill
 from models import AppConfig, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,9 @@ _STATE_TIMEZONES = {
 }
 
 DEFAULT_TIMEZONE = "America/New_York"
+
+
+BACKFILL_PER_RUN = 10  # max backfilled resumes per daily pipeline run
 
 
 def effective_timezone(config: AppConfig) -> str:
@@ -476,6 +480,19 @@ def run_daily_pipeline(user_id: str) -> dict:
                 )
                 job_label = f"{job.company} - {job.title}" if job else job_id
                 run_log["errors"].append(f"Generate {job_id} ({job_label}): {str(e)}")
+
+    # ── Step 4: Backfill resumes for scored jobs that missed step 3 ────────────
+    # Step 3 only sees jobs created in this run; this catches jobs scored later (manual add,
+    # intake, re-score). Capped so one run can't spend unbounded credits; the rest wait a day.
+    if config.auto_generate_above_threshold:
+        try:
+            res = backfill.generate_missing(user_id, config.auto_generate_threshold, BACKFILL_PER_RUN)
+            run_log["backfilled"] = res["generated"]
+            run_log["errors"].extend(f"Backfill {e}" for e in res["errors"])
+            logger.info(f"[{user_id}] Backfilled {len(res['generated'])} resumes, {res['remaining']} remaining")
+        except Exception as e:
+            logger.error(f"[{user_id}] Resume backfill failed: {e}")
+            run_log["errors"].append(f"Backfill: {e}")
 
     run_log["finished_at"] = datetime.now(timezone.utc).isoformat()
     _save_run_log(run_log)

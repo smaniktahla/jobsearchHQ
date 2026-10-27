@@ -519,6 +519,11 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <input type="number" id="cfg-auto-threshold" value="7" min="1" max="10" style="width:80px">
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Jobs scoring at or above this get auto-generated resume + 3 cover letter variants</div>
       </div>
+      <div style="margin-left:28px;font-size:13px">
+        <div id="missing-resumes-msg" class="text-dim">Checking for scored jobs without a tailored resume…</div>
+        <button class="btn btn-ghost btn-sm" id="missing-resumes-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Resumes only, using the saved threshold. The daily pipeline also backfills up to 10 a day when auto-generate is on.</div>
+      </div>
     </div>
   </div>
   <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
@@ -796,7 +801,7 @@ function closeSidebar(){document.getElementById('sidebar')?.classList.remove('op
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
 async function _api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(res.status===503){window.location.href='/setup';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
 let _inflight=0,_topTimer=null;
-const _QUIET=/\/status(\?|$)|^\/api\/activity/;
+const _QUIET=/\/status(\?|$)|^\/api\/activity|^\/api\/resumes\/missing/;
 async function api(path,opts){const q=_QUIET.test(path);if(!q)_busyBar(1);try{return await _api(path,opts)}finally{if(!q)_busyBar(-1)}}
 function _busyBar(d){_inflight+=d;const b=document.getElementById('topbar');if(_inflight>0){if(!_topTimer)_topTimer=setTimeout(()=>b.classList.add('on'),150)}else{_inflight=0;clearTimeout(_topTimer);_topTimer=null;b.classList.remove('on')}}
 function skelRows(n){return Array.from({length:n},()=>'<div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>').join('')}
@@ -1574,6 +1579,7 @@ async function loadSettings(){
   updateProviderUI();loadAiHealth();
   document.getElementById('cfg-auto-generate').checked=!!c.auto_generate_above_threshold;
   document.getElementById('cfg-auto-threshold').value=c.auto_generate_threshold||7;
+  refreshMissingResumes();
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
   loadResumeTemplate();
   await renderResumeStatus();
@@ -1804,6 +1810,34 @@ async function refreshSchedulerStatus(){
     parts.push(`Boards: ${(s.search_sites||[]).join(', ')}`);
     el.innerHTML=parts.join('<br>');
   }catch(e){document.getElementById('scheduler-status').textContent='Failed to load status'}}
+let _missingTimer=null;
+async function refreshMissingResumes(){
+  const msg=document.getElementById('missing-resumes-msg'),btn=document.getElementById('missing-resumes-btn');
+  if(!msg)return;
+  try{
+    const r=await api('/api/resumes/missing');
+    const run=r.run||{};
+    if(run.running){
+      msg.textContent=`Generating resumes… ${run.done||0} of ${run.total||0} done`;
+      btn.disabled=true;
+      if(!_missingTimer)_missingTimer=setInterval(refreshMissingResumes,4000);
+      return;
+    }
+    if(_missingTimer){clearInterval(_missingTimer);_missingTimer=null;
+      if(run.finished_at)msg.dataset.last=`Last run: ${run.generated||0} generated, ${(run.errors||[]).length} failed.`;}
+    const last=msg.dataset.last?' '+msg.dataset.last:'';
+    msg.textContent=(r.count?`${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold} ha${r.count>1?'ve':'s'} no tailored resume.`:`Every job scoring ≥ ${r.threshold} has a tailored resume.`)+last;
+    btn.disabled=!r.count;
+  }catch(e){msg.textContent='Could not check for missing resumes: '+e.message}}
+async function generateMissingResumes(){
+  const btn=document.getElementById('missing-resumes-btn');
+  const r=await api('/api/resumes/missing');
+  if(!r.count)return refreshMissingResumes();
+  if(!confirm(`Generate tailored resumes for ${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold}? This uses Claude API credits.`))return;
+  btn.disabled=true;
+  try{await api('/api/resumes/generate-missing',{method:'POST',body:{threshold:r.threshold}})}
+  catch(e){alert('Could not start: '+e.message)}
+  refreshMissingResumes();}
 async function runPipelineNow(){
   if(!confirm('Run the full search → score → generate pipeline now? This may use significant Claude API credits.'))return;
   const el=document.getElementById('pipeline-running');
