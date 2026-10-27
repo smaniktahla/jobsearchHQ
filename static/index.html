@@ -1865,7 +1865,7 @@ async function generateMissingResumes(){
   catch(e){alert('Could not start: '+e.message)}
   refreshMissingResumes();}
 async function runPipelineNow(){
-  if(!confirm('Run the full search → score → generate pipeline now? If you're using subscription APIs for these tasks, you will use API credits (a full run can use a lot); on a local model it costs nothing.'))return;
+  if(!confirm('Run the full search → score → generate pipeline now? If you are using subscription APIs for these tasks, you will use API credits (a full run can use a lot); on a local model it costs nothing.'))return;
   const el=document.getElementById('pipeline-running');
   el.style.display='flex';
   document.getElementById('pipeline-msg').textContent='Running pipeline... this may take several minutes';
