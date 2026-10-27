@@ -533,8 +533,8 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Sets the job to Approved, which makes it ready to apply. Ignore-lane, closed and already-decided jobs are skipped; reject a job to keep it out. You get one summary email per run.</div>
       </div>
       <div style="margin-left:28px;font-size:13px">
-        <div class="mr-msg text-dim">Checking for scored jobs without a tailored resume…</div>
-        <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
+        <div class="mr-msg text-dim">Checking for scored jobs missing a tailored resume or cover letters…</div>
+        <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes &amp; cover letters</button>
         <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px" onclick="stopMissingResumes()" disabled>Stop</button>
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Resumes only, using the saved threshold. The daily pipeline also backfills up to 10 a day when auto-generate is on.</div>
       </div>
@@ -649,8 +649,8 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <span id="test-batch-provider-status" class="text-sm"></span>
       </div>
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a3a);font-size:13px">
-        <div class="mr-msg text-dim">Checking for scored jobs without a tailored resume…</div>
-        <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
+        <div class="mr-msg text-dim">Checking for scored jobs missing a tailored resume or cover letters…</div>
+        <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes &amp; cover letters</button>
         <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px" onclick="stopMissingResumes()" disabled>Stop</button>
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Same backfill as under Auto-Processing: resumes for jobs at or above the saved score threshold. It runs on the batch server when one is set.</div>
       </div>
@@ -1888,14 +1888,14 @@ async function refreshMissingResumes(){
     const r=await api('/api/resumes/missing');
     const run=r.run||{};
     if(run.running){
-      show(run.cancelling?`Stopping after the current resume… ${run.done||0} of ${run.total||0} done`:`Generating resumes… ${run.done||0} of ${run.total||0} done`,true,true,run.cancelling);
+      show(run.cancelling?`Stopping after the current job… ${run.done||0} of ${run.total||0} done`:`Generating resumes & cover letters… ${run.done||0} of ${run.total||0} done`,true,true,run.cancelling);
       if(!_missingTimer)_missingTimer=setInterval(refreshMissingResumes,4000);
       return;
     }
     if(_missingTimer){clearInterval(_missingTimer);_missingTimer=null;
       if(run.finished_at)_missingLast=`Last run${run.cancelled?' (stopped)':''}: ${run.generated||0} generated, ${(run.errors||[]).length} failed.`;}
     const last=_missingLast?' '+_missingLast:'';
-    show((r.count?`${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold} ha${r.count>1?'ve':'s'} no tailored resume.`:`Every job scoring ≥ ${r.threshold} has a tailored resume.`)+last,!r.count,false);
+    show((r.count?`${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold} need documents: ${r.missing_resumes} missing a tailored resume, ${r.missing_letters} missing cover letters.`:`Every job scoring ≥ ${r.threshold} has a tailored resume and cover letters.`)+last,!r.count,false);
   }catch(e){msgs.forEach(m=>m.textContent='Could not check for missing resumes: '+e.message)}}
 async function stopMissingResumes(){
   try{await api('/api/resumes/cancel-generate',{method:'POST'})}catch(e){alert('Could not stop: '+e.message)}
@@ -1903,7 +1903,7 @@ async function stopMissingResumes(){
 async function generateMissingResumes(){
   const r=await api('/api/resumes/missing');
   if(!r.count)return refreshMissingResumes();
-  if(!confirm(`Generate tailored resumes for ${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold}? If you're using subscription APIs (Anthropic, Gemini, OpenAI) for this task, you will use API credits. On a local model it costs nothing but can take hours.`))return;
+  if(!confirm(`Generate ${r.missing_resumes} tailored resume${r.missing_resumes==1?'':'s'} and cover letters for ${r.missing_letters} job${r.missing_letters==1?'':'s'} scoring ≥ ${r.threshold}? If you're using subscription APIs (Anthropic, Gemini, OpenAI) for this task, you will use API credits. On a local model it costs nothing but can take hours.`))return;
   document.querySelectorAll('.mr-btn').forEach(b=>b.disabled=true);
   try{await api('/api/resumes/generate-missing',{method:'POST',body:{threshold:r.threshold}})}
   catch(e){alert('Could not start: '+e.message)}

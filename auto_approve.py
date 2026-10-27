@@ -44,7 +44,7 @@ def _approved_last_24h(jobs) -> int:
     return n
 
 
-def run(user_id: str, config: AppConfig | None = None) -> dict:
+def run(user_id: str, config: AppConfig | None = None, notify: bool = True) -> dict:
     """Approve eligible jobs (best score first) up to the daily cap.
 
     Returns {"approved": [...], "waiting": n, "enabled": bool}.
@@ -70,14 +70,15 @@ def run(user_id: str, config: AppConfig | None = None) -> dict:
         storage.save_job(user_id, job)
         approved.append({"id": job.id, "company": job.company, "title": job.title, "total": job.score.total})
     waiting = len(eligible) - len(approved)
-    if approved:
-        _notify(config, approved, waiting, threshold)
+    if approved and notify:
+        send_summary(config, approved, waiting)
     logger.info(f"[{user_id}] Auto-approved {len(approved)} jobs, {waiting} waiting")
     return {"approved": approved, "waiting": waiting, "enabled": True}
 
 
-def _notify(config: AppConfig, approved: list[dict], waiting: int, threshold: int) -> None:
+def send_summary(config: AppConfig, approved: list[dict], waiting: int) -> None:
     """One summary email per run listing what JobPilot may now apply to."""
+    threshold = config.auto_approve_threshold
     if not (config.smtp_user and config.smtp_password and config.author_email):
         return
     try:
