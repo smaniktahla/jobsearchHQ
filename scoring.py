@@ -15,6 +15,7 @@ import os
 import httpx
 import anthropic
 from models import Job, ScoreBreakdown, CoverLetter, MarketLane, AppConfig
+import lanes
 import storage
 import ai_router
 
@@ -157,11 +158,7 @@ LANE ASSIGNMENT:
 - Contract-to-hire roles → "contract_to_hire"
 - Total <5 → "ignore"
 
-RESUME RECOMMENDATION:
-- w2_sniper lane → "director" (leadership + architecture angle)
-- contract lane → "contract" (keyword-heavy, fast to skim)
-- contract_to_hire → "base" (general purpose)
-- ignore → "none"
+{resume_lanes}
 
 BULLSHIT FLAG: Set to true if the JD is vague, has MLM/pyramid indicators, unrealistic requirements, or obvious red flags (e.g., "entry level" requiring 15 years experience, unpaid, commission-only).
 
@@ -176,7 +173,7 @@ You MUST respond with ONLY valid JSON matching this exact structure (no markdown
   "scope_rationale": "string - 1-2 sentences explaining scope score",
   "pay_rationale": "string - 1 sentence explaining pay score",
   "raw_analysis": "string - 2-3 sentence overall assessment",
-  "recommended_resume": "director|base|contract|none",
+  "recommended_resume": "{lane_keys}",
   "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
   "keyword_gaps": ["skill1", "skill2"],
   "red_flags": ["flag1"],
@@ -193,7 +190,10 @@ def score_job(job: Job, user_id: str = None) -> ScoreBreakdown:
     if not full_history:
         full_history = "(No full employment history loaded. Score based on JD quality only.)"
 
+    lane_list = lanes.available(user_id, config)
     system = SCORING_SYSTEM_PROMPT.format(
+        resume_lanes=lanes.prompt_block(lane_list),
+        lane_keys=lanes.keys_for_schema(lane_list),
         full_history=full_history,
         w2_min=config.w2_salary_min,
         w2_max=config.w2_salary_max,
@@ -217,14 +217,14 @@ IMPORTANT: Respond with ONLY valid JSON using EXACTLY these keys and value types
   "scope_rationale": "<string>",
   "pay_rationale": "<string>",
   "raw_analysis": "<string>",
-  "recommended_resume": "director|base|contract|none",
+  "recommended_resume": "{lane_keys}",
   "recommended_lane": "w2_sniper|contract|contract_to_hire|ignore",
   "keyword_gaps": ["<string>", ...],
   "red_flags": ["<string>", ...],
   "bullshit_flag": <true/false>,
   "bullshit_reason": "<string>"
 }
-No markdown. No explanation. No extra keys. ONLY the JSON object."""
+No markdown. No explanation. No extra keys. ONLY the JSON object.""".replace("{lane_keys}", lanes.keys_for_schema(lane_list))
 
     # Always route through ai_router — handles anthropic/gemini/openai/ollama
     provider = getattr(config, "fast_provider", "unknown")
@@ -292,7 +292,7 @@ No markdown. No explanation. No extra keys. ONLY the JSON object."""
         red_flags=data.get("red_flags", []),
         bullshit_flag=bool(data.get("bullshit_flag", False)),
         bullshit_reason=str(data.get("bullshit_reason", "")),
-        recommended_resume=str(data.get("recommended_resume", "none")),
+        recommended_resume=lanes.coerce(data.get("recommended_resume"), lane_list, lane),
         recommended_lane=lane,
         raw_analysis=str(data.get("raw_analysis", "")),
     )
@@ -374,7 +374,7 @@ def generate_cover_letters(job: Job, user_id: str = None) -> list[CoverLetter]:
     """Generate 3 cover letter variants for a scored job."""
     config = storage.load_config(user_id) if user_id else AppConfig()
 
-    resume_variant = job.score.recommended_resume if job.score else "base"
+    resume_variant = (lanes.resolve(job, user_id)[0] if user_id else "") or "base"
     resume_text = storage.load_resume_text(user_id, resume_variant)
     if not resume_text:
         resume_text = storage.load_resume_text(user_id, "base")
@@ -444,7 +444,7 @@ def generate_tailored_resume(job: Job, user_id: str = None) -> str:
     """Generate a resume tailored to a specific job description."""
     config = storage.load_config(user_id) if user_id else AppConfig()
 
-    resume_variant = job.score.recommended_resume if job.score else "base"
+    resume_variant = (lanes.resolve(job, user_id)[0] if user_id else "") or "base"
     resume_text = storage.load_resume_text(user_id, resume_variant)
     if not resume_text:
         resume_text = storage.load_resume_text(user_id, "base")

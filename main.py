@@ -57,6 +57,7 @@ import archiving
 import company_research
 import company_site_search
 import ai_router
+import lanes
 import activity
 import scheduler
 import backfill
@@ -503,7 +504,60 @@ def get_job(job_id: str, user: User = Depends(get_current_user)):
     job = storage.load_job(user.id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    return enrich_job(job)
+    d = enrich_job(job)
+    d.update(_lane_info(job, user.id))
+    return d
+
+
+def _lane_info(job: Job, user_id: str, config=None) -> dict:
+    """Effective resume lane for a job, plus what the scorer alone would pick (without a manual override)."""
+    config = config or storage.load_config(user_id)
+    key, source = lanes.resolve(job, user_id)
+    auto, _ = lanes.resolve(job, user_id, use_override=False)
+    return {
+        "resume_lane": key, "resume_lane_label": lanes.label(config, key) if key else "",
+        "resume_lane_source": source, "resume_lane_auto": auto,
+    }
+
+
+@app.get("/api/resume-lanes")
+def get_resume_lanes(user: User = Depends(get_current_user)):
+    """Each resume lane with its description and how many active jobs resolve to it."""
+    config = storage.load_config(user.id)
+    loaded = lanes.loaded_keys(user.id)
+    counts = {k: 0 for k in lanes.LANE_KEYS}
+    unassigned = 0
+    for j in storage.load_all_jobs(user.id, copy=False):
+        k, _ = lanes.resolve(j, user.id, loaded)
+        if k: counts[k] += 1
+        else: unassigned += 1
+    return {
+        "lanes": [{
+            "key": k, "label": lanes.label(config, k), "description": lanes.description(config, k),
+            "default_description": lanes.DEFAULT_DESCRIPTIONS[k], "loaded": k in loaded,
+            "has_original": bool(storage.load_resume_original(user.id, k)), "jobs": counts[k],
+        } for k in lanes.LANE_KEYS],
+        "unassigned": unassigned,
+    }
+
+
+@app.put("/api/resume-lanes")
+async def put_resume_lanes(request: Request, user: User = Depends(get_current_user)):
+    """Save lane descriptions: {"descriptions": {"director": "...", ...}}. Blank resets to the default."""
+    body = await request.json()
+    config = storage.load_config(user.id)
+    descriptions = dict(config.resume_lane_descriptions or {})
+    for k, text in (body.get("descriptions") or {}).items():
+        if k not in lanes.LANE_KEYS:
+            raise HTTPException(400, f"Unknown lane '{k}'")
+        text = str(text or "").strip()[:500]
+        if text and text != lanes.DEFAULT_DESCRIPTIONS[k]:
+            descriptions[k] = text
+        else:
+            descriptions.pop(k, None)
+    config.resume_lane_descriptions = descriptions
+    storage.save_config(user.id, config)
+    return {"ok": True}
 
 
 @app.post("/api/jobs")
@@ -984,6 +1038,10 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
     if data.url is not None: job.url = data.url
     if data.pay_range is not None: job.pay_range = data.pay_range
     if data.market_lane is not None: job.market_lane = data.market_lane
+    if data.resume_lane_override is not None:
+        if data.resume_lane_override not in ("", *lanes.LANE_KEYS):
+            raise HTTPException(400, "resume_lane_override must be blank or one of: " + ", ".join(lanes.LANE_KEYS))
+        job.resume_lane_override = data.resume_lane_override
     if data.notes is not None: job.notes = data.notes
     if data.status is not None:
         job.update_status(data.status, applied_date=data.applied_at or "")
@@ -1404,6 +1462,7 @@ def get_job_package(job_id: str, request: Request):
     if not job:
         raise HTTPException(404, "Job not found")
     base = f"/api/agent/jobs/{job_id}"
+    choice = _agent_resume_choice(admin_id, job)
     return {
         "job": {
             "id": job.id,
@@ -1413,7 +1472,10 @@ def get_job_package(job_id: str, request: Request):
             "ats_url": job.ats_url,
             "score": job.score.total if job.score else None,
             "lane": job.market_lane,
-            "recommended_resume": job.score.recommended_resume if job.score else "base",
+            "recommended_resume": choice["lane"] or (job.score.recommended_resume if job.score else "base"),
+            "resume_lane": choice["lane"],
+            "resume_lane_label": choice["lane_label"],
+            "resume_source": choice["source"],
         },
         "downloads": {
             "resume": f"{base}/resume/download",
@@ -1480,9 +1542,19 @@ def agent_trigger_job_research(job_id: str, request: Request):
     return {"job_id": job_id, "researched": True}
 
 
-@app.get("/api/agent/jobs/{job_id}/resume/download")
-def download_agent_resume(job_id: str, request: Request):
-    """Download the tailored resume .docx for a job. Called by dispatch.js."""
+def _agent_resume_choice(admin_id: str, job: Job) -> dict:
+    """The resume JobPilot gets for a job: its tailored resume, or nothing. A job with no tailored resume
+    is not ready to apply (Job.ready_to_apply), so there is deliberately no fallback to an untailored one."""
+    config = storage.load_config(admin_id)
+    lane, lane_source = lanes.resolve(job, admin_id)
+    has = bool(job.tailored_resume_docx) and Path(job.tailored_resume_docx).exists()
+    return {"lane": lane, "lane_label": lanes.label(config, lane) if lane else "", "lane_source": lane_source,
+            "source": "tailored" if has else "none", "path": job.tailored_resume_docx if has else None}
+
+
+@app.get("/api/agent/jobs/{job_id}/resume")
+def agent_get_job_resume(job_id: str, request: Request):
+    """The job's resume lane (which uploaded resume its tailored resume is built from) and whether a tailored resume exists."""
     key = request.headers.get("X-API-Key", "")
     if not key or not verify_agent_api_key(key):
         raise HTTPException(401, "Invalid or missing API key")
@@ -1490,9 +1562,32 @@ def download_agent_resume(job_id: str, request: Request):
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    if not job.tailored_resume_docx or not Path(job.tailored_resume_docx).exists():
+    choice = _agent_resume_choice(admin_id, job)
+    return {
+        "job_id": job_id, "lane": choice["lane"], "lane_label": choice["lane_label"],
+        "lane_source": choice["lane_source"], "resume_source": choice["source"],
+        "available": choice["source"] == "tailored",
+        "download": f"/api/agent/jobs/{job_id}/resume/download",
+    }
+
+
+@app.get("/api/agent/jobs/{job_id}/resume/download")
+def download_agent_resume(job_id: str, request: Request):
+    """Download the tailored resume .docx for a job. Called by dispatch.js. 404 if the job has none."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    choice = _agent_resume_choice(admin_id, job)
+    if not choice["path"]:
         raise HTTPException(404, "No tailored resume found for this job")
-    return FileResponse(job.tailored_resume_docx, filename=f"resume_{job.company}_{job.id}.docx")
+    return FileResponse(
+        choice["path"], filename=f"resume_{job.company}_{job.id}.docx",
+        headers={"X-Resume-Lane": choice["lane"], "X-Resume-Source": choice["source"]},
+    )
 
 
 @app.get("/api/agent/jobs/{job_id}/cover-letter/download")
@@ -1982,6 +2077,7 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     config.author_website  = existing.author_website
     config.author_github   = existing.author_github
     config.author_portfolio = existing.author_portfolio
+    config.resume_lane_descriptions = existing.resume_lane_descriptions
     config.work_experience = existing.work_experience
     config.education       = existing.education
     config.certifications  = existing.certifications
