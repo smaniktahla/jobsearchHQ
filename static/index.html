@@ -522,7 +522,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div style="margin-left:28px;font-size:13px">
         <div class="mr-msg text-dim">Checking for scored jobs without a tailored resume…</div>
         <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
-        <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px;display:none" onclick="stopMissingResumes()">Stop</button>
+        <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px" onclick="stopMissingResumes()" disabled>Stop</button>
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Resumes only, using the saved threshold. The daily pipeline also backfills up to 10 a day when auto-generate is on.</div>
       </div>
     </div>
@@ -638,7 +638,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a3a);font-size:13px">
         <div class="mr-msg text-dim">Checking for scored jobs without a tailored resume…</div>
         <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
-        <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px;display:none" onclick="stopMissingResumes()">Stop</button>
+        <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px" onclick="stopMissingResumes()" disabled>Stop</button>
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Same backfill as under Auto-Processing: resumes for jobs at or above the saved score threshold. It runs on the batch server when one is set.</div>
       </div>
     </div>
@@ -1839,7 +1839,7 @@ async function refreshMissingResumes(){
   if(!msgs.length)return;
   const show=(text,disabled,stopShown,stopDisabled)=>{
     msgs.forEach(m=>m.textContent=text);btns.forEach(b=>b.disabled=disabled);
-    stops.forEach(b=>{b.style.display=stopShown?'':'none';b.disabled=!!stopDisabled});};
+    stops.forEach(b=>{b.disabled=!stopShown||!!stopDisabled});};
   try{
     const r=await api('/api/resumes/missing');
     const run=r.run||{};
