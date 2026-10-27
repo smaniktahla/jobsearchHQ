@@ -522,6 +522,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div style="margin-left:28px;font-size:13px">
         <div id="missing-resumes-msg" class="text-dim">Checking for scored jobs without a tailored resume…</div>
         <button class="btn btn-ghost btn-sm" id="missing-resumes-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes</button>
+        <button class="btn btn-ghost btn-sm" id="missing-resumes-stop" style="margin-top:6px;display:none" onclick="stopMissingResumes()">Stop</button>
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Resumes only, using the saved threshold. The daily pipeline also backfills up to 10 a day when auto-generate is on.</div>
       </div>
     </div>
@@ -1812,23 +1813,27 @@ async function refreshSchedulerStatus(){
   }catch(e){document.getElementById('scheduler-status').textContent='Failed to load status'}}
 let _missingTimer=null;
 async function refreshMissingResumes(){
-  const msg=document.getElementById('missing-resumes-msg'),btn=document.getElementById('missing-resumes-btn');
+  const msg=document.getElementById('missing-resumes-msg'),btn=document.getElementById('missing-resumes-btn'),stop=document.getElementById('missing-resumes-stop');
   if(!msg)return;
   try{
     const r=await api('/api/resumes/missing');
     const run=r.run||{};
     if(run.running){
-      msg.textContent=`Generating resumes… ${run.done||0} of ${run.total||0} done`;
-      btn.disabled=true;
+      msg.textContent=run.cancelling?`Stopping after the current resume… ${run.done||0} of ${run.total||0} done`:`Generating resumes… ${run.done||0} of ${run.total||0} done`;
+      btn.disabled=true;stop.style.display='';stop.disabled=!!run.cancelling;
       if(!_missingTimer)_missingTimer=setInterval(refreshMissingResumes,4000);
       return;
     }
+    stop.style.display='none';
     if(_missingTimer){clearInterval(_missingTimer);_missingTimer=null;
-      if(run.finished_at)msg.dataset.last=`Last run: ${run.generated||0} generated, ${(run.errors||[]).length} failed.`;}
+      if(run.finished_at)msg.dataset.last=`Last run${run.cancelled?' (stopped)':''}: ${run.generated||0} generated, ${(run.errors||[]).length} failed.`;}
     const last=msg.dataset.last?' '+msg.dataset.last:'';
     msg.textContent=(r.count?`${r.count} job${r.count>1?'s':''} scoring ≥ ${r.threshold} ha${r.count>1?'ve':'s'} no tailored resume.`:`Every job scoring ≥ ${r.threshold} has a tailored resume.`)+last;
     btn.disabled=!r.count;
   }catch(e){msg.textContent='Could not check for missing resumes: '+e.message}}
+async function stopMissingResumes(){
+  try{await api('/api/resumes/cancel-generate',{method:'POST'})}catch(e){alert('Could not stop: '+e.message)}
+  refreshMissingResumes();}
 async function generateMissingResumes(){
   const btn=document.getElementById('missing-resumes-btn');
   const r=await api('/api/resumes/missing');
