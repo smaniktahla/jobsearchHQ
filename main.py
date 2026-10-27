@@ -2342,6 +2342,12 @@ async def generate_missing_resumes(request: Request, user: User = Depends(get_cu
     return {"started": True, "threshold": threshold}
 
 
+@app.post("/api/resumes/cancel-generate")
+def cancel_generate_missing(user: User = Depends(get_current_user)):
+    """Stop the running backfill after the resume currently being generated."""
+    return {"cancelling": backfill.cancel(user.id)}
+
+
 @app.get("/api/scheduler/logs")
 def scheduler_logs(count: int = 10, user: User = Depends(get_current_user)):
     """Get recent scheduler run logs."""

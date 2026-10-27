@@ -21,6 +21,7 @@ _CLOSED = {JobStatus.APPLIED, JobStatus.INTERVIEW, JobStatus.OFFER, JobStatus.RE
 
 _lock = threading.Lock()
 _state: dict[str, dict] = {}  # user_id -> progress of the latest/current run
+_cancel: dict[str, threading.Event] = {}  # user_id -> set to stop the current run
 
 
 def find_missing(user_id: str, threshold: int) -> list:
@@ -55,6 +56,16 @@ def status(user_id: str) -> dict:
         return dict(_state.get(user_id, {"running": False}))
 
 
+def cancel(user_id: str) -> bool:
+    """Ask the current run to stop. The resume being generated finishes; no further ones start."""
+    with _lock:
+        if not _state.get(user_id, {}).get("running"):
+            return False
+        _cancel[user_id].set()
+        _state[user_id]["cancelling"] = True
+    return True
+
+
 def generate_missing(user_id: str, threshold: int, limit: int | None = None) -> dict:
     """Generate resumes for jobs from find_missing(). One run per user at a time.
 
@@ -66,6 +77,7 @@ def generate_missing(user_id: str, threshold: int, limit: int | None = None) -> 
             raise RuntimeError("A resume backfill is already running")
         _state[user_id] = {"running": True, "started_at": datetime.now(timezone.utc).isoformat(),
                            "done": 0, "total": 0, "errors": []}
+        stop = _cancel[user_id] = threading.Event()
     generated, errors = [], []
     try:
         jobs = find_missing(user_id, threshold)
@@ -73,6 +85,8 @@ def generate_missing(user_id: str, threshold: int, limit: int | None = None) -> 
         with _lock:
             _state[user_id]["total"] = len(todo)
         for job in todo:
+            if stop.is_set():
+                break
             try:
                 # Reload: find_missing used shared cache objects, which are read-only.
                 job = storage.load_job(user_id, job.id)
@@ -89,10 +103,12 @@ def generate_missing(user_id: str, threshold: int, limit: int | None = None) -> 
             with _lock:
                 _state[user_id]["done"] += 1
                 _state[user_id]["errors"] = list(errors)
-        return {"generated": generated, "errors": errors, "remaining": len(jobs) - len(todo)}
+        return {"generated": generated, "errors": errors, "remaining": len(jobs) - len(todo),
+                "cancelled": stop.is_set()}
     finally:
         with _lock:
-            _state[user_id].update(running=False, finished_at=datetime.now(timezone.utc).isoformat(),
+            _state[user_id].update(running=False, cancelling=False, cancelled=stop.is_set(),
+                                   finished_at=datetime.now(timezone.utc).isoformat(),
                                    generated=len(generated))
 
 
