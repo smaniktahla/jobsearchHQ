@@ -60,6 +60,7 @@ import ai_router
 import lanes
 import activity
 import scheduler
+import auto_approve
 import backfill
 from intake import process_intake
 import jd_cleanup
@@ -2091,6 +2092,9 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     config.certifications  = existing.certifications
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
+    if config.auto_approve_enabled:
+        # Settings changed (cap, threshold, switch): approve what now qualifies instead of waiting for the nightly run.
+        threading.Thread(target=auto_approve.run, args=(user.id, config), daemon=True).start()
     return config.model_dump()
 
 
