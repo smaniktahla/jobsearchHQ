@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Application-stage jobs are tracked by hand; a closed posting there is noise.
 SKIP_STATUSES = {JobStatus.APPLIED, JobStatus.INTERVIEW, JobStatus.OFFER, JobStatus.REJECTED, JobStatus.PASSED}
 
+MANUAL_REASON = "set manually"
 RECHECK_OPEN_DAYS = 7
 RECHECK_UNKNOWN_DAYS = 14
 HOST_MIN_INTERVAL = 2.0   # seconds between requests to the same host
@@ -36,6 +37,7 @@ DEFAULT_BATCH = 300
 
 CLOSED_PHRASES = (
     "no longer accepting applications",
+    "not currently accepting applications",
     "no longer available",
     "this job has expired",
     "job has expired",
@@ -154,6 +156,8 @@ def check_job(job: Job) -> bool:
 
 def _due(job: Job, now: datetime, min_score: int = 0) -> bool:
     if not job.url.strip() or job.status in SKIP_STATUSES or job.posting_status == "closed":
+        return False
+    if job.posting_reason.startswith(MANUAL_REASON):   # set by hand; the nightly check must not overrule it
         return False
     if job.score is None or job.score.total < min_score:
         return False
