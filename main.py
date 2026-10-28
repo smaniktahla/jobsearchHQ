@@ -1143,6 +1143,30 @@ def check_posting(job_id: str, user: User = Depends(get_current_user)):
     return enrich_job(job)
 
 
+class PostingStatusUpdate(BaseModel):
+    status: str   # "closed" | "open"
+
+
+@app.post("/api/jobs/{job_id}/posting-status")
+def set_posting_status(job_id: str, data: PostingStatusUpdate, user: User = Depends(get_current_user)):
+    """Mark a posting closed (or open again) by hand, e.g. when the page says it isn't accepting applications."""
+    if data.status not in ("closed", "open"):
+        raise HTTPException(400, "status must be 'closed' or 'open'")
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    now = datetime.now(timezone.utc).isoformat()
+    if data.status == "closed" and job.posting_status != "closed":
+        job.posting_closed_at = now
+    job.posting_status = data.status
+    job.posting_reason = f"{job_liveness.MANUAL_REASON} (marked {data.status} in the UI)"
+    job.posting_checked_at = now
+    job.agent_log.append(AgentEvent(event_type=AgentEventType.RESOLVE, success=True,
+                                    notes=f"posting marked {data.status} in the UI"))
+    storage.save_job(user.id, job)
+    return enrich_job(job)
+
+
 @app.post("/api/jobs/check-postings")
 def check_postings_now(user: User = Depends(get_current_user)):
     """Kick off a background open/closed pass over due tracker jobs."""

@@ -251,7 +251,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </div>
 <!-- Job Detail -->
 <div id="view-detail" class="view">
-  <div class="flex items-center gap-8 mb-16"><button class="btn btn-ghost btn-sm" onclick="showView('tracker')">&larr; Back</button><h1 id="detail-title"></h1><span id="detail-posting" class="text-sm" style="margin-left:8px"></span><button class="btn btn-ghost btn-sm" id="btn-check-posting" onclick="checkPosting()" style="margin-left:auto">Check if still open</button></div>
+  <div class="flex items-center gap-8 mb-16"><button class="btn btn-ghost btn-sm" onclick="showView('tracker')">&larr; Back</button><h1 id="detail-title"></h1><span id="detail-posting" class="text-sm" style="margin-left:8px"></span><button class="btn btn-ghost btn-sm" id="btn-check-posting" onclick="checkPosting()" style="margin-left:auto">Check if still open</button><button class="btn btn-ghost btn-sm" id="btn-posting-closed" onclick="toggleClosed()"></button></div>
   <div class="detail-grid">
     <div>
       <div class="card mb-16">
@@ -2075,7 +2075,14 @@ function renderDetailPosting(j){
   const when=j.posting_checked_at?new Date(j.posting_checked_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   const map={open:['var(--green)','● Posting open'],closed:['var(--red)','● Posting closed'],unknown:['var(--yellow)','● Posting status unclear']};
   const m=map[j.posting_status];
+  const cb=document.getElementById('btn-posting-closed');if(cb)cb.textContent=j.posting_status==='closed'?'Mark open':'Mark closed';
   el.innerHTML=m?`<span style="color:${m[0]}">${m[1]}</span> <span class="text-dim">${esc(j.posting_reason||'')}${when?' · checked '+when:''}</span>`:'<span class="text-dim">Posting not checked yet</span>';
+}
+async function toggleClosed(){
+  if(!currentJobId)return;
+  const next=currentJob&&currentJob.posting_status==='closed'?'open':'closed';
+  try{const j=await api('/api/jobs/'+currentJobId+'/posting-status',{method:'POST',body:{status:next}});currentJob=j;renderDetailPosting(j);renderReadiness(j);toast('Posting marked '+next)}
+  catch(e){alert(e.message)}
 }
 async function checkPosting(){
   if(!currentJobId)return;const b=document.getElementById('btn-check-posting');b.disabled=true;showLoading('Checking whether the posting is still open...');
