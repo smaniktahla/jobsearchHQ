@@ -6,6 +6,7 @@ something we already looked at.
 A job is archivable once it's both old AND either dead-ended or low value:
   - status is rejected or passed, or
   - it was scored below min_score
+A job whose posting is closed is archived CLOSED_GRACE_DAYS after it was marked closed.
 
 Anything still active (applied/interview/offer), unscored, or recently touched
 is left alone regardless of how it would otherwise score, so nothing you're
@@ -64,6 +65,19 @@ def below_tracking_threshold(job: Job, grace_cutoff: datetime, min_score: int) -
     return updated is not None and updated < grace_cutoff
 
 
+# A closed posting can't be applied to, so it leaves the Tracker a day after it was closed
+# (long enough to undo a mistaken "Mark closed"). Application stages stay put.
+CLOSED_GRACE_DAYS = 1
+CLOSED_ARCHIVE_STATUSES = {JobStatus.NEW, JobStatus.SCORED}
+
+
+def closed_posting(job: Job, closed_cutoff: datetime) -> bool:
+    if job.posting_status != "closed" or job.status not in CLOSED_ARCHIVE_STATUSES:
+        return False
+    closed_at = _parse_dt(job.posting_closed_at) or _parse_dt(job.posting_checked_at)
+    return closed_at is not None and closed_at < closed_cutoff
+
+
 def run_archive_pass(
     user_id: str,
     max_age_days: int = DEFAULT_MAX_AGE_DAYS,
@@ -79,11 +93,13 @@ def run_archive_pass(
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=max_age_days)
     grace_cutoff = now - timedelta(days=SCORE_GRACE_DAYS)
+    closed_cutoff = now - timedelta(days=CLOSED_GRACE_DAYS)
     jobs = storage.load_all_jobs(user_id, copy=False)
     archived = []
     for job in jobs:
         if is_archivable(job, cutoff, min_score) and job.status not in ACTIVE_STATUSES or \
-           below_tracking_threshold(job, grace_cutoff, min_score):
+           below_tracking_threshold(job, grace_cutoff, min_score) or \
+           closed_posting(job, closed_cutoff):
             if storage.archive_job(user_id, job.id):
                 archived.append({"id": job.id, "title": job.title, "company": job.company})
 
