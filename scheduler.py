@@ -510,7 +510,7 @@ def run_daily_pipeline(user_id: str) -> dict:
 
     # ── Step 6: Mark applied jobs rejected from rejection emails in the inbox ──
     try:
-        res = rejection_intake.run(user_id, config)
+        res = rejection_intake.run(user_id, config) if config.inbox_rejections_enabled else {"error": "disabled"}
         if not res.get("error"):
             run_log["inbox_rejections"] = [r["id"] for r in res["rejected"]]
     except Exception as e:

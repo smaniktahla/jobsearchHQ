@@ -409,6 +409,8 @@ class AppConfig(BaseModel):
     auto_approve_enabled: bool = False
     auto_approve_threshold: int = 9
     auto_approve_daily_cap: int = 25
+    # Nightly: mark Applied jobs Rejected when a matching rejection email is in the Gmail inbox. Off by default.
+    inbox_rejections_enabled: bool = False
     # --- AI Provider ---
     # fast_provider: scoring, metadata, research (cheap/free tasks)
     # strong_provider: resumes, cover letters, LinkedIn messages (quality tasks)
