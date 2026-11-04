@@ -28,6 +28,7 @@ import archiving
 import job_liveness
 import ai_router
 import auto_approve
+import rejection_intake
 import backfill
 from models import AppConfig, JobStatus
 
@@ -506,6 +507,15 @@ def run_daily_pipeline(user_id: str) -> dict:
     except Exception as e:
         logger.error(f"[{user_id}] Auto-approve failed: {e}")
         run_log["errors"].append(f"Auto-approve: {e}")
+
+    # ── Step 6: Mark applied jobs rejected from rejection emails in the inbox ──
+    try:
+        res = rejection_intake.run(user_id, config)
+        if not res.get("error"):
+            run_log["inbox_rejections"] = [r["id"] for r in res["rejected"]]
+    except Exception as e:
+        logger.error(f"[{user_id}] Inbox rejection scan failed: {e}")
+        run_log["errors"].append(f"Inbox rejections: {e}")
 
     run_log["finished_at"] = datetime.now(timezone.utc).isoformat()
     _save_run_log(run_log)
