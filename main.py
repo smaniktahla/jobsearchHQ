@@ -61,6 +61,7 @@ import lanes
 import activity
 import scheduler
 import auto_approve
+import rejection_intake
 import backfill
 from intake import process_intake
 import jd_cleanup
@@ -1165,6 +1166,16 @@ def set_posting_status(job_id: str, data: PostingStatusUpdate, user: User = Depe
                                     notes=f"posting marked {data.status} in the UI"))
     storage.save_job(user.id, job)
     return enrich_job(job)
+
+
+@app.post("/api/inbox/scan-rejections")
+def scan_inbox_rejections(dry_run: bool = False, days: int = rejection_intake.DEFAULT_LOOKBACK_DAYS,
+                          user: User = Depends(get_current_user)):
+    """Scan the Gmail inbox for rejection emails and mark matching applied jobs rejected (dry_run: report only)."""
+    res = rejection_intake.run(user.id, lookback_days=max(1, min(days, 90)), dry_run=dry_run, notify=not dry_run)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
 
 
 @app.post("/api/jobs/check-postings")
