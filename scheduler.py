@@ -30,6 +30,7 @@ import ai_router
 import auto_approve
 import rejection_intake
 import backfill
+import research_batch
 from models import AppConfig, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -499,6 +500,21 @@ def run_daily_pipeline(user_id: str) -> dict:
         except Exception as e:
             logger.error(f"[{user_id}] Resume backfill failed: {e}")
             run_log["errors"].append(f"Backfill: {e}")
+
+    # ── Step 5: Research companies for high-scoring jobs ───────────────────────
+    # Capped per run; the rest wait for the next one. Stops early if the search backend is down.
+    if config.auto_research_enabled:
+        try:
+            res = research_batch.research_missing(
+                user_id, config.auto_research_threshold, config.auto_research_daily_cap)
+            run_log["researched"] = res["researched"]
+            run_log["errors"].extend(f"Research {e}" for e in res["errors"])
+            if res["aborted"]:
+                run_log["errors"].append(f"Research {res['aborted']}")
+            logger.info(f"[{user_id}] Researched {len(res['researched'])} companies, {res['remaining']} remaining")
+        except Exception as e:
+            logger.error(f"[{user_id}] Company research failed: {e}")
+            run_log["errors"].append(f"Research: {e}")
 
     # ── Step 5: Auto-approve jobs whose documents are ready (opt-in) ───────────
     try:
