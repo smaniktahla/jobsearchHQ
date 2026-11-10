@@ -113,3 +113,17 @@ def resolve_review(review_id: str, data: ReviewChoice, store: NetworkStore = Dep
     except KeyError:
         raise HTTPException(404, "Review item or contact not found") from None
     return {"id": result}
+
+
+class RelationshipEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str
+
+
+@router.put("/contacts/{contact_id}/relationship")
+def edit_relationship(contact_id: str, data: RelationshipEdit, store: NetworkStore = Depends(enabled_store)):
+    try:
+        store.update_primary_relationship(contact_id, data.kind)
+    except KeyError:
+        raise HTTPException(404, "Contact not found") from None
+    return {"ok": True}

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Search Command Center</title>
 <style>
+#view-network .card{margin-top:16px}#view-network button:disabled{opacity:.45;cursor:not-allowed}#view-network h1{margin-bottom:8px}#network-status{margin:12px 0;color:var(--accent)}#network-editor::backdrop{background:rgba(0,0,0,.65)}
+
 :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#232736;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--yellow:#fbbf24;--red:#f87171;--orange:#fb923c;--radius:8px}
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
 .app{display:flex;min-height:100vh}.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto;display:flex;flex-direction:column}.main{flex:1;margin-left:220px;padding:24px 32px}
@@ -99,6 +101,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="nav-item" data-view="followups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Follow-Ups<span id="nav-followup-badge2" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Activity<span id="nav-activity-badge" class="nav-badge" style="display:none"></span></div>
   <div class="nav-item" data-view="archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archive</div>
+  <div class="nav-item" data-view="network" id="nav-network" style="display:none">Network</div>
   <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
   <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;overflow:hidden">
@@ -110,6 +113,38 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </nav>
 <div class="main">
 <!-- Dashboard -->
+<div id="view-network" class="view">
+  <h1>Network</h1>
+  <p class="text-dim">Your private contact directory. Imported information is unverified until you confirm it.</p>
+  <div id="network-status" role="status" aria-live="polite"></div>
+  <div class="card">
+    <h2>Import LinkedIn connections</h2>
+    <label for="network-file">Connections CSV (maximum 10 MB)</label>
+    <input id="network-file" type="file" accept=".csv,text/csv">
+    <button class="btn btn-primary" id="network-preview">Preview import</button>
+    <button class="btn btn-primary" id="network-commit" disabled>Commit import</button>
+    <p id="network-preview-result" aria-live="polite">Choose a file to preview changes before importing.</p>
+  </div>
+  <div class="card">
+    <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
+      <label>Search <input id="network-search" type="search" placeholder="Name, email, employer or notes"></label>
+      <label>Employer <select id="network-employer"><option value="">All employers</option></select></label>
+      <button class="btn btn-ghost" id="network-export">Export JSON</button>
+      <button class="btn btn-ghost" id="network-delete-all">Delete all network data</button>
+    </div>
+    <p id="network-count"></p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Name / email</th><th>Employer / position</th><th>Provenance</th><th>Verification</th><th>Actions</th></tr></thead><tbody id="network-contacts"></tbody></table></div>
+  </div>
+  <div class="card"><h2>Identity review</h2><p class="text-dim">Names alone never confirm identity. Compare the imported record before merging.</p><div id="network-review"></div></div>
+  <dialog id="network-editor" style="background:var(--surface);color:var(--text);max-width:600px;width:90%;border:1px solid var(--border);border-radius:12px;padding:24px">
+    <form id="network-edit-form"><h2 id="network-edit-name"></h2>
+      <div class="form-group"><label for="network-notes">Notes</label><textarea id="network-notes" rows="4"></textarea></div>
+      <div class="form-group"><label for="network-relationship">Relationship (manually confirmed)</label><input id="network-relationship" placeholder="e.g. Former colleague"></div>
+      <label><input id="network-verified" type="checkbox" style="width:auto"> I verified this contact</label>
+      <div class="flex gap-8 mt-16"><button class="btn btn-primary" type="submit">Save</button><button class="btn btn-ghost" type="button" id="network-edit-cancel">Cancel</button></div>
+    </form>
+  </dialog>
+</div>
 <div id="view-dashboard" class="view active">
   <div class="flex justify-between items-center mb-16"><h1>Dashboard</h1><button class="btn btn-primary" onclick="showView('add')">+ Add Job</button></div>
   <div id="pause-banner" style="display:none" class="card mb-16 follow-up-card overdue"><div class="flex justify-between items-center"><div>⏸ Job search is paused — no new jobs are being ingested, parsed, or scored</div><button class="btn btn-warning btn-sm" onclick="showSettingsPage('automation')">Resume</button></div></div>
@@ -835,7 +870,7 @@ if(new URLSearchParams(window.location.search).get('logged_out')==='1'){window.l
 const API='';let currentJobId=null,allJobs=[],currentJob=null;
 let resumeLabels={director:'Resume 1 — Director',base:'Resume 2 — Base',contract:'Resume 3 — Contract'};
 function resumeLabel(key){return resumeLabels[key]||key||'none'}
-function showView(n){if(n==='profile'){_sxPage='profile';n='settings'}document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');closeSidebar();if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings'){applySettingsPage();loadSettings()}if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity();if(n==='archive')loadArchive()}
+function showView(n){if(n==='network'&&!networkEnabled)return;if(n==='profile'){_sxPage='profile';n='settings'}document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('view-'+n)?.classList.add('active');document.querySelector(`[data-view="${n}"]`)?.classList.add('active');closeSidebar();if(n==='dashboard')loadDashboard();if(n==='tracker')loadTracker();if(n==='settings'){applySettingsPage();loadSettings()}if(n==='followups')loadFollowUps();if(n==='search')initSearch();if(n==='profile')loadProfile();if(n==='activity')loadActivity();if(n==='archive')loadArchive();if(n==='network')loadNetwork()}
 document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>showView(i.dataset.view)));
 // Settings sub-pages
 let _sxPage=null;
@@ -2224,8 +2259,71 @@ function showLoading(m){
   _busyTimer=setInterval(()=>{const sec=Math.floor((Date.now()-t0)/1000);sub.textContent=sec+'s'+(sec>=20?' — AI generation can take a minute or two, especially on local models':'')},1000);
 }
 function hideLoading(){clearInterval(_busyTimer);_busyTimer=null;document.getElementById('busy-overlay').classList.remove('show')}
+
+// Network: session-only API, local rendering, and explicit preview before commit.
+let networkEnabled=false, networkContacts=[], networkSnapshot={}, networkFile=null, networkEditing=null, networkBusy=false;
+const ne=id=>document.getElementById('network-'+id);
+function networkStatus(message){ne('status').textContent=message}
+function networkElement(tag,text){const el=document.createElement(tag);el.textContent=text;return el}
+function networkButton(text,action){const b=networkElement('button',text);b.className='btn btn-ghost btn-sm';b.onclick=()=>networkAction(action);return b}
+async function networkAction(action){if(networkBusy)return;networkBusy=true;try{await action()}catch(e){networkStatus(e.message||'Network request failed')}finally{networkBusy=false}}
+async function networkRequest(path,options={}){
+  const response=await fetch('/api/network'+path,{credentials:'same-origin',...options});
+  if(response.status===401){location.href='/auth/login';throw new Error('Please sign in')}
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){const detail=data.detail;throw new Error(typeof detail==='string'?detail:JSON.stringify(detail||'Network request failed'))}
+  return data;
+}
+async function loadNetwork(){
+  if(!networkEnabled)return;
+  try{
+    const data=await networkRequest('/export');networkSnapshot=data;networkContacts=Object.values(data.contacts);
+    const employer=ne('employer').value;ne('employer').replaceChildren(new Option('All employers',''));
+    [...new Set(networkContacts.map(c=>c.company).filter(Boolean))].sort().forEach(c=>ne('employer').add(new Option(c,c)));
+    ne('employer').value=employer;renderNetwork();renderNetworkReview();
+  }catch(e){networkStatus(e.message)}
+}
+function renderNetwork(){
+  const q=ne('search').value.toLocaleLowerCase(),employer=ne('employer').value;
+  const rows=networkContacts.filter(c=>(!employer||c.company===employer)&&[c.first_name,c.last_name,c.email,c.company,c.position,c.notes].join(' ').toLocaleLowerCase().includes(q));
+  ne('count').textContent=rows.length+' of '+networkContacts.length+' contacts';ne('contacts').replaceChildren();
+  for(const c of rows){const tr=document.createElement('tr');
+    for(const value of [[c.first_name,c.last_name].filter(Boolean).join(' ')+' / '+(c.email||'No email'),[c.company,c.position].filter(Boolean).join(' / '),c.source+(c.connected_on?' · connected '+c.connected_on:'')])tr.append(networkElement('td',value));
+    const verification=document.createElement('td'),badge=networkElement('span',c.verified?'Verified':'Unverified');badge.className='badge '+(c.verified?'badge-applied':'badge-ignore');verification.append(badge);tr.append(verification);
+    const actions=document.createElement('td');actions.append(networkButton('Edit notes / relationship',()=>editNetworkContact(c)),networkButton('Delete',async()=>{if(!confirm('Delete this contact and its relationships?'))return;await networkRequest('/contacts/'+encodeURIComponent(c.id),{method:'DELETE'});await loadNetwork();networkStatus('Contact deleted')}));tr.append(actions);ne('contacts').append(tr);
+  }
+  if(!rows.length){const td=networkElement('td',networkContacts.length?'No matching contacts.':'No contacts yet. Import a connections CSV to begin.');td.colSpan=5;const tr=document.createElement('tr');tr.append(td);ne('contacts').append(tr)}
+}
+function renderNetworkReview(){
+  const root=ne('review');root.replaceChildren();const items=Object.entries(networkSnapshot.review_queue||{});
+  if(!items.length){root.textContent='No identities awaiting review.';return}
+  for(const [id,item] of items){const card=document.createElement('div');card.className='card';const c=item.contact;
+    card.append(networkElement('h3',[c.first_name,c.last_name].join(' ')),networkElement('p',[c.email,c.company,c.position,c.linkedin_url].filter(Boolean).join(' · ')),networkElement('p','Source: '+c.source+' · Unverified · '+item.reason));
+    const select=document.createElement('select');select.setAttribute('aria-label','Merge target for '+c.first_name);select.add(new Option('Choose an existing contact',''));
+    for(const candidate of item.candidate_ids){const existing=networkSnapshot.contacts[candidate];if(existing)select.add(new Option([existing.first_name,existing.last_name,existing.email,existing.company,existing.linkedin_url].filter(Boolean).join(' · '),candidate))}
+    async function resolve(target){await networkRequest('/review/'+encodeURIComponent(id)+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_id:target})});await loadNetwork();networkStatus('Identity review saved')}
+    card.append(select,networkButton('Merge into selected contact',async()=>{if(!select.value)throw new Error('Choose a merge target first');if(confirm('Merge this imported record into the selected contact?'))await resolve(select.value)}),networkButton('Keep separate',()=>resolve(null)));root.append(card);
+  }
+}
+function editNetworkContact(contact){networkEditing=contact.id;ne('edit-name').textContent=[contact.first_name,contact.last_name].join(' ');ne('notes').value=contact.notes;ne('verified').checked=contact.verified;ne('relationship').value=Object.values(networkSnapshot.relationships||{}).find(r=>r.contact_id===contact.id&&r.source==='manual')?.kind||'';ne('editor').showModal()}
+ne('edit-cancel').onclick=()=>ne('editor').close();
+ne('edit-form').onsubmit=e=>{e.preventDefault();networkAction(async()=>{
+  await networkRequest('/contacts/'+encodeURIComponent(networkEditing),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:ne('notes').value,verified:ne('verified').checked})});
+  await networkRequest('/contacts/'+encodeURIComponent(networkEditing)+'/relationship',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:ne('relationship').value.trim()})});
+  ne('editor').close();await loadNetwork();networkStatus('Contact saved');
+})};
+ne('search').oninput=renderNetwork;ne('employer').onchange=renderNetwork;
+ne('file').onchange=()=>{networkFile=null;ne('commit').disabled=true;ne('preview-result').textContent='Preview the selected file before importing.'};
+ne('preview').onclick=()=>networkAction(async()=>{
+  networkFile=null;ne('commit').disabled=true;const file=ne('file').files[0];if(!file)throw new Error('Choose a CSV file');if(file.size>10*1024*1024)throw new Error('CSV exceeds the 10 MB limit');
+  const data=await networkRequest('/import/preview',{method:'POST',headers:{'Content-Type':'text/csv'},body:file});if(ne('file').files[0]!==file)throw new Error('File changed. Preview the selected file again.');networkFile=file;ne('preview-result').textContent=data.created+' new, '+data.updated+' updated, '+data.review+' requiring identity review. Nothing imported yet.';ne('commit').disabled=false;networkStatus('Preview ready');
+});
+ne('commit').onclick=()=>networkAction(async()=>{if(!networkFile)throw new Error('Preview a file first');ne('commit').disabled=true;const file=networkFile;networkFile=null;await networkRequest('/import/commit',{method:'POST',headers:{'Content-Type':'text/csv'},body:file});ne('preview-result').textContent='Import complete.';await loadNetwork();networkStatus('Import complete')});
+ne('export').onclick=()=>networkAction(async()=>{const data=await networkRequest('/export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='network-export.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);networkStatus('Network exported')});
+ne('delete-all').onclick=()=>networkAction(async()=>{if(!confirm('Delete ALL network contacts, relationships, imports and review history? This cannot be undone.'))return;await networkRequest('/contacts',{method:'DELETE'});networkFile=null;ne('commit').disabled=true;await loadNetwork();networkStatus('All network data deleted')});
+
 // Init
-api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels}).catch(()=>{}).finally(()=>{
+api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels;networkEnabled=c.network_enabled===true;document.getElementById('nav-network').style.display=networkEnabled?'':'none'}).catch(()=>{}).finally(()=>{
   const m=location.hash.match(/^#settings(?:\/(\w+))?/);
   if(m)showSettingsPage(m[1]||'profile');else loadDashboard();
 });
