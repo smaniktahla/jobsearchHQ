@@ -575,6 +575,45 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   </section>
   <section class="sx-page" id="sx-ai" style="display:none">
     <div class="sx-head"><h2>AI</h2><p>Choose which model handles scoring and research (Fast) and resumes and cover letters (Strong).</p></div>
+    <style>
+      .pg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px}
+      .pg-tab{padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text-dim);cursor:pointer}
+      .pg-tab.active{color:var(--accent);border-color:var(--accent)}
+      .pg-body{font-size:13px;line-height:1.55}
+      .pg-body ol{margin:6px 0 6px 20px;padding:0}.pg-body li{margin:3px 0}
+      .pg-body a,.pg-help a{color:var(--accent)}
+      .pg-note{margin-top:8px;padding:8px 10px;border-left:3px solid var(--yellow);background:var(--surface2);font-size:12px;border-radius:4px}
+      .pg-help{font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5}
+      .pg-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}.pg-table th,.pg-table td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+    </style>
+    <details class="card mb-16" id="pg-guide">
+      <summary style="cursor:pointer;font-weight:600">📖 How to set up AI providers (Claude, ChatGPT, Gemini, local) — start here</summary>
+      <div style="margin-top:12px;font-size:13px;line-height:1.55">
+        <p style="margin:0 0 8px"><strong>Two slots, two jobs.</strong> <em>Fast</em> handles high-volume work (scoring jobs, company research): pick something cheap or free. <em>Strong</em> writes your resumes, cover letters and messages: pick the best writer you're willing to pay for. They can be different providers.</p>
+        <div class="pg-note"><strong>Chat subscriptions are not API access.</strong> ChatGPT Plus/Pro, Claude Pro/Max and Google AI Pro do <u>not</u> include an API key. JSHQ needs an <em>API key</em> from the provider's developer console, billed separately (pay-as-you-go), except Gemini, which has a free tier.</div>
+        <div class="pg-tabs" id="pg-tabs"></div>
+        <div class="pg-body" id="pg-body"></div>
+        <div style="margin-top:14px"><strong>Suggested combinations</strong>
+          <table class="pg-table">
+            <tr><th>Goal</th><th>Fast</th><th>Strong</th></tr>
+            <tr><td>Best resume quality</td><td>Gemini (free) or Claude Haiku</td><td>Claude Sonnet</td></tr>
+            <tr><td>Lowest cost</td><td>Gemini (free)</td><td>Gemini Flash</td></tr>
+            <tr><td>Already pay for OpenAI</td><td>GPT-4o mini</td><td>GPT-4o</td></tr>
+            <tr><td>Nothing leaves your network</td><td>Local Ollama/Hermes</td><td>Local Ollama/Hermes</td></tr>
+          </table>
+        </div>
+        <div style="margin-top:14px"><strong>Troubleshooting</strong>
+          <ul style="margin:6px 0 0 20px;padding:0">
+            <li><em>"No API key"</em>: paste the key into the field for the provider you selected, then click Test (Test saves first).</li>
+            <li><em>401 / invalid key</em>: re-copy the key with no spaces, and check it belongs to the provider selected.</li>
+            <li><em>429 / quota / billing</em>: the account has no credit (Claude, OpenAI) or hit the free-tier rate limit (Gemini). Add credit or wait a minute.</li>
+            <li><em>Model not found</em>: clear the "Model override" box to go back to the default.</li>
+            <li>Using the same provider for Fast and Strong shares one key. Leaving a key blank uses the server's shared key, if the admin configured one.</li>
+            <li>Company-research web search always uses Anthropic regardless of the choices here.</li>
+          </ul>
+        </div>
+      </div>
+    </details>
     <div class="card mb-16">
     <div class="card-header">Provider &amp; API Keys</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Set providers independently — e.g. Gemini (free) for scoring, Anthropic for resumes. If API key is left blank, the system key is used.</div>
@@ -591,6 +630,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
           </select>
           <div id="fast-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
           <div id="fast-ai-health" class="ai-health"></div>
+          <div id="fast-key-help" class="pg-help"></div>
         </div>
         <div class="form-group" id="fast-anthropic-key-group">
           <label>Fast Provider API Key</label>
@@ -635,6 +675,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
           </select>
           <div id="strong-model-hint" style="font-size:11px;color:var(--text-dim);margin-top:4px"></div>
           <div id="strong-ai-health" class="ai-health"></div>
+          <div id="strong-key-help" class="pg-help"></div>
         </div>
         <div class="form-group" id="strong-anthropic-key-group">
           <label>Strong Provider API Key</label>
@@ -1710,7 +1751,41 @@ async function loadSettings(){
   refreshSchedulerStatus()
 }
 const PROVIDER_FAST_DEFAULTS={anthropic:'claude-haiku-4-5-20251001',gemini:'gemini-2.0-flash',openai:'gpt-4o-mini',ollama:'your ollama model'};
-const PROVIDER_STRONG_DEFAULTS={anthropic:'claude-sonnet-4-5',gemini:'gemini-2.0-flash',openai:'gpt-4o',ollama:'your ollama model'};
+const PROVIDER_STRONG_DEFAULTS={anthropic:'claude-sonnet-4-5',gemini:'gemini-2.5-flash',openai:'gpt-4o',ollama:'your ollama model'};
+const PROVIDER_GUIDE={
+  anthropic:{name:'Claude (Anthropic)',link:'https://console.anthropic.com/settings/keys',linkText:'console.anthropic.com → API Keys',
+    short:'Get a key at console.anthropic.com → Settings → API Keys (starts with sk-ant-). Needs prepaid credit; a Claude Pro/Max chat plan does not include API access.',
+    best:'Best choice for <strong>Strong</strong> (Sonnet writes the most natural resumes and cover letters). Haiku is a fast, cheap option for <strong>Fast</strong>.',
+    steps:['Go to <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> and sign up or sign in (separate from claude.ai).','Open <strong>Settings → Billing</strong> and buy a small amount of prepaid credit (a few dollars goes a long way). Without credit, calls fail.','Open <strong>Settings → <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">API Keys</a> → Create Key</strong>, name it "JSHQ" and copy it right away. It is shown only once.','Paste it into the API Key field here (it starts with <code>sk-ant-</code>) and click <strong>Test</strong>.']},
+  openai:{name:'ChatGPT / OpenAI',link:'https://platform.openai.com/api-keys',linkText:'platform.openai.com → API keys',
+    short:'Get a key at platform.openai.com → API keys (starts with sk-). Needs prepaid credit; ChatGPT Plus/Pro does not include API access.',
+    best:'GPT-4o mini works well for <strong>Fast</strong>; GPT-4o for <strong>Strong</strong>. Choose this if you already have an OpenAI developer account.',
+    steps:['Go to <a href="https://platform.openai.com" target="_blank" rel="noopener">platform.openai.com</a> and sign in (your ChatGPT login works, but billing is separate).','Open <strong>Settings → Billing</strong> and add prepaid credit. New accounts with no credit get 429 "quota" errors.','Open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener"><strong>API keys</strong></a> → <strong>Create new secret key</strong>, name it "JSHQ", and copy it. It is shown only once.','Paste it here (starts with <code>sk-</code> or <code>sk-proj-</code>) and click <strong>Test</strong>.'],
+    note:'To use an OpenAI-compatible server instead (LM Studio, vLLM, llama-server), set the <em>OpenAI-compatible base URL</em> field below.'},
+  gemini:{name:'Google Gemini',link:'https://aistudio.google.com/apikey',linkText:'aistudio.google.com → Get API key',
+    short:'Get a free key at aistudio.google.com/apikey (starts with AIza). No credit card needed for the free tier.',
+    best:'Excellent for <strong>Fast</strong> (free tier covers a lot of scoring). Usable for <strong>Strong</strong> on a budget, with somewhat less polished writing than Claude.',
+    steps:['Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with a Google account.','Click <strong>Create API key</strong> (pick or create a project when asked) and copy the key.','Paste it here (starts with <code>AIza</code>) and click <strong>Test</strong>.'],
+    note:'The free tier is rate limited (roughly 15 requests/min and 1,500/day for Flash; less for Pro). Per Google\'s terms, free-tier prompts may be used to improve their products. Your resume and job text is sent, so enable billing on the project if that matters to you.'},
+  ollama:{name:'Local (Ollama / Hermes)',link:'',linkText:'',
+    short:'No key needed. Enter the URL of your local server and the model name it serves, e.g. http://10.10.10.226:8642 and gemma4.',
+    best:'Free and private: nothing leaves your network. Quality and speed depend on your hardware; large models are best for resumes.',
+    steps:['Run an Ollama or Hermes server reachable from the JSHQ host (try <code>curl http://HOST:PORT/api/tags</code> from there).','Select <strong>Local Ollama / Hermes</strong> and enter the server URL and exact model name.','Click <strong>Test</strong>. Slow first replies are normal while the model loads.'],
+    note:'For a server that speaks the OpenAI API (llama-server, vLLM, LM Studio), pick <em>OpenAI</em> as the provider and set the <em>OpenAI-compatible base URL</em> field below instead.'}
+};
+let _pgTab='anthropic';
+function renderProviderGuide(){
+  const tabs=document.getElementById('pg-tabs'),body=document.getElementById('pg-body');
+  if(!tabs||!body)return;
+  tabs.innerHTML=Object.entries(PROVIDER_GUIDE).map(([k,g])=>`<button type="button" class="pg-tab ${k===_pgTab?'active':''}" onclick="_pgTab='${k}';renderProviderGuide()">${g.name}</button>`).join('');
+  const g=PROVIDER_GUIDE[_pgTab];
+  body.innerHTML=`<p style="margin:0 0 6px">${g.best}</p><ol>${g.steps.map(x=>`<li>${x}</li>`).join('')}</ol>${g.note?`<div class="pg-note">${g.note}</div>`:''}`;
+}
+function openProviderGuide(k){_pgTab=k;renderProviderGuide();const d=document.getElementById('pg-guide');if(d){d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'})}}
+function providerHelpHtml(k){
+  const g=PROVIDER_GUIDE[k];if(!g)return'';
+  return esc(g.short)+` <a href="#" onclick="openProviderGuide('${k}');return false">Step-by-step guide</a>`;
+}
 function updateProviderUI(){
   const fp=document.getElementById('cfg-fast-provider')?.value||'anthropic';
   const sp=document.getElementById('cfg-strong-provider')?.value||'anthropic';
@@ -1728,6 +1803,10 @@ function updateProviderUI(){
   const sh=document.getElementById('strong-model-hint');
   if(fh)fh.textContent='Default: '+(PROVIDER_FAST_DEFAULTS[fp]||'');
   if(sh)sh.textContent='Default: '+(PROVIDER_STRONG_DEFAULTS[sp]||'');
+  const fk=document.getElementById('fast-key-help'),sk=document.getElementById('strong-key-help');
+  if(fk)fk.innerHTML=providerHelpHtml(fp);
+  if(sk)sk.innerHTML=providerHelpHtml(sp);
+  renderProviderGuide();
 }
 // Work arrangement: "Remote only" is exclusive of Hybrid / In-person.
 function workModeToggle(prefix,el){
