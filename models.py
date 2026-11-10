@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from enum import Enum
 from datetime import datetime, timedelta, timezone
@@ -323,6 +323,27 @@ class EmailCompose(BaseModel):
 
 
 class AppConfig(BaseModel):
+    network_enabled: bool = False
+    network_ai_opt_in: bool = False
+    application_strategy: str = "standard"
+    network_ai_url: str = ""
+    network_ai_model: str = ""
+
+    @field_validator("network_ai_url")
+    @classmethod
+    def validate_network_ai_url(cls, value: str) -> str:
+        from urllib.parse import urlsplit
+        if value == "":
+            return value
+        try:
+            url = urlsplit(value)
+            valid = url.scheme in ("http", "https") and bool(url.hostname) and url.port != 0
+        except ValueError:
+            valid = False
+        if not valid or url.username or url.password or any(c.isspace() for c in value):
+            raise ValueError("Expected an HTTP(S) URL without credentials, or blank")
+        return value
+
     # Scoring targets
     w2_salary_min: int = 160000
     w2_salary_max: int = 220000
