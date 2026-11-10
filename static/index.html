@@ -427,6 +427,18 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   </div>
   <div id="resume-status" class="mb-16"></div>
     <div class="card"><div class="card-header">Upload Resume Text</div><div class="form-group mt-8"><label>Variant</label><select id="resume-variant" style="width:auto"><option value="full_history">Full Employment History (scoring)</option><option value="director" id="opt-director">Resume 1 — Director</option><option value="base" id="opt-base">Resume 2 — Base</option><option value="contract" id="opt-contract">Resume 3 — Contract</option></select></div><div class="flex gap-8 items-center mb-16"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('resume-docx-file').click()">Upload .docx File</button><input type="file" id="resume-docx-file" accept=".docx" style="display:none" onchange="uploadResumeDocx(this.files[0])"><span id="resume-docx-status" class="text-sm"></span></div><div class="form-group"><label>Or paste resume text</label><textarea id="resume-text" rows="10"></textarea></div><button class="btn btn-primary" onclick="uploadResume()">Upload Text</button></div>
+  <div class="card mb-16"><div class="card-header">Writing Samples</div>
+    <p class="text-dim text-sm mt-8">Upload or paste samples of your own writing. When generating cover letters and tailored resumes, the AI matches your voice from these. Style only: facts still come from your resume. Samples are stored on your account and sent to your configured AI provider when documents are generated.</p>
+    <label class="flex items-center gap-8 mt-8"><input type="checkbox" id="ws-enabled" onchange="toggleWritingSamples(this.checked)"> <span>Use writing samples when generating documents</span></label>
+    <div id="ws-list" class="mt-8"></div>
+    <div class="flex gap-8 items-center mt-8">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ws-file').click()">Upload File (.docx, .pdf, .txt, .md)</button>
+      <input type="file" id="ws-file" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="uploadWritingSample(this.files[0])">
+      <span id="ws-status" class="text-sm"></span>
+    </div>
+    <div class="form-group mt-8"><label>Or paste a sample</label><input type="text" id="ws-name" placeholder="Name (optional)" style="margin-bottom:6px"><textarea id="ws-text" rows="6"></textarea></div>
+    <button class="btn btn-primary btn-sm" onclick="addWritingSample()">Add Sample</button>
+  </div>
   </section>
   <section class="sx-page" id="sx-automation" style="display:none">
     <div class="sx-head"><h2>Job Search &amp; Automation</h2><p>Pause ingestion, schedule the daily search, and choose what happens to new jobs automatically.</p></div>
@@ -1693,6 +1705,7 @@ async function loadSettings(){
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
   loadResumeTemplate();
   loadResumeLanes();
+  loadWritingSamples();
   await renderResumeStatus();
   refreshSchedulerStatus()
 }
@@ -1874,6 +1887,51 @@ async function deleteResume(k){
   const extra=k==='full_history'?'\n\nFull Employment History is used for scoring and as background for every tailored resume.':'';
   if(!confirm('Delete "'+resumeLabel(k)+'" ('+k+')? This removes its stored text.'+extra)) return;
   try{await api('/api/resumes/'+k,{method:'DELETE'});loadSettings()}
+  catch(e){alert('Delete failed: '+e.message)}
+}
+// Writing samples
+async function loadWritingSamples(){
+  const el=document.getElementById('ws-list');if(!el)return;
+  try{
+    const r=await api('/api/writing-samples');
+    document.getElementById('ws-enabled').checked=r.enabled;
+    el.innerHTML=r.samples.length?r.samples.map(m=>`<div style="margin:4px 0"><div class="flex items-center gap-8"><strong>${esc(m.name)}</strong> <span class="text-dim text-sm">${m.chars} chars${m.truncated?' (truncated)':''}</span> <button class="btn btn-ghost btn-sm" id="ws-view-btn-${m.id}" onclick="toggleWritingSampleView('${m.id}')">View</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteWritingSample('${m.id}')">Delete</button></div><pre id="ws-view-${m.id}" style="display:none;white-space:pre-wrap;max-height:320px;overflow:auto;margin:8px 0 12px;padding:12px;font:12px/1.5 inherit;border:1px solid var(--border);border-radius:8px;background:var(--surface2)"></pre></div>`).join(''):'<div class="text-dim text-sm">No samples yet.</div>';
+  }catch(e){el.textContent='Failed to load: '+e.message}
+}
+function wsStatus(msg,color){const s=document.getElementById('ws-status');s.textContent=msg;s.style.color=color||'var(--text-dim)'}
+async function uploadWritingSample(file){
+  if(!file) return;
+  wsStatus('Uploading...');
+  try{
+    const fd=new FormData();fd.append('file',file);
+    const res=await fetch('/api/writing-samples/upload',{method:'POST',body:fd});
+    if(res.status===401){window.location.href='/auth/login';return}
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}
+    wsStatus('Added ✓','var(--green)');loadWritingSamples();
+  }catch(e){wsStatus('Failed: '+e.message,'var(--red)')}
+  document.getElementById('ws-file').value='';
+}
+async function addWritingSample(){
+  const c=document.getElementById('ws-text').value;if(!c.trim())return alert('Paste some text');
+  try{await api('/api/writing-samples',{method:'POST',body:{name:document.getElementById('ws-name').value,content:c}});
+    document.getElementById('ws-text').value='';document.getElementById('ws-name').value='';wsStatus('Added ✓','var(--green)');loadWritingSamples()}
+  catch(e){wsStatus('Failed: '+e.message,'var(--red)')}
+}
+async function toggleWritingSamples(on){
+  try{await api('/api/writing-samples/settings',{method:'PUT',body:{enabled:on}})}
+  catch(e){alert('Could not save: '+e.message);loadWritingSamples()}
+}
+async function toggleWritingSampleView(id){
+  const box=document.getElementById('ws-view-'+id),btn=document.getElementById('ws-view-btn-'+id);
+  if(!box) return;
+  if(box.style.display!=='none'){box.style.display='none';btn.textContent='View';return}
+  box.textContent='Loading...';box.style.display='block';btn.textContent='Hide';
+  try{const r=await api('/api/writing-samples/'+id);box.textContent=r.content||'(empty)'}
+  catch(e){box.textContent='Failed to load: '+e.message}
+}
+async function deleteWritingSample(id){
+  if(!confirm('Delete this writing sample?')) return;
+  try{await api('/api/writing-samples/'+id,{method:'DELETE'});loadWritingSamples()}
   catch(e){alert('Delete failed: '+e.message)}
 }
 // Resume template
