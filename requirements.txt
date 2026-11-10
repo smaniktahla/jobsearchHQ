@@ -11,3 +11,4 @@ APScheduler==3.10.4
 googlesearch-python==1.2.5
 google-generativeai==0.8.5
 openai==1.75.0
+pypdf==5.1.0

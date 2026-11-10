@@ -18,6 +18,7 @@ from models import Job, ScoreBreakdown, CoverLetter, MarketLane, AppConfig
 import lanes
 import storage
 import ai_router
+import writing_samples
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +393,7 @@ Overall: {job.score.raw_analysis}"""
         resume_text=resume_text,
         score_analysis=score_analysis,
     )
+    system = writing_samples.with_cover_letter_guidance(system, user_id)
 
     styles = {
         "direct": "Write a confident, direct cover letter. Lead with the strongest qualification match. Assertive tone. This person knows their value.",
@@ -499,6 +501,7 @@ Overall: {job.score.raw_analysis}"""
         resume_text=resume_text,
         score_analysis=score_analysis,
     )
+    system = writing_samples.with_resume_guidance(system, user_id)
 
     user_msg = f"Tailor my resume for this job:\n\nCompany: {job.company}\nTitle: {job.title}\n\nJob Description:\n{job.raw_jd}"
 
