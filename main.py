@@ -58,6 +58,7 @@ import company_research
 import company_site_search
 import ai_router
 import lanes
+import writing_samples
 import activity
 import scheduler
 import auto_approve
@@ -415,6 +416,20 @@ def agent_update_profile(data: ProfileUpdate, request: Request):
     if data.certifications is not None: config.certifications = data.certifications
     storage.save_config(admin_id, config)
     return agent_get_profile(request)
+
+
+@app.get("/api/agent/writing-samples")
+def agent_get_writing_samples(request: Request):
+    """The user's writing samples (voice/style reference for cover letters and resumes). Empty when the feature is turned off."""
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    if not admin_id:
+        raise HTTPException(503, "No admin user configured")
+    enabled = writing_samples.is_enabled(admin_id)
+    samples = [{**m, "text": writing_samples.get_text(admin_id, m["id"]) or ""} for m in writing_samples.list_samples(admin_id)] if enabled else []
+    return {"enabled": enabled, "samples": samples, "prompt_text": writing_samples.prompt_text(admin_id)}
 
 
 @app.get("/api/agent/key")
@@ -2270,6 +2285,67 @@ def download_resume_original(variant: str, user: User = Depends(get_current_user
         path, filename=name,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
+
+
+# ── Writing samples (voice/style guidance for generated cover letters and resumes) ──
+
+@app.get("/api/writing-samples")
+def list_writing_samples(user: User = Depends(get_current_user)):
+    return {
+        "enabled": writing_samples.is_enabled(user.id),
+        "samples": writing_samples.list_samples(user.id),
+        "limits": {"max_samples": writing_samples.MAX_SAMPLES, "max_sample_chars": writing_samples.MAX_SAMPLE_CHARS,
+                   "prompt_budget_chars": writing_samples.PROMPT_BUDGET_CHARS,
+                   "extensions": list(writing_samples.ALLOWED_EXTENSIONS)},
+    }
+
+
+@app.post("/api/writing-samples")
+async def add_writing_sample(request: Request, user: User = Depends(get_current_user)):
+    """Add a pasted writing sample: JSON {"name": str, "content": str}."""
+    body = await request.json()
+    try:
+        return writing_samples.add_sample(user.id, str(body.get("name", "")), str(body.get("content", "")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/writing-samples/upload")
+async def upload_writing_sample(user: User = Depends(get_current_user), file: UploadFile = File(...), name: str = ""):
+    """Upload a writing sample file (.docx, .pdf, .txt, .md); text is extracted and stored."""
+    data = await file.read(writing_samples.MAX_FILE_BYTES + 1)
+    if len(data) > writing_samples.MAX_FILE_BYTES:
+        raise HTTPException(400, "File is too large (5 MB max)")
+    try:
+        text = writing_samples.extract_text(data, file.filename or "")
+        return writing_samples.add_sample(user.id, name, text, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.put("/api/writing-samples/settings")
+async def put_writing_samples_settings(request: Request, user: User = Depends(get_current_user)):
+    body = await request.json()
+    if not isinstance(body.get("enabled"), bool):
+        raise HTTPException(400, "enabled must be true or false")
+    writing_samples.set_enabled(user.id, body["enabled"])
+    return {"ok": True, "enabled": body["enabled"]}
+
+
+@app.get("/api/writing-samples/{sample_id}")
+def get_writing_sample(sample_id: str, user: User = Depends(get_current_user)):
+    text = writing_samples.get_text(user.id, sample_id)
+    if text is None:
+        raise HTTPException(404, "No such writing sample")
+    meta = next((m for m in writing_samples.list_samples(user.id) if m["id"] == sample_id), {"id": sample_id})
+    return {**meta, "content": text}
+
+
+@app.delete("/api/writing-samples/{sample_id}")
+def delete_writing_sample(sample_id: str, user: User = Depends(get_current_user)):
+    if not writing_samples.delete_sample(user.id, sample_id):
+        raise HTTPException(404, "No such writing sample")
+    return {"ok": True}
 
 
 # ── Resume template (user-uploaded layout for tailored resumes) ─────────────
