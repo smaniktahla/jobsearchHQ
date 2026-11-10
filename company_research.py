@@ -11,6 +11,7 @@ Flow:
 
 import json
 import logging
+import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -48,8 +49,27 @@ def _claude_search(prompt: str, max_tokens: int = 1000) -> str:
 
 # ── Step 1: Find domain ────────────────────────────────────────────────────────
 
+class ResearchError(RuntimeError):
+    """The search backend failed (not "searched and found nothing"). Callers surface this to the user."""
+
+
+def _api_error_message(e: Exception) -> str:
+    """One-line reason from an Anthropic/HTTP error, e.g. 'credit balance too low'."""
+    detail = getattr(e, "message", None)
+    body = getattr(e, "body", None)
+    if isinstance(body, dict):
+        detail = (body.get("error") or {}).get("message") or detail
+    detail = str(detail or e)
+    if "credit balance is too low" in detail:
+        return "Anthropic API credit balance too low"
+    return detail[:200]
+
+
 def _find_domain(company: str) -> str | None:
-    """Use Claude web search to find the official company domain."""
+    """Use Claude web search to find the official company domain.
+
+    Returns None only when the search ran and gave no usable domain; a backend failure raises ResearchError.
+    """
     logger.info(f"Finding domain for: {company}")
     try:
         text = _claude_search(
@@ -57,10 +77,10 @@ def _find_domain(company: str) -> str | None:
             f'Return ONLY the domain name like "alvarezandmarsal.com" — '
             f'no https://, no www., no trailing slash, nothing else.'
         )
-        return _clean_domain(text)
     except Exception as e:
         logger.error(f"Domain search failed: {e}")
-        return None
+        raise ResearchError(_api_error_message(e)) from e
+    return _clean_domain(text)
 
 
 def _clean_domain(text: str) -> str | None:
@@ -97,14 +117,148 @@ def _search_contacts(company: str, job_title: str, domain: str | None) -> dict:
 
     try:
         raw = _claude_search(prompt, max_tokens=2000)
+    except Exception as e:
+        logger.error(f"Contact web search failed: {e}")
+        raise ResearchError(_api_error_message(e)) from e
+    try:
         raw = re.sub(r'^```json\s*|^```\s*|\s*```$', '', raw, flags=re.MULTILINE).strip()
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             return json.loads(match.group())
     except Exception as e:
-        logger.error(f"Contact web search failed: {e}")
+        logger.error(f"Contact search returned unparseable JSON: {e}")
 
     return {"company_summary": "", "contacts": []}
+
+
+# ── Local fallback: SearXNG + local LLM ───────────────────────────────────────
+# Used only when Claude web search raises ResearchError (e.g. API credit exhausted).
+
+SEARXNG_URL = os.environ.get("RESEARCH_SEARXNG_URL", "http://10.10.10.244:8081")
+FALLBACK_LLM_URL = os.environ.get("RESEARCH_FALLBACK_LLM_URL", "http://10.10.10.105:8081")  # AI1 llama-server
+FALLBACK_LLM_MODEL = os.environ.get("RESEARCH_FALLBACK_LLM_MODEL", "qwen35-4b")  # alias; model is Gemma4 26B-A4B
+
+
+class _FallbackLLMConfig:
+    ollama_url = FALLBACK_LLM_URL
+    ollama_model = FALLBACK_LLM_MODEL
+
+
+def _searx(query: str, limit: int = 8) -> list[dict]:
+    """Query SearXNG. Raises ResearchError if it is unreachable or returns nothing."""
+    try:
+        r = requests.get(f"{SEARXNG_URL}/search", params={"q": query, "format": "json"}, timeout=30)
+        r.raise_for_status()
+        results = r.json().get("results", [])
+    except Exception as e:
+        raise ResearchError(f"SearXNG search failed: {str(e)[:150]}") from e
+    out = [
+        {"title": x.get("title", ""), "url": x.get("url", ""), "content": x.get("content", "")}
+        for x in results if x.get("url")
+    ][:limit]
+    if not out:
+        raise ResearchError(f"SearXNG returned no results for: {query}")
+    return out
+
+
+def _fallback_llm_json(system: str, user_msg: str, max_tokens: int = 1500) -> dict:
+    try:
+        raw = ai_router._ollama_chat(
+            system, user_msg, _FallbackLLMConfig, json_mode=True, max_tokens=max_tokens, timeout=180
+        )
+        return json.loads(raw)
+    except Exception as e:
+        raise ResearchError(f"local LLM extraction failed: {str(e)[:150]}") from e
+
+
+def _host(url: str) -> str:
+    m = re.match(r'^(?:https?://)?([^/:?#]+)', url.strip().lower())
+    return re.sub(r'^www\.', '', m.group(1)) if m else ""
+
+
+def _local_find_domain(company: str) -> str | None:
+    """SearXNG + local LLM: pick the official domain from search results (must appear in a result URL)."""
+    results = _searx(f"{company} official website")
+    hosts = {_host(r["url"]) for r in results}
+    listing = "\n".join(f"{i+1}. {r['title']} | {_host(r['url'])} | {r['content'][:150]}" for i, r in enumerate(results))
+    data = _fallback_llm_json(
+        "You identify official company websites from search results. Reply with JSON only.",
+        f'Which result is the official website of "{company}" (the company itself, not Wikipedia, '
+        f'LinkedIn, a directory, a news site or a job board)?\n\n{listing}\n\n'
+        f'Reply as {{"domain": "example.com"}} using a domain exactly as listed, or {{"domain": null}} if none is clearly official.',
+        max_tokens=100,
+    )
+    domain = _clean_domain(str(data.get("domain") or ""))
+    if domain and any(h == domain or h.endswith("." + domain) for h in hosts):
+        return domain
+    return None
+
+
+def _local_search_contacts(company: str, job_title: str, domain: str | None) -> dict:
+    """SearXNG + local LLM leadership extraction. Only names present in the gathered text are kept."""
+    queries = [f"{company} leadership team", f"{company} CEO chief executive officer"]
+    if domain:
+        queries.append(f"{company} {domain} executive team")
+    queries.append(f"{company} chief data officer chief people officer head of talent")
+    blocks, seen = [], set()
+    for q in queries:
+        try:
+            results = _searx(q)
+        except ResearchError:
+            if q == queries[0]:
+                raise
+            continue
+        for r in results:
+            if r["url"] in seen:
+                continue
+            seen.add(r["url"])
+            blocks.append(f"[{r['title']}] ({r['url']})\n{r['content']}")
+    context = "\n\n".join(blocks)
+    # Fetch up to 2 leadership-looking result pages (snippets alone are thin).
+    pages = 0
+    for u in [u for u in seen if (re.search(r'leader|executive|management|our-team|/team|people', u.lower())
+               and (not domain or _host(u).endswith(domain))) or "en.wikipedia.org/wiki/" in u]:
+        if pages >= 2:
+            break
+        try:
+            r = requests.get(u, headers=HEADERS, timeout=FETCH_TIMEOUT)
+            if r.status_code != 200:
+                continue
+            soup = BeautifulSoup(r.text, "html.parser")
+            for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+                tag.decompose()
+            text = re.sub(r'\s+', ' ', soup.get_text(separator=" ", strip=True))
+            if len(text) > 300:
+                context += f"\n\n[Page] ({u})\n{text[:4000]}"
+                pages += 1
+        except Exception as e:
+            logger.debug(f"Fallback page fetch failed {u}: {e}")
+    if domain:
+        page_text, page_url = _try_scrape(domain)
+        if page_url:
+            context += f"\n\n[Company leadership page] ({page_url})\n{page_text}"
+    context = context[:16000]
+
+    data = _fallback_llm_json(
+        "You extract people from search results. Use ONLY names and titles that appear in the text provided. "
+        "Never invent or guess a person. Reply with JSON only.",
+        f'Company: "{company}"{" (" + domain + ")" if domain else ""}\n\n{context}\n\n'
+        f'List current leadership and key people at this company who matter to a {job_title or "Director of Data Analytics"} '
+        f'candidate (CEO/President, data/analytics leaders, HR/talent leaders). Max 6, most relevant first. Reply as '
+        f'{{"company_summary": "1-2 sentences, only facts in the text", "contacts": [{{"name": "Full Name", '
+        f'"title": "Title as written", "notes": "why relevant, 1 sentence", "confidence": "high|medium|low"}}]}}',
+        max_tokens=1500,
+    )
+    haystack = re.sub(r'\s+', ' ', context.lower())
+    contacts = []
+    for c in data.get("contacts") or []:
+        name = re.sub(r'\s+', ' ', str(c.get("name", ""))).strip()
+        if len(name.split()) >= 2 and name.lower() in haystack:
+            c["name"] = name
+            contacts.append(c)
+        else:
+            logger.info(f"Fallback dropped contact not found in search text: {name!r}")
+    return {"company_summary": str(data.get("company_summary") or ""), "contacts": contacts}
 
 
 # ── Step 3: Direct site scrape (bonus enrichment) ─────────────────────────────
@@ -251,18 +405,52 @@ def research_company(company: str, job_title: str = "", user_id: str = "") -> di
         "searches_run": [],
     }
 
+    # Claude web search is primary; on ResearchError fall back to SearXNG + local LLM.
+    claude_down = False
+    fallback_used = False
+
+    def _with_fallback(label, primary, local):
+        nonlocal claude_down, fallback_used
+        if not claude_down:
+            try:
+                return primary()
+            except ResearchError as e:
+                claude_down = True
+                primary_err = e
+                logger.warning(f"{label}: Claude search failed ({e}); trying SearXNG + local LLM")
+                result["searches_run"].append(f"Claude web search failed ({e}); using SearXNG + local LLM fallback")
+                try:
+                    value = local()
+                except ResearchError as e2:
+                    raise ResearchError(f"{primary_err}; local fallback also failed: {e2}") from e2
+                fallback_used = True
+                return value
+        try:
+            value = local()
+        except ResearchError as e2:
+            raise ResearchError(f"Claude search unavailable; local fallback also failed: {e2}") from e2
+        fallback_used = True
+        return value
+
     # Step 1: Find domain
-    domain = _find_domain(company)
+    domain = _with_fallback("domain", lambda: _find_domain(company), lambda: _local_find_domain(company))
+    tag = " [SearXNG+local LLM]" if fallback_used else ""
     result["searches_run"].append(
-        f"Domain search: {'found ' + domain if domain else 'not found'}"
+        f"Domain search{tag}: {'found ' + domain if domain else 'not found'}"
     )
     logger.info(f"Domain: {domain}")
 
     # Step 2: Web search for contacts (primary — always runs)
-    extracted = _search_contacts(company, job_title, domain)
+    extracted = _with_fallback(
+        "contacts",
+        lambda: _search_contacts(company, job_title, domain),
+        lambda: _local_search_contacts(company, job_title, domain),
+    )
     result["company_summary"] = extracted.get("company_summary", "")
     raw_contacts = extracted.get("contacts", [])
-    result["searches_run"].append(f"Leadership web search: {len(raw_contacts)} contacts found")
+    result["searches_run"].append(
+        f"Leadership web search{' [SearXNG+local LLM]' if claude_down else ''}: {len(raw_contacts)} contacts found"
+    )
     logger.info(f"Web search found {len(raw_contacts)} contacts")
 
     # Step 3: Bonus — try direct scrape for enrichment
@@ -296,8 +484,12 @@ def research_company(company: str, job_title: str = "", user_id: str = "") -> di
             "confidence": c.get("confidence", "medium"),
         })
 
-    # Step 5: Google email search (parallel, non-blocking per contact)
-    if contacts:
+    # Step 5: Google email search (parallel, non-blocking per contact). Skipped when Claude is down.
+    if contacts and claude_down:
+        for c in contacts:
+            c["google_email_search_url"] = _build_google_email_url(c["name"], company)
+        result["searches_run"].append("Google email search: skipped (Claude unavailable; manual search links added)")
+    elif contacts:
         contacts = _enrich_contacts_with_emails(contacts, company)
         found_emails = sum(1 for c in contacts if c.get("email"))
         result["searches_run"].append(

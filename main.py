@@ -63,6 +63,7 @@ import scheduler
 import auto_approve
 import rejection_intake
 import backfill
+import research_batch
 from intake import process_intake
 import jd_cleanup
 import job_liveness
@@ -2496,6 +2497,33 @@ async def generate_missing_resumes(request: Request, user: User = Depends(get_cu
 def cancel_generate_missing(user: User = Depends(get_current_user)):
     """Stop the running backfill after the resume currently being generated."""
     return {"cancelling": backfill.cancel(user.id)}
+
+
+@app.get("/api/research/missing")
+def unresearched_jobs(threshold: int | None = None, user: User = Depends(get_current_user)):
+    """Scored jobs at/above the threshold (default: the auto-research threshold) with no company research."""
+    if threshold is None:
+        threshold = storage.load_config(user.id).auto_research_threshold
+    return research_batch.summarize(user.id, threshold)
+
+
+@app.post("/api/research/run-missing")
+async def research_missing_companies(request: Request, user: User = Depends(get_current_user)):
+    """Start researching the unresearched companies in the background; poll GET /api/research/missing."""
+    body = await request.json() if (await request.body()) else {}
+    threshold = int(body.get("threshold") or storage.load_config(user.id).auto_research_threshold)
+    limit = body.get("limit")
+    try:
+        research_batch.start_background(user.id, threshold, int(limit) if limit else None)
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+    return {"started": True, "threshold": threshold}
+
+
+@app.post("/api/research/cancel")
+def cancel_research_missing(user: User = Depends(get_current_user)):
+    """Stop the running batch after the company currently being researched."""
+    return {"cancelling": research_batch.cancel(user.id)}
 
 
 @app.get("/api/scheduler/logs")
