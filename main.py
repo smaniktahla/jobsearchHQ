@@ -2037,7 +2037,7 @@ def generate_contact_message(
             job=job,
             contact_name=req.contact_name,
             contact_title=req.contact_title,
-            author_name=config.author_name or "Salil",
+            author_name=config.author_name or user.name or "",
             user_id=user.id,
         )
         return {"message": message}
@@ -2141,6 +2141,12 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     config.author_github   = existing.author_github
     config.author_portfolio = existing.author_portfolio
     config.resume_lane_descriptions = existing.resume_lane_descriptions
+    # Not editable from the Settings form: wizard state and intake pre-filter knobs.
+    config.onboarding_completed = existing.onboarding_completed
+    config.prefilter_w2_floor = existing.prefilter_w2_floor
+    config.prefilter_hourly_floor = existing.prefilter_hourly_floor
+    config.prefilter_dc_metro_only = existing.prefilter_dc_metro_only
+    config.prefilter_manager_plus_only = existing.prefilter_manager_plus_only
     config.work_experience = existing.work_experience
     config.education       = existing.education
     config.certifications  = existing.certifications
@@ -2220,6 +2226,93 @@ def update_profile(data: ProfileUpdate, user: User = Depends(get_current_user)):
     if data.certifications is not None: config.certifications = data.certifications
     storage.save_config(user.id, config)
     return get_profile(user)
+
+
+# ── First-login setup wizard ───────────────────────────────────────────────────
+
+class OnboardingAI(BaseModel):
+    provider: str                      # anthropic | gemini | openai | ollama (applied to Fast and Strong)
+    api_key: str = ""
+    ollama_url: str = ""
+    ollama_model: str = ""
+    openai_base_url: str = ""
+
+
+class OnboardingPreferences(BaseModel):
+    job_titles: list[str] = []
+    location: str = ""
+    work_mode: str = ""                # "remote" | "hybrid" | "onsite" | "any" (blank = leave as is)
+    w2_salary_min: int = 0
+    w2_salary_max: int = 0
+    contract_hourly_min: int = 0
+    contract_hourly_max: int = 0
+    deal_breakers: list[str] = []
+    preferred_keywords: list[str] = []
+
+
+def _clean_list(items: list[str]) -> list[str]:
+    seen, out = set(), []
+    for x in items:
+        x = (x or "").strip()
+        if x and x.lower() not in seen:
+            seen.add(x.lower()); out.append(x)
+    return out
+
+
+@app.put("/api/onboarding/ai")
+def onboarding_ai(data: OnboardingAI, user: User = Depends(get_current_user)):
+    if data.provider not in ("anthropic", "gemini", "openai", "ollama"):
+        raise HTTPException(400, "Unknown provider")
+    config = storage.load_config(user.id)
+    config.fast_provider = config.strong_provider = data.provider
+    key = data.api_key.strip()
+    if data.provider in ("anthropic", "gemini", "openai") and key:
+        setattr(config, f"{data.provider}_api_key", key)
+    if data.provider == "ollama":
+        config.ollama_url = data.ollama_url.strip()
+        config.ollama_model = data.ollama_model.strip()
+    if data.provider == "openai":
+        config.openai_base_url = data.openai_base_url.strip()
+    config.fast_model = config.strong_model = ""   # provider defaults
+    storage.save_config(user.id, config)
+    return {"ok": True}
+
+
+@app.put("/api/onboarding/preferences")
+def onboarding_preferences(data: OnboardingPreferences, user: User = Depends(get_current_user)):
+    config = storage.load_config(user.id)
+    config.scheduled_search_terms = _clean_list(data.job_titles)
+    config.scheduled_search_location = data.location.strip()
+    if data.work_mode in ("remote", "hybrid", "onsite", "any"):
+        config.scheduled_search_remote = data.work_mode == "remote"
+        config.scheduled_search_hybrid = data.work_mode in ("hybrid", "any")
+        config.scheduled_search_onsite = data.work_mode in ("onsite", "any")
+    config.w2_salary_min = max(0, data.w2_salary_min)
+    config.w2_salary_max = max(0, data.w2_salary_max)
+    config.contract_hourly_min = max(0, data.contract_hourly_min)
+    config.contract_hourly_max = max(0, data.contract_hourly_max)
+    config.deal_breakers = _clean_list(data.deal_breakers)
+    config.preferred_keywords = _clean_list(data.preferred_keywords)
+    storage.save_config(user.id, config)
+    scheduler.update_schedule(config, user.id)
+    return {"ok": True}
+
+
+@app.post("/api/onboarding/complete")
+def onboarding_complete(user: User = Depends(get_current_user)):
+    config = storage.load_config(user.id)
+    config.onboarding_completed = True
+    storage.save_config(user.id, config)
+    return {"ok": True}
+
+
+@app.post("/api/onboarding/reset")
+def onboarding_reset(user: User = Depends(get_current_user)):
+    """Re-open the setup wizard (Settings → "Run setup again"). Changes no data."""
+    config = storage.load_config(user.id)
+    config.onboarding_completed = False
+    storage.save_config(user.id, config)
+    return {"ok": True}
 
 
 @app.get("/api/resumes")

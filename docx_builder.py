@@ -135,10 +135,25 @@ def add_job_meta(doc, org, dates=""):
     return p
 
 
-def _resume_filename(company: str, title: str) -> str:
+def _name_prefix(name: str) -> str:
+    safe = re.sub(r"[^\w\s.-]", "", name or "").strip()[:60]
+    return f"{safe} - " if safe else ""
+
+
+def _resume_filename(company: str, title: str, author_name: str = "") -> str:
     safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
     safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
-    return f"Salil Maniktahla - {safe_title} - {safe_company}.docx"
+    return f"{_name_prefix(author_name)}{safe_title} - {safe_company}.docx"
+
+
+def _author_name_for(user_id: str) -> str:
+    if not user_id:
+        return ""
+    try:
+        import storage as _s
+        return _s.load_config(user_id).author_name or ""
+    except Exception:
+        return ""
 
 
 def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", company: str = "", title: str = "") -> str:
@@ -156,7 +171,7 @@ def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", com
         if resume_template.has_template(user_id):
             try:
                 return resume_template.render(
-                    tailored_text, user_id, out_dir / _resume_filename(company, title)
+                    tailored_text, user_id, out_dir / _resume_filename(company, title, _author_name_for(user_id))
                 )
             except Exception:
                 import logging
@@ -332,7 +347,7 @@ def generate_resume_docx(tailored_text: str, job_id: str, user_id: str = "", com
         i += 1
 
     # Save
-    filepath = out_dir / _resume_filename(company, title)
+    filepath = out_dir / _resume_filename(company, title, _author_name_for(user_id))
     doc.save(str(filepath))
 
     return str(filepath)
@@ -345,10 +360,10 @@ def generate_cover_letter_docx(
     user_id: str = "",
     company: str = "",
     title: str = "",
-    author_name: str = "Salil Maniktahla",
-    author_location: str = "Springfield, VA",
-    author_phone: str = "571-215-8218",
-    author_email: str = "salil.maniktahla@gmail.com",
+    author_name: str = "",
+    author_location: str = "",
+    author_phone: str = "",
+    author_email: str = "",
 ) -> str:
     """
     Generate a professional cover letter .docx.
@@ -380,7 +395,7 @@ def generate_cover_letter_docx(
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.space_after = Pt(0)
-    run = p.add_run(author_name or "Salil Maniktahla")
+    run = p.add_run(author_name or "")
     run.bold = True
     run.font.name = "Calibri"
     run.font.size = Pt(14)
@@ -389,10 +404,7 @@ def generate_cover_letter_docx(
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(2)
     p.paragraph_format.space_after = Pt(0)
-    _loc = author_location or "Springfield, VA"
-    _phone = author_phone or "571-215-8218"
-    _email = author_email or "salil.maniktahla@gmail.com"
-    run = p.add_run(f"{_loc}  \u00B7  {_phone}  \u00B7  {_email}")
+    run = p.add_run("  \u00B7  ".join(x for x in (author_location, author_phone, author_email) if x))
     run.font.name = "Calibri"
     run.font.size = Pt(9)
     run.font.color.rgb = MEDIUM
@@ -441,7 +453,7 @@ def generate_cover_letter_docx(
     safe_company = re.sub(r"[^\w\s-]", "", company or "Company")[:40].strip()
     safe_title = re.sub(r"[^\w\s-]", "", title or "Position")[:50].strip()
     safe_variant = re.sub(r"[^\w]", "", variant)[:15]
-    filename = f"Salil Maniktahla - Cover Letter ({safe_variant}) - {safe_title} - {safe_company}.docx"
+    filename = f"{_name_prefix(author_name)}Cover Letter ({safe_variant}) - {safe_title} - {safe_company}.docx"
     filepath = out_dir / filename
     doc.save(str(filepath))
 

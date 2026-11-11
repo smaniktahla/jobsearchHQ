@@ -87,8 +87,10 @@ def send_follow_up_digest(config: AppConfig, due_jobs: list[Job]) -> dict:
             lines.append(f"  {j.url}")
         lines.append("")
 
-    lines.append("---")
-    lines.append("Manage at http://10.10.10.13:8093")
+    base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
+    if base_url:
+        lines.append("---")
+        lines.append(f"Manage at {base_url}")
 
     return send_email(
         config=config,

@@ -15,7 +15,7 @@ import storage
 GMAIL_LABEL = "LinkedIn Job Alerts"
 GMAIL_IMAP_HOST = "imap.gmail.com"
 
-# DC-metro location tokens — mirrors the "on-site only outside DC metro" deal breaker.
+# DC-metro location tokens — used only when the user's config sets prefilter_dc_metro_only.
 DC_METRO_TOKENS = (
     "remote", "dc", "washington", "virginia", " va", "va)", "maryland", " md", "md)",
     "arlington", "alexandria", "tysons", "reston", "bethesda", "rockville", "mclean", "vienna",
@@ -30,15 +30,13 @@ SENIOR_ENOUGH_TOKENS = (
     "manager", "director", "vp", "vice president", "head of", "principal", "lead", "chief",
 )
 
-# Pre-filter pay floors for thin digest listings — set explicitly higher than
-# config.w2_salary_min/contract_hourly_min since this is a stricter first-pass
-# cut, not the full scoring engine's target range.
-PREFILTER_W2_FLOOR = 180000
-PREFILTER_HOURLY_FLOOR = 60
+# Pre-filter pay floors for thin digest listings come from the user's config
+# (prefilter_w2_floor / prefilter_hourly_floor, 0 = off): a stricter first-pass
+# cut than the full scoring engine's target range.
 
 
 def _prefilter_reason(title: str, company: str, location: str, pay_range: str, deal_breakers: list[str],
-                       w2_floor: float, hourly_floor: float) -> str | None:
+                       w2_floor: float, hourly_floor: float, dc_metro_only: bool = False, manager_plus_only: bool = False) -> str | None:
     """
     Cheap, deterministic rejection pass for thin (title/company/location/pay-only)
     listings — these lack a full JD so the real LLM scorer (scoring.score_job)
@@ -56,7 +54,7 @@ def _prefilter_reason(title: str, company: str, location: str, pay_range: str, d
             return f"Deal breaker: {breaker}"
 
     # Location — only reject if a location was actually disclosed
-    if location_l and not any(tok in location_l for tok in DC_METRO_TOKENS):
+    if dc_metro_only and location_l and not any(tok in location_l for tok in DC_METRO_TOKENS):
         return f"Outside DC metro / not remote: {location}"
 
     # Pay floor
@@ -71,7 +69,7 @@ def _prefilter_reason(title: str, company: str, location: str, pay_range: str, d
                 return f"Below ${w2_floor:,.0f}/yr floor: {pay_range}"
 
     # Seniority floor — W2 roles only (contract/hourly listings have no floor)
-    if not is_hourly:
+    if manager_plus_only and not is_hourly:
         has_junior_token = any(tok in title_l for tok in JUNIOR_TITLE_TOKENS)
         has_senior_token = any(tok in title_l for tok in SENIOR_ENOUGH_TOKENS)
         if has_junior_token and not has_senior_token:
@@ -204,7 +202,9 @@ def process_linkedin_alerts(user_id: str) -> dict:
 
                 reason = _prefilter_reason(
                     title, company, pj["location"], pj["pay_range"], config.deal_breakers,
-                    w2_floor=PREFILTER_W2_FLOOR, hourly_floor=PREFILTER_HOURLY_FLOOR,
+                    w2_floor=config.prefilter_w2_floor, hourly_floor=config.prefilter_hourly_floor,
+                    dc_metro_only=config.prefilter_dc_metro_only,
+                    manager_plus_only=config.prefilter_manager_plus_only,
                 )
                 if reason:
                     job.review_status = ReviewStatus.REJECTED

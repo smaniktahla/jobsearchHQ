@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class JobSearchRequest(BaseModel):
     search_term: str
-    location: str = "Washington DC-Baltimore Area"
+    location: str = ""
     sites: list[str] = ["indeed", "linkedin", "google"]
     results_wanted: int = 25
     hours_old: int = 72

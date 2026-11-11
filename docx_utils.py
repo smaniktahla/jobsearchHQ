@@ -25,8 +25,8 @@ def extract_text_from_docx(file_path: str | Path) -> str:
 def generate_cover_letter_docx(
     output_path: str | Path,
     body_text: str,
-    candidate_name: str = "Salil Maniktahla",
-    candidate_contact: str = "Springfield, VA · 571-215-8218 · salil.maniktahla@gmail.com",
+    candidate_name: str = "",
+    candidate_contact: str = "",
     company: str = "",
     job_title: str = "",
     variant_label: str = "",

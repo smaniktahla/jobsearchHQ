@@ -280,7 +280,7 @@ def load_config(user_id: str) -> AppConfig:
             return AppConfig(**json.loads(path.read_text()))
         except Exception:
             pass
-    config = AppConfig()
+    config = AppConfig(onboarding_completed=False)
     save_config(user_id, config)
     return config
 

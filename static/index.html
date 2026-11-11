@@ -133,7 +133,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="card mb-16">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="form-group"><label>Search Term</label><input type="text" id="search-term" placeholder="senior director information technology" value="senior director data analytics"></div>
-      <div class="form-group"><label>Location</label><input type="text" id="search-location" value="Washington, DC"><div style="font-size:11px;color:var(--text-dim);margin-top:4px">Use standard format: "Washington, DC" or "New York, NY" or "Remote". LinkedIn metro names like "Washington DC-Baltimore Area" won't work for other boards.</div></div>
+      <div class="form-group"><label>Location</label><input type="text" id="search-location" value="" placeholder="City, State or \"Remote\""><div style="font-size:11px;color:var(--text-dim);margin-top:4px">Use standard format: "Washington, DC" or "New York, NY" or "Remote". LinkedIn metro names like "Washington DC-Baltimore Area" won't work for other boards.</div></div>
       <div class="form-group"><label>Job Boards</label>
         <div class="flex gap-8" style="flex-wrap:wrap;margin-top:4px">
           <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="site-indeed" checked style="width:auto"> Indeed</label>
@@ -492,7 +492,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
           </div>
         </div>
         <div class="form-group"><label>Company Career Sites (one per line)</label><textarea id="cfg-sched-company-sites" rows="3" placeholder="MITRE | https://careers.mitre.org/us/en/search-results"></textarea></div>
-      <div class="form-group"><label>Location</label><input type="text" id="cfg-sched-location" value="Washington, DC"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="cfg-sched-location" value="" placeholder="City, State"></div>
       <div class="form-group"><label>Results Per Board</label><input type="number" id="cfg-sched-results" value="25" style="width:100px"></div>
       <div class="form-group"><label>Posted Within (hours)</label><input type="number" id="cfg-sched-hours" value="24" style="width:100px"></div>
       <div class="form-group">
@@ -647,11 +647,11 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div id="fast-ollama-group" style="display:none">
           <div class="form-group">
             <label>Ollama / Hermes URL</label>
-            <input type="text" id="cfg-ollama-url" placeholder="http://10.10.10.226:8642">
+            <input type="text" id="cfg-ollama-url" placeholder="http://localhost:11434">
           </div>
           <div class="form-group">
             <label>Ollama Model</label>
-            <input type="text" id="cfg-ollama-model" placeholder="gemma4">
+            <input type="text" id="cfg-ollama-model" placeholder="model name, e.g. llama3.1">
           </div>
         </div>
         <div class="form-group">
@@ -692,11 +692,11 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <div id="strong-ollama-group" style="display:none">
           <div class="form-group">
             <label>Ollama / Hermes URL</label>
-            <input type="text" id="cfg-strong-ollama-url" placeholder="http://10.10.10.226:8642">
+            <input type="text" id="cfg-strong-ollama-url" placeholder="http://localhost:11434">
           </div>
           <div class="form-group">
             <label>Ollama Model</label>
-            <input type="text" id="cfg-strong-ollama-model" placeholder="gemma4">
+            <input type="text" id="cfg-strong-ollama-model" placeholder="model name, e.g. llama3.1">
           </div>
         </div>
         <div class="form-group">
@@ -713,7 +713,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="card-header">Batch jobs (large, slow runs)</div>
       <div style="font-size:12px;color:var(--text-dim);margin:8px 0 12px">Score-all, the resume backfill and the daily pipeline send their model calls to this local server instead of the Fast/Strong providers above, so a big queue doesn't tie up the server you use interactively. Leave the URL blank to use the providers above for everything.</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <div class="form-group" style="flex:2;min-width:240px"><label>Batch server URL</label><input type="text" id="cfg-batch-url" placeholder="blank = off · e.g. http://10.10.10.105:8081"></div>
+        <div class="form-group" style="flex:2;min-width:240px"><label>Batch server URL</label><input type="text" id="cfg-batch-url" placeholder="blank = off · e.g. http://localhost:8081"></div>
         <div class="form-group" style="flex:1;min-width:160px"><label>Batch model</label><input type="text" id="cfg-batch-model" placeholder="same as Ollama model"></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -729,7 +729,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <div class="form-group" style="margin-top:16px;max-width:520px">
       <label>OpenAI-compatible base URL <span style="color:var(--text-dim);font-weight:normal">(optional — only used when a provider is OpenAI)</span></label>
-      <input type="text" id="cfg-openai-base-url" placeholder="blank = api.openai.com · e.g. http://10.10.10.226:8080/v1">
+      <input type="text" id="cfg-openai-base-url" placeholder="blank = api.openai.com · e.g. http://localhost:8080/v1">
       <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Point the OpenAI provider at any OpenAI-compatible server (llama-server, vLLM, LM Studio). Applies to both Fast and Strong.</div>
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring) or Local Ollama/Hermes (zero cost), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
@@ -739,11 +739,12 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <section class="sx-page" id="sx-email" style="display:none">
     <div class="sx-head"><h2>Email &amp; Follow-Up</h2><p>SMTP credentials for sending applications and digests, and follow-up timing.</p></div>
     <div class="card mb-16"><div class="card-header">Email / Follow-Up</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>Follow-Up After (days)</label><input type="number" id="cfg-followup-days"></div><div class="form-group"><label>Notification Email</label><input type="email" id="cfg-followup-email"></div><div class="form-group"><label>Your Gmail Email (login username)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div><div class="form-group"><label>Gmail App Password</label><input type="password" id="cfg-smtp-pass" placeholder="16-character app password"></div><div class="form-group"><label>SMTP Host</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>SMTP Port</label><input type="number" id="cfg-smtp-port" placeholder="587"></div></div><button class="btn btn-ghost btn-sm mt-8" onclick="sendTestEmail()">Send Test Email</button><span id="test-email-status" class="text-sm" style="margin-left:8px"></span><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfg-email-html" style="width:16px;height:16px;accent-color:var(--accent)"><label for="cfg-email-html" style="color:var(--text);font-size:13px;cursor:pointer">Send HTML digest emails (uncheck for plain text)</label></div></div>
-    <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto">0 9 * * * curl -s -X POST http://10.10.10.13:8093/api/follow-ups/send-digest</pre></div>
+    <div class="card mt-16"><div class="card-header">Cron (daily follow-up digest at 9 AM)</div><pre style="background:var(--surface2);padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto"><span id="cron-example">0 9 * * * curl -s -X POST &lt;your JSHQ address&gt;/api/follow-ups/send-digest</span></pre></div>
   <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
   </section>
   <section class="sx-page" id="sx-account" style="display:none">
     <div class="sx-head"><h2>Account</h2><p>Your sign-in details, password, and configuration backup.</p></div>
+  <div class="card mb-16"><div class="card-header">Setup wizard</div><div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">Walk through profile, resume, AI provider and job preferences again. Nothing is erased; each step is pre-filled with what you have saved.</div><button class="btn btn-ghost btn-sm" onclick="openWizard(true)">Run setup again</button></div>
   <!-- Account Info -->
   <div class="card mb-16">
     <div class="card-header">Account</div>
@@ -870,6 +871,24 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 </div>
 <div id="topbar"></div>
 <div id="busy-overlay" class="busy-overlay" role="status" aria-live="polite"><div class="busy-card"><div class="busy-ring"></div><div id="busy-msg">Working…</div><div id="busy-sub" class="busy-sub"></div></div></div>
+<div id="wiz" class="modal-overlay" style="z-index:200" role="dialog" aria-modal="true" aria-labelledby="wiz-title">
+<style>
+.wiz-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(680px,95vw);max-height:92vh;display:flex;flex-direction:column}
+.wiz-head{padding:18px 24px 12px;border-bottom:1px solid var(--border)}
+.wiz-steps{display:flex;gap:6px;margin-top:10px}.wiz-dot{flex:1;height:4px;border-radius:2px;background:var(--surface2)}.wiz-dot.done{background:var(--accent)}
+.wiz-body{padding:18px 24px;overflow-y:auto;font-size:13px;line-height:1.55}
+.wiz-foot{padding:12px 24px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+.wiz-body .form-group{margin-bottom:12px}.wiz-body textarea{min-height:70px}
+.wiz-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.wiz-grid{grid-template-columns:1fr}}
+.wiz-pick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.wiz-opt{padding:10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface2);font-size:12px}.wiz-opt.sel{border-color:var(--accent)}.wiz-opt b{display:block;font-size:13px;margin-bottom:2px}
+.wiz-hint{font-size:11px;color:var(--text-dim);margin-top:4px}
+.wiz-ok{color:var(--green)}.wiz-miss{color:var(--yellow)}
+</style>
+<div class="wiz-card"><div class="wiz-head"><div style="display:flex;justify-content:space-between;align-items:center"><strong id="wiz-title" style="font-size:16px"></strong><span id="wiz-count" class="text-dim text-sm"></span></div><div class="wiz-steps" id="wiz-dots"></div></div>
+<div class="wiz-body" id="wiz-body"></div>
+<div class="wiz-foot"><button class="btn btn-ghost btn-sm" id="wiz-skip" onclick="wizSkip()">Skip for now</button><span id="wiz-msg" class="text-sm" style="flex:1;text-align:right"></span><button class="btn btn-ghost" id="wiz-back" onclick="wizGo(-1)">Back</button><button class="btn btn-primary" id="wiz-next" onclick="wizGo(1)">Next</button></div></div></div>
 <div id="toast" class="toast" role="status"></div>
 <script>
 if(new URLSearchParams(window.location.search).get('logged_out')==='1'){window.location.replace('/auth/login');}
@@ -1511,7 +1530,7 @@ async function setContactEmail(email){if(!currentJobId)return;await api('/api/jo
 async function deleteCurrentJob(){if(!currentJobId||!confirm('Delete?'))return;await api('/api/jobs/'+currentJobId,{method:'DELETE'});showView('tracker')}
 async function deleteJob(id){if(!confirm('Delete?'))return;await api('/api/jobs/'+id,{method:'DELETE'});loadTracker()}
 // Email Compose
-function openEmailComposer(){if(!currentJob)return;const m=document.getElementById('email-modal');const cl=currentJob.cover_letters?.[0];document.getElementById('email-to').value=currentJob.follow_up?.contact_email||'';document.getElementById('email-cc').value='';document.getElementById('email-subject').value=`Application: ${currentJob.title} - Salil Maniktahla`;document.getElementById('email-body').value=cl?.content||'';document.getElementById('email-attach').checked=!!currentJob.tailored_resume_docx;m.classList.add('show')}
+function openEmailComposer(){if(!currentJob)return;const m=document.getElementById('email-modal');const cl=currentJob.cover_letters?.[0];document.getElementById('email-to').value=currentJob.follow_up?.contact_email||'';document.getElementById('email-cc').value='';document.getElementById('email-subject').value=`Application: ${currentJob.title}${(window._currentUser&&window._currentUser.name)?' - '+window._currentUser.name:''}`;document.getElementById('email-body').value=cl?.content||'';document.getElementById('email-attach').checked=!!currentJob.tailored_resume_docx;m.classList.add('show')}
 async function sendEmail(){const data={to:document.getElementById('email-to').value,subject:document.getElementById('email-subject').value,body:document.getElementById('email-body').value,cc:document.getElementById('email-cc').value,attach_resume:document.getElementById('email-attach').checked};if(!data.to)return alert('Enter a recipient');document.getElementById('email-send-status').style.display='flex';try{await api('/api/jobs/'+currentJobId+'/send-email',{method:'POST',body:data});document.getElementById('email-modal').classList.remove('show');alert('Email sent!');await showDetail(currentJobId)}catch(e){alert('Failed: '+e.message)}finally{document.getElementById('email-send-status').style.display='none'}}
 // Confirmation Parser
 function openConfirmationParser(){document.getElementById('confirm-email-text').value='';document.getElementById('confirm-result').style.display='none';document.getElementById('confirm-modal').classList.add('show')}
@@ -1702,7 +1721,7 @@ async function loadSettings(){
   document.getElementById('cfg-sched-glassdoor').checked=schedSites.includes('glassdoor');
   document.getElementById('cfg-sched-zip').checked=schedSites.includes('zip_recruiter');
   document.getElementById('cfg-sched-company-sites').value=(c.scheduled_company_sites||[]).map(s=>(s.company?`${s.company} | `:'')+s.url).join('\n');
-  document.getElementById('cfg-sched-location').value=c.scheduled_search_location||'Washington, DC';
+  document.getElementById('cfg-sched-location').value=c.scheduled_search_location||'';
   document.getElementById('cfg-sched-results').value=c.scheduled_search_results||25;
   document.getElementById('cfg-sched-hours').value=c.scheduled_search_hours_old||24;
   document.getElementById('cfg-sched-remote').checked=c.scheduled_search_remote!==false;
@@ -1718,14 +1737,14 @@ async function loadSettings(){
   document.getElementById('cfg-anthropic-key').value=c.anthropic_api_key||'';
   document.getElementById('cfg-gemini-key').value=c.gemini_api_key||'';
   document.getElementById('cfg-openai-key').value=c.openai_api_key||'';
-  document.getElementById('cfg-ollama-url').value=c.ollama_url||'http://10.10.10.226:8642';
-  document.getElementById('cfg-ollama-model').value=c.ollama_model||'gemma4';
+  document.getElementById('cfg-ollama-url').value=c.ollama_url||'';
+  document.getElementById('cfg-ollama-model').value=c.ollama_model||'';
   // Strong provider keys (mirror same stored values — provider determines which is used)
   document.getElementById('cfg-strong-anthropic-key').value=c.anthropic_api_key||'';
   document.getElementById('cfg-strong-gemini-key').value=c.gemini_api_key||'';
   document.getElementById('cfg-strong-openai-key').value=c.openai_api_key||'';
-  document.getElementById('cfg-strong-ollama-url').value=c.ollama_url||'http://10.10.10.226:8642';
-  document.getElementById('cfg-strong-ollama-model').value=c.ollama_model||'gemma4';
+  document.getElementById('cfg-strong-ollama-url').value=c.ollama_url||'';
+  document.getElementById('cfg-strong-ollama-model').value=c.ollama_model||'';
   document.getElementById('cfg-openai-base-url').value=c.openai_base_url||'';
   document.getElementById('cfg-batch-url').value=c.batch_ollama_url||'';
   document.getElementById('cfg-batch-model').value=c.batch_ollama_model||'';
@@ -1768,7 +1787,7 @@ const PROVIDER_GUIDE={
     steps:['Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with a Google account.','Click <strong>Create API key</strong> (pick or create a project when asked) and copy the key.','Paste it here (starts with <code>AIza</code>) and click <strong>Test</strong>.'],
     note:'The free tier is rate limited (roughly 15 requests/min and 1,500/day for Flash; less for Pro). Per Google\'s terms, free-tier prompts may be used to improve their products. Your resume and job text is sent, so enable billing on the project if that matters to you.'},
   ollama:{name:'Local (Ollama / Hermes)',link:'',linkText:'',
-    short:'No key needed. Enter the URL of your local server and the model name it serves, e.g. http://10.10.10.226:8642 and gemma4.',
+    short:'No key needed. Enter the URL of your local server and the model name it serves, e.g. http://localhost:11434 and llama3.1.',
     best:'Free and private: nothing leaves your network. Quality and speed depend on your hardware; large models are best for resumes.',
     steps:['Run an Ollama or Hermes server reachable from the JSHQ host (try <code>curl http://HOST:PORT/api/tags</code> from there).','Select <strong>Local Ollama / Hermes</strong> and enter the server URL and exact model name.','Click <strong>Test</strong>. Slow first replies are normal while the model loads.'],
     note:'For a server that speaks the OpenAI API (llama-server, vLLM, LM Studio), pick <em>OpenAI</em> as the provider and set the <em>OpenAI-compatible base URL</em> field below instead.'}
@@ -1872,7 +1891,7 @@ async function saveConfig(opts){
   scheduled_search_terms:document.getElementById('cfg-sched-terms').value.split('\n').filter(Boolean),
   scheduled_search_sites:schedSites,
   scheduled_company_sites:schedCompanySites,
-  scheduled_search_location:document.getElementById('cfg-sched-location').value||'Washington, DC',
+  scheduled_search_location:document.getElementById('cfg-sched-location').value||'',
   scheduled_search_results:+document.getElementById('cfg-sched-results').value||25,
   scheduled_search_hours_old:+document.getElementById('cfg-sched-hours').value||24,
   scheduled_search_remote:document.getElementById('cfg-sched-remote').checked,
@@ -1897,8 +1916,8 @@ async function saveConfig(opts){
   anthropic_api_key:document.getElementById('cfg-anthropic-key').value||document.getElementById('cfg-strong-anthropic-key').value||'',
   gemini_api_key:document.getElementById('cfg-gemini-key').value||document.getElementById('cfg-strong-gemini-key').value||'',
   openai_api_key:document.getElementById('cfg-openai-key').value||document.getElementById('cfg-strong-openai-key').value||'',
-  ollama_url:document.getElementById('cfg-ollama-url').value||document.getElementById('cfg-strong-ollama-url').value||'http://10.10.10.226:8642',
-  ollama_model:document.getElementById('cfg-ollama-model').value||document.getElementById('cfg-strong-ollama-model').value||'gemma4',
+  ollama_url:document.getElementById('cfg-ollama-url').value||document.getElementById('cfg-strong-ollama-url').value||'',
+  ollama_model:document.getElementById('cfg-ollama-model').value||document.getElementById('cfg-strong-ollama-model').value||'',
   openai_base_url:document.getElementById('cfg-openai-base-url').value.trim(),
   batch_ollama_url:document.getElementById('cfg-batch-url').value.trim(),
   batch_ollama_model:document.getElementById('cfg-batch-model').value.trim(),
@@ -2310,11 +2329,123 @@ api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels}).ca
 });
 api('/api/auth/me').then(u=>{
   window._currentUser=u;
+  maybeStartWizard();
+  const ce=document.getElementById('cron-example');if(ce)ce.textContent='0 9 * * * curl -s -X POST '+location.origin+'/api/follow-ups/send-digest';
   const nameEl=document.getElementById('nav-user-name');
   const badgeEl=document.getElementById('nav-admin-badge');
   if(nameEl) nameEl.textContent=u.name||(u.email||'');
   if(badgeEl&&u.is_admin) badgeEl.style.display='inline';
 }).catch(()=>{});
+// ── First-login setup wizard ────────────────────────────────────────────────
+const WIZ_STEPS=['Welcome','About you','Your resume','AI provider','What you want','All set'];
+let _wiz={step:0,provider:'',data:{}};
+const _wl=t=>(t||'').split(/\n|,/).map(x=>x.trim()).filter(Boolean);
+const _wlLines=t=>(t||'').split(/\n/).map(x=>x.trim()).filter(Boolean);
+async function maybeStartWizard(){
+  try{if(sessionStorage.getItem('wizSkipped')==='1')return}catch(e){}
+  try{const c=await api('/api/config');if(c&&c.onboarding_completed===false)openWizard(false)}catch(e){}
+}
+async function openWizard(force){
+  _wiz={step:0,provider:'',data:{}};
+  try{
+    const [p,c,r]=await Promise.all([api('/api/profile'),api('/api/config'),api('/api/resumes')]);
+    const u=window._currentUser||{};
+    _wiz.data={name:p.name||u.name||'',email:p.email||u.email||'',phone:p.phone||'',city:p.city||'',state:p.state||'',linkedin:p.linkedin||'',
+      resumeLoaded:!!(r.base&&r.base.loaded),
+      provider:(c.fast_provider===c.strong_provider&&(c.anthropic_api_key||c.gemini_api_key||c.openai_api_key||c.ollama_url))?c.fast_provider:'',
+      ollama_url:c.ollama_url||'',ollama_model:c.ollama_model||'',openai_base_url:c.openai_base_url||'',
+      titles:(c.scheduled_search_terms||[]).join('\n'),location:c.scheduled_search_location||'',
+      mode:c.scheduled_search_remote?'remote':(c.scheduled_search_hybrid&&c.scheduled_search_onsite?'any':c.scheduled_search_hybrid?'hybrid':c.scheduled_search_onsite?'onsite':''),
+      w2min:c.w2_salary_min||'',w2max:c.w2_salary_max||'',hmin:c.contract_hourly_min||'',hmax:c.contract_hourly_max||'',
+      breakers:(c.deal_breakers||[]).join('\n'),keywords:(c.preferred_keywords||[]).join('\n'),aiTested:false};
+    _wiz.provider=_wiz.data.provider;
+  }catch(e){}
+  document.getElementById('wiz').classList.add('show');wizRender();
+}
+function wizClose(){document.getElementById('wiz').classList.remove('show')}
+function wizSkip(){try{sessionStorage.setItem('wizSkipped','1')}catch(e){}wizClose();toast('You can finish setup any time: Settings → Account → Run setup again')}
+function wizMsg(t,bad){const m=document.getElementById('wiz-msg');m.textContent=t||'';m.style.color=bad?'var(--red)':'var(--text-dim)'}
+function wizField(id,label,val,ph,type){return`<div class="form-group"><label>${label}</label><input type="${type||'text'}" id="${id}" value="${escAttr2(val)}" placeholder="${ph||''}"></div>`}
+function escAttr2(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function wizRender(){
+  const s=_wiz.step,d=_wiz.data;
+  document.getElementById('wiz-title').textContent=WIZ_STEPS[s]==='Welcome'?'Welcome to Job Search HQ':WIZ_STEPS[s];
+  document.getElementById('wiz-count').textContent=`Step ${s+1} of ${WIZ_STEPS.length}`;
+  document.getElementById('wiz-dots').innerHTML=WIZ_STEPS.map((_,i)=>`<div class="wiz-dot ${i<=s?'done':''}"></div>`).join('');
+  document.getElementById('wiz-back').style.visibility=s===0?'hidden':'visible';
+  document.getElementById('wiz-next').textContent=s===0?'Get started':s===WIZ_STEPS.length-1?'Finish':'Next';
+  document.getElementById('wiz-skip').style.display=s===WIZ_STEPS.length-1?'none':'';
+  wizMsg('');
+  const b=document.getElementById('wiz-body');
+  if(s===0)b.innerHTML=`<p>Job Search HQ finds jobs, scores them against your background, and drafts a tailored resume and cover letter for the ones worth applying to.</p><p>This takes about five minutes. Your account starts completely blank, so we need a few things from you:</p><ol style="margin:8px 0 8px 20px"><li>Your contact details (they go on your resumes and cover letters)</li><li>Your current resume</li><li>An AI provider (it does the scoring and writing)</li><li>The kind of jobs you want</li></ol><p class="text-dim">You can skip any step and come back later from Settings.</p>`;
+  if(s===1)b.innerHTML=`<p>These appear at the top of the resumes and cover letters JSHQ generates for you.</p><div class="wiz-grid">${wizField('wz-name','Full name',d.name,'Jane Smith')}${wizField('wz-email','Email',d.email,'you@example.com','email')}${wizField('wz-phone','Phone',d.phone,'555-555-0100')}${wizField('wz-linkedin','LinkedIn URL (optional)',d.linkedin,'linkedin.com/in/you')}${wizField('wz-city','City',d.city,'')}${wizField('wz-state','State',d.state,'')}</div>`;
+  if(s===2)b.innerHTML=`<p>Upload your current resume as a Word file (.docx), or paste the text. JSHQ uses it to score jobs and as the basis for tailored versions.</p>${d.resumeLoaded?'<p class="wiz-ok">✓ A resume is already saved. Upload or paste again only to replace it.</p>':''}<div class="form-group"><label>Upload .docx</label><input type="file" id="wz-file" accept=".docx"></div><div class="form-group"><label>…or paste resume text</label><textarea id="wz-resume" rows="8" placeholder="Paste your resume here"></textarea></div><div class="wiz-hint">Nothing is shared with other JSHQ users.</div>`;
+  if(s===3){
+    const opts=['anthropic','gemini','openai','ollama'].map(k=>`<div class="wiz-opt ${_wiz.provider===k?'sel':''}" onclick="wizPick('${k}')"><b>${PROVIDER_GUIDE[k].name}</b>${k==='gemini'?'Free tier available':k==='ollama'?'Your own server':'Pay-as-you-go key'}</div>`).join('');
+    b.innerHTML=`<p>JSHQ needs an AI provider to score jobs and write documents. Pick one for now (you can set different ones for scoring and writing later in Settings → AI).</p><div class="wiz-pick">${opts}</div><div id="wz-ai"></div>`;
+    wizAIRender();
+  }
+  if(s===4)b.innerHTML=`<p>Tell JSHQ what to look for. Everything here is optional and editable later.</p>
+<div class="form-group"><label>Job titles to search for <span class="text-dim">(one per line)</span></label><textarea id="wz-titles" rows="3" placeholder="Project Manager\nOperations Manager">${escAttr2(d.titles)}</textarea></div>
+<div class="wiz-grid"><div class="form-group"><label>Location</label><input type="text" id="wz-loc" value="${escAttr2(d.location)}" placeholder="City, State"></div>
+<div class="form-group"><label>Work arrangement</label><select id="wz-mode"><option value="">No preference</option><option value="remote"${d.mode==='remote'?' selected':''}>Remote only</option><option value="hybrid"${d.mode==='hybrid'?' selected':''}>Hybrid</option><option value="onsite"${d.mode==='onsite'?' selected':''}>On-site</option><option value="any"${d.mode==='any'?' selected':''}>Hybrid or on-site</option></select></div></div>
+<div class="wiz-grid">${wizField('wz-w2min','Salary minimum ($/year)',d.w2min,'e.g. 90000','number')}${wizField('wz-w2max','Salary maximum ($/year)',d.w2max,'e.g. 130000','number')}${wizField('wz-hmin','Contract rate minimum ($/hour)',d.hmin,'optional','number')}${wizField('wz-hmax','Contract rate maximum ($/hour)',d.hmax,'optional','number')}</div>
+<div class="form-group"><label>Deal breakers <span class="text-dim">(one per line; jobs mentioning these get flagged)</span></label><textarea id="wz-breakers" rows="2" placeholder="e.g. must relocate">${escAttr2(d.breakers)}</textarea></div>
+<div class="form-group"><label>Skills / keywords you want to match <span class="text-dim">(one per line)</span></label><textarea id="wz-keywords" rows="2" placeholder="e.g. Excel, Salesforce">${escAttr2(d.keywords)}</textarea></div>`;
+  if(s===5){
+    const row=(ok,t)=>`<li class="${ok?'wiz-ok':'wiz-miss'}">${ok?'✓':'○'} ${t}</li>`;
+    b.innerHTML=`<p>Here's where things stand:</p><ul style="list-style:none;margin:8px 0;padding:0">${row(!!d.name,'Profile'+(d.name?'':' (add your name in Settings → Profile)'))}${row(d.resumeLoaded,'Resume'+(d.resumeLoaded?'':' (upload one in Settings → Resumes before generating documents)'))}${row(!!_wiz.provider&&d.aiSaved,'AI provider'+((_wiz.provider&&d.aiSaved)?(d.aiTested?' (tested)':' (not tested yet)'):' (set one in Settings → AI)'))}${row(!!_wlLines(d.titles).length,'Job search preferences'+(_wlLines(d.titles).length?'':' (add titles in Settings → Job Search & Automation)'))}</ul><p>Next, try <strong>Search Boards</strong> to pull in your first jobs, then <strong>Score</strong> them from the Tracker.</p>`;
+  }
+}
+function wizPick(k){_wiz.provider=k;_wiz.data.aiTested=false;document.querySelectorAll('#wiz .wiz-opt').forEach((e,i)=>e.classList.toggle('sel',['anthropic','gemini','openai','ollama'][i]===k));wizAIRender()}
+function wizAIRender(){
+  const k=_wiz.provider,el=document.getElementById('wz-ai'),d=_wiz.data;if(!el)return;
+  if(!k){el.innerHTML='';return}
+  const g=PROVIDER_GUIDE[k];
+  let f='';
+  if(k==='ollama')f=wizField('wz-ourl','Server URL',d.ollama_url,'http://localhost:11434')+wizField('wz-omodel','Model name',d.ollama_model,'e.g. llama3.1');
+  else f=wizField('wz-key','API key',_wiz.key||'',k==='anthropic'?'sk-ant-…':k==='gemini'?'AIza…':'sk-…','password');
+  el.innerHTML=`<div style="margin-bottom:8px"><strong>${g.name}</strong><div class="wiz-hint" style="font-size:12px">${g.best}</div><ol style="margin:6px 0 6px 20px">${g.steps.map(x=>`<li>${x}</li>`).join('')}</ol>${g.note?`<div class="pg-note">${g.note}</div>`:''}</div>${f}<button class="btn btn-primary btn-sm" onclick="wizTestAI()">Save &amp; test</button> <span id="wz-aitest" class="text-sm"></span>`;
+}
+async function wizSaveAI(){
+  const k=_wiz.provider;if(!k)return false;
+  const body={provider:k,api_key:(document.getElementById('wz-key')||{}).value||'',ollama_url:(document.getElementById('wz-ourl')||{}).value||'',ollama_model:(document.getElementById('wz-omodel')||{}).value||''};
+  if(k!=='ollama')_wiz.key=body.api_key;else{_wiz.data.ollama_url=body.ollama_url;_wiz.data.ollama_model=body.ollama_model}
+  await api('/api/onboarding/ai',{method:'PUT',body});_wiz.data.aiSaved=true;return true;
+}
+async function wizTestAI(){
+  const t=document.getElementById('wz-aitest');t.textContent='Testing…';t.style.color='var(--text-dim)';
+  try{await wizSaveAI();const r=await api('/api/config/test-ai-provider?tier=strong',{method:'POST'});_wiz.data.aiTested=true;t.textContent='Working ✓ ('+r.model+')';t.style.color='var(--green)'}
+  catch(e){t.textContent=e.message;t.style.color='var(--red)'}
+}
+async function wizGo(dir){
+  const s=_wiz.step,d=_wiz.data;
+  const btn=document.getElementById('wiz-next');btn.disabled=true;
+  try{
+    if(dir>0){
+      if(s===1){
+        const g=id=>document.getElementById(id).value.trim();
+        Object.assign(d,{name:g('wz-name'),email:g('wz-email'),phone:g('wz-phone'),linkedin:g('wz-linkedin'),city:g('wz-city'),state:g('wz-state')});
+        if(!d.name){wizMsg('Please enter your name.',true);return}
+        await api('/api/profile',{method:'PUT',body:{name:d.name,email:d.email,phone:d.phone,linkedin:d.linkedin,city:d.city,state:d.state,location:[d.city,d.state].filter(Boolean).join(', ')}});
+      }
+      if(s===2){
+        const f=document.getElementById('wz-file').files[0],t=document.getElementById('wz-resume').value;
+        if(f){const fd=new FormData();fd.append('file',f);const res=await fetch('/api/resumes/base/upload-docx',{method:'PUT',body:fd});if(!res.ok){const er=await res.json().catch(()=>({}));throw new Error(er.detail||res.statusText)}d.resumeLoaded=true}
+        else if(t.trim().length){await api('/api/resumes/base',{method:'PUT',body:{content:t}});d.resumeLoaded=true}
+      }
+      if(s===3&&_wiz.provider&&!d.aiSaved){const hasInput=(document.getElementById('wz-key')||document.getElementById('wz-ourl')||{}).value;if(hasInput)await wizSaveAI()}
+      if(s===4){
+        const g=id=>document.getElementById(id).value,n=id=>parseInt(g(id),10)||0;
+        Object.assign(d,{titles:g('wz-titles'),location:g('wz-loc').trim(),mode:g('wz-mode'),w2min:n('wz-w2min')||'',w2max:n('wz-w2max')||'',hmin:n('wz-hmin')||'',hmax:n('wz-hmax')||'',breakers:g('wz-breakers'),keywords:g('wz-keywords')});
+        await api('/api/onboarding/preferences',{method:'PUT',body:{job_titles:_wlLines(d.titles),location:d.location,work_mode:d.mode,w2_salary_min:+d.w2min||0,w2_salary_max:+d.w2max||0,contract_hourly_min:+d.hmin||0,contract_hourly_max:+d.hmax||0,deal_breakers:_wl(d.breakers),preferred_keywords:_wl(d.keywords)}});
+      }
+      if(s===WIZ_STEPS.length-1){await api('/api/onboarding/complete',{method:'POST'});wizClose();toast('Setup complete');showView('search');return}
+    }
+    _wiz.step=Math.max(0,Math.min(WIZ_STEPS.length-1,s+dir));wizRender();
+  }catch(e){wizMsg(e.message||'Something went wrong',true)}
+  finally{btn.disabled=false}
+}
 </script>
 </body>
 </html>

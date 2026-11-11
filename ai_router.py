@@ -170,8 +170,10 @@ def _ollama_chat(system: str, user_msg: str, config, json_mode: bool = False, ma
     # native /api/chat). chat_template_kwargs.enable_thinking=False suppresses
     # hidden reasoning tokens on templates that support it (e.g. Gemma4); it's
     # a no-op on servers/templates that don't recognize the field.
-    url = (config.ollama_url or "http://10.10.10.105:11434").rstrip("/") + "/v1/chat/completions"
-    model = config.ollama_model or "gemma4:e4b"
+    if not (config.ollama_url or "").strip() or not (config.ollama_model or "").strip():
+        raise ProviderConfigError("Local server URL and model name are required. Add them in Settings → AI.")
+    url = config.ollama_url.rstrip("/") + "/v1/chat/completions"
+    model = config.ollama_model
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
