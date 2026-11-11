@@ -48,7 +48,7 @@ def test_existing_config_without_flag_counts_as_onboarded():
 
 
 def test_no_personal_data_hardcoded_in_source():
-    banned = [r'Salil', r'Maniktahla', r'571-215', r'10\.10\.10\.\d', r'Springfield, VA', r'gemma4']
+    banned = [r'Salil', r'Maniktahla', r'571-215', r'10\.10\.10\.\d', r'Springfield, VA', r'gemma4', r'placeholder="22150"']
     offenders = []
     for path in list(ROOT.glob('*.py')) + [ROOT / 'static' / 'index.html']:
         text = path.read_text()

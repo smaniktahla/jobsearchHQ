@@ -4,15 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Search Command Center</title>
+<script src="/static/theme.js"></script>
 <style>
 :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#232736;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--yellow:#fbbf24;--red:#f87171;--orange:#fb923c;--radius:8px}
+:root[data-theme="light"]{color-scheme:light;--bg:#f4f5f9;--surface:#ffffff;--surface2:#eceef5;--border:#d5d9e5;--text:#1b2030;--text-dim:#5a6177;--accent:#2563d6;--green:#0b8a5f;--yellow:#a86a00;--red:#cf3b3b;--orange:#c2610f;--overlay:rgba(244,245,249,.75)}
+:root[data-theme="dark"]{color-scheme:dark}
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
 .app{display:flex;min-height:100vh}.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto;display:flex;flex-direction:column}.main{flex:1;margin-left:220px;padding:24px 32px}
 .logo{padding:0 20px 24px;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text-dim);cursor:pointer;font-size:14px;transition:all .15s}.nav-item:hover,.nav-item.active{color:var(--text);background:var(--surface2)}.nav-item.active{border-left:3px solid var(--accent)}.nav-item svg{width:18px;height:18px;flex-shrink:0}.nav-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:auto}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}.card-header{font-size:13px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px}.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px}.stat-value{font-size:28px;font-weight:700}.stat-label{font-size:12px;color:var(--text-dim);margin-top:2px}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#6ba0f8}.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text-dim)}.btn-sm{padding:5px 10px;font-size:12px}.btn-danger{background:var(--red);color:#fff}.btn-success{background:var(--green);color:#000}.btn-warning{background:var(--orange);color:#000}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{filter:brightness(1.12)}.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text-dim)}.btn-sm{padding:5px 10px;font-size:12px}.btn-danger{background:var(--red);color:#fff}.btn-success{background:var(--green);color:#000}.btn-warning{background:var(--orange);color:#000}
 input,textarea,select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:14px;width:100%;font-family:inherit}input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}textarea{resize:vertical;min-height:120px}label{font-size:13px;color:var(--text-dim);margin-bottom:4px;display:block}.form-group{margin-bottom:16px}
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:10px 12px;color:var(--text-dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}td{padding:10px 12px;border-bottom:1px solid var(--border)}tr:hover td{background:var(--surface2)}tr{cursor:pointer}
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}.badge-w2{background:rgba(79,143,247,.15);color:var(--accent)}.badge-contract{background:rgba(52,211,153,.15);color:var(--green)}.badge-c2h{background:rgba(251,191,36,.15);color:var(--yellow)}.badge-ignore{background:rgba(139,143,163,.15);color:var(--text-dim)}.badge-new{background:rgba(79,143,247,.15);color:var(--accent)}.badge-scored{background:rgba(251,191,36,.15);color:var(--yellow)}.badge-applied{background:rgba(52,211,153,.15);color:var(--green)}.badge-interview{background:rgba(251,146,60,.15);color:var(--orange)}.badge-offer{background:rgba(52,211,153,.2);color:var(--green)}.badge-rejected{background:rgba(248,113,113,.15);color:var(--red)}.badge-passed{background:rgba(139,143,163,.15);color:var(--text-dim)}.badge-followup{background:rgba(248,113,113,.2);color:var(--red);animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
@@ -36,7 +39,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 .skel{border-radius:6px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 37%,var(--surface2) 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite}
 @keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
 .skel-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.skel-row .skel{height:14px;flex:1}.skel-row .skel:nth-child(1){flex:.6}.skel-row .skel:nth-child(2){flex:1.4}.skel-row .skel:nth-child(3){flex:.3}
-.busy-overlay{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;background:rgba(15,17,23,.65);backdrop-filter:blur(2px)}
+.busy-overlay{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;background:var(--overlay,rgba(15,17,23,.65));backdrop-filter:blur(2px)}
 .busy-overlay.show{display:flex;animation:fadein .2s ease}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 .busy-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px 36px;text-align:center;min-width:260px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.45)}
@@ -105,6 +108,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div id="nav-user-name" style="font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0"></div>
       <span id="nav-admin-badge" style="display:none;background:rgba(79,143,247,.2);color:var(--accent);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;letter-spacing:.3px;flex-shrink:0">ADMIN</span>
     </div>
+    <a href="#" id="theme-quick" onclick="quickTheme();return false" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);text-decoration:none;padding:6px 0">☀ Light mode</a>
     <a href="/auth/logout" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);text-decoration:none;padding:6px 0" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out</a>
   </div>
 </nav>
@@ -345,6 +349,9 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     <div class="sx-body">
   <section class="sx-page" id="sx-profile" style="display:none">
     <div class="sx-head"><h2>Profile</h2><p>Personal details, links (LinkedIn, GitHub, website — hyperlinked in every resume's contact line), work history and job preferences used in resumes, cover letters, scoring and application packages.</p></div>
+  <div class="card mb-16"><div class="card-header">Appearance</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">Choose a light or dark theme. "System" follows your device. This is saved in this browser.</div>
+    <div class="pg-tabs" id="theme-choices" style="margin:0"></div></div>
   <!-- Personal Info -->
   <div class="card mb-16">
     <div class="card-header">Personal Information</div>
@@ -358,8 +365,8 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div><label class="label">Portfolio / Other Link</label><input class="input" id="prof-portfolio" placeholder="https://..."></div>
       <div><label class="label">Address</label><input class="input" id="prof-address" placeholder="Street address"></div>
       <div><label class="label">City</label><input class="input" id="prof-city" placeholder="City"></div>
-      <div><label class="label">State</label><input class="input" id="prof-state" placeholder="VA"></div>
-      <div><label class="label">ZIP</label><input class="input" id="prof-zip" placeholder="22150"></div>
+      <div><label class="label">State</label><input class="input" id="prof-state" placeholder="State"></div>
+      <div><label class="label">ZIP</label><input class="input" id="prof-zip" placeholder="ZIP"></div>
     </div>
   </div>
 
@@ -721,7 +728,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         <button class="btn btn-primary btn-sm" onclick="testAIProvider('batch')">Test Batch Server</button>
         <span id="test-batch-provider-status" class="text-sm"></span>
       </div>
-      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a3a);font-size:13px">
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px">
         <div class="mr-msg text-dim">Checking for scored jobs missing a tailored resume or cover letters…</div>
         <button class="btn btn-ghost btn-sm mr-btn" style="margin-top:6px" onclick="generateMissingResumes()" disabled>Generate missing resumes &amp; cover letters</button>
         <button class="btn btn-ghost btn-sm mr-stop" style="margin-top:6px" onclick="stopMissingResumes()" disabled>Stop</button>
@@ -1808,6 +1815,15 @@ function providerHelpHtml(k){
   const g=PROVIDER_GUIDE[k];if(!g)return'';
   return esc(g.short)+` <a href="#" onclick="openProviderGuide('${k}');return false">Step-by-step guide</a>`;
 }
+function renderThemeChoices(){
+  const el=document.getElementById('theme-choices');if(!el)return;
+  const cur=window.getTheme?getTheme():'system';
+  el.innerHTML=[['light','☀ Light'],['dark','☾ Dark'],['system','Match device']].map(([k,l])=>`<button type="button" class="pg-tab ${k===cur?'active':''}" onclick="setTheme('${k}')">${l}</button>`).join('');
+  const b=document.getElementById('theme-quick');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☾ Dark mode':'☀ Light mode';
+}
+function quickTheme(){setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light')}
+document.addEventListener('themechange',renderThemeChoices);
+document.addEventListener('DOMContentLoaded',renderThemeChoices);
 function updateProviderUI(){
   const fp=document.getElementById('cfg-fast-provider')?.value||'anthropic';
   const sp=document.getElementById('cfg-strong-provider')?.value||'anthropic';

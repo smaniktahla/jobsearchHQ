@@ -4,9 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Search HQ — Sign in</title>
+<script src="/static/theme.js"></script>
 <style>
 
 :root{--bg:#0f1117;--surface:#1a1d27;--border:#2e3347;--text:#e1e4ed;--text-dim:#8b8fa3;--accent:#4f8ff7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--radius:8px}
+:root[data-theme="light"]{color-scheme:light;--bg:#f4f5f9;--surface:#ffffff;--surface2:#eceef5;--border:#d5d9e5;--text:#1b2030;--text-dim:#5a6177;--accent:#2563d6;--green:#0b8a5f;--yellow:#a86a00;--red:#cf3b3b;--orange:#c2610f;--overlay:rgba(244,245,249,.75)}
+:root[data-theme="dark"]{color-scheme:dark}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:520px}
