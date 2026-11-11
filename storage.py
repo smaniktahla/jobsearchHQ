@@ -282,6 +282,10 @@ def load_config(user_id: str) -> AppConfig:
             pass
     config = AppConfig(onboarding_completed=False)
     save_config(user_id, config)
+    # Brand-new account: start with the bundled ATS resume template (deleting it later sticks,
+    # since this branch only runs when no config file exists yet).
+    import resume_template
+    resume_template.install_default_template(user_id)
     return config
 
 
