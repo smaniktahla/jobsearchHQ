@@ -72,7 +72,7 @@ def route_calls(dependant):
 def test_every_route_session_only_flag_off_agent_rejected(client):
     assert auth.verify_agent_api_key('synthetic-agent-key')
     routes = [r for r in main.app.routes if getattr(r, 'path', '').startswith('/api/network')]
-    assert len(routes) == len(router.routes) == 9
+    assert len(routes) == len(router.routes) == 10
     for route in routes:
         assert auth.get_current_user in route_calls(route.dependant)
         assert auth.verify_agent_api_key not in route_calls(route.dependant)
@@ -155,3 +155,22 @@ def test_no_paid_ai_or_web_search_in_network():
                 assert node.module not in forbidden
                 assert not (node.module == 'google' and any(a.name in ('genai', 'generativeai') for a in node.names))
         assert 'web_search_chat' not in source
+
+
+def test_manual_relationship_edit_isolated_and_survives_import(client):
+    login(client)
+    client.post('/api/network/import/commit', content=CSV)
+    cid = client.get('/api/network/contacts').json()[0]['id']
+    path = f'/api/network/contacts/{cid}/relationship'
+    assert client.put(path, json={'kind': 'Former colleague'}).status_code == 200
+    client.post('/api/network/import/commit', content=CSV)
+    relationships = client.get('/api/network/export').json()['relationships']
+    assert len(relationships) == 1
+    assert next(iter(relationships.values()))['kind'] == 'Former colleague'
+    assert client.put(path, json={'kind': 'Friend'}).status_code == 200
+    assert len(client.get('/api/network/export').json()['relationships']) == 1
+    login(client, 'bob')
+    assert client.put(path, json={'kind': 'attack'}).status_code == 404
+    login(client)
+    assert client.put(path, json={'kind': ''}).status_code == 200
+    assert client.get('/api/network/export').json()['relationships'] == {}

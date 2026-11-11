@@ -159,6 +159,25 @@ class NetworkStore:
             state["relationships"][relationship.id] = relationship.model_dump(mode="json")
             self._write(state)
 
+    def update_primary_relationship(self, contact_id: str, kind: str):
+        with _LOCK:
+            state = self._read()
+            if contact_id not in state["contacts"]:
+                raise KeyError(contact_id)
+            existing = next((r for r in state["relationships"].values()
+                             if r["contact_id"] == contact_id and r["source"] == "manual"), None)
+            if not kind:
+                if existing:
+                    del state["relationships"][existing["id"]]
+                    self._write(state)
+                return
+            relationship = Relationship.model_validate(existing) if existing else Relationship(contact_id=contact_id)
+            relationship.kind = kind
+            relationship.verified = True
+            relationship.updated_at = datetime.now(timezone.utc)
+            state["relationships"][relationship.id] = relationship.model_dump(mode="json")
+            self._write(state)
+
     def merge(self, target_id: str, source_id: str):
         """Explicit human-confirmed merge; both original records are retained."""
         if target_id == source_id:
