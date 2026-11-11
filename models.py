@@ -287,6 +287,14 @@ class WorkExperience(BaseModel):
     current: bool = False
     description: str = ""
 
+LANGUAGE_LEVELS = ["Beginner", "Intermediate", "Proficient", "Fluent", "Native"]
+
+class Language(BaseModel):
+    language: str = ""
+    speaking: str = "Beginner"
+    reading: str = "Beginner"
+    writing: str = "Beginner"
+
 class Education(BaseModel):
     school: str = ""
     degree: str = ""
@@ -312,6 +320,7 @@ class ProfileUpdate(BaseModel):
     work_experience: list[WorkExperience] | None = None
     education: Education | None = None
     certifications: list[str] | None = None
+    languages: list[Language] | None = None
 
 
 class EmailCompose(BaseModel):
@@ -380,6 +389,7 @@ class AppConfig(BaseModel):
     work_experience: list[WorkExperience] = []
     education: Education = Education()
     certifications: list[str] = []
+    languages: list[Language] = []
     # Email
     follow_up_email: str = ""
     smtp_host: str = "smtp.gmail.com"
