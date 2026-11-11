@@ -435,6 +435,15 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <div id="prof-cert-list" style="margin-top:12px"></div>
   </div>
+
+  <!-- Languages -->
+  <div class="card mb-16">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+      Languages
+      <button class="btn btn-ghost btn-sm" onclick="addLang()">+ Add</button>
+    </div>
+    <div id="prof-lang-list" style="margin-top:12px"></div>
+  </div>
     <div class="card mb-16"><div class="card-header">Pay Targets</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-8"><div class="form-group"><label>W2 Salary Min ($)</label><input type="number" id="cfg-w2-min"></div><div class="form-group"><label>W2 Salary Max ($)</label><input type="number" id="cfg-w2-max"></div><div class="form-group"><label>Contract Hourly Min ($)</label><input type="number" id="cfg-hr-min"></div><div class="form-group"><label>Contract Hourly Max ($)</label><input type="number" id="cfg-hr-max"></div></div></div>
     <div class="card mb-16"><div class="card-header">Deal Breakers</div><div class="form-group mt-8"><label>One per line</label><textarea id="cfg-dealbreakers" rows="4"></textarea></div></div>
     <div class="card mb-16"><div class="card-header">Preferred Keywords</div><div class="form-group mt-8"><label>Comma-separated</label><input type="text" id="cfg-keywords"></div></div>
@@ -1604,6 +1613,7 @@ async function loadProfile(){
     document.getElementById('edu-completed').checked = p.education?.completed!==false;
     renderWorkList(p.work_experience||[]);
     renderCertList(p.certifications||[]);
+    renderLangList(p.languages||[]);
   }catch(e){console.error(e);}
 }
 
@@ -1637,6 +1647,22 @@ function renderCertList(certs){
     </div>`).join('');
 }
 
+const LANG_LEVELS=['Beginner','Intermediate','Proficient','Fluent','Native'];
+function renderLangList(langs){
+  const el=document.getElementById('prof-lang-list');
+  const sel=(i,f,v)=>`<select class="input input-sm" onchange="updateLang(${i},'${f}',this.value)">${LANG_LEVELS.map(l=>`<option${l===v?' selected':''}>${l}</option>`).join('')}</select>`;
+  el.innerHTML=langs.map((l,i)=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px">
+      <div><label class="label">Language</label><input class="input input-sm" value="${esc(l.language)}" onchange="updateLang(${i},'language',this.value)"></div>
+      <div><label class="label">Speaking</label>${sel(i,'speaking',l.speaking)}</div>
+      <div><label class="label">Reading</label>${sel(i,'reading',l.reading)}</div>
+      <div><label class="label">Writing</label>${sel(i,'writing',l.writing)}</div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeLang(${i})">✕</button>
+    </div>`).join('');
+}
+function updateLang(i,field,val){_profileData.languages[i][field]=val;}
+function addLang(){_profileData.languages=_profileData.languages||[];_profileData.languages.push({language:'',speaking:'Beginner',reading:'Beginner',writing:'Beginner'});renderLangList(_profileData.languages);}
+function removeLang(i){_profileData.languages.splice(i,1);renderLangList(_profileData.languages);}
 function updateWork(i,field,val){_profileData.work_experience[i][field]=val;}
 function updateCert(i,val){_profileData.certifications[i]=val;}
 function addWorkEntry(){
@@ -1673,6 +1699,7 @@ async function saveProfile(btn){
     },
     work_experience:_profileData.work_experience||[],
     certifications:_profileData.certifications||[],
+    languages:(_profileData.languages||[]).filter(l=>l.language.trim()),
   };
   try{
     await api('/api/profile',{method:'PUT',body:payload});

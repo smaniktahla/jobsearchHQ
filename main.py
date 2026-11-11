@@ -389,6 +389,7 @@ def agent_get_profile(request: Request):
         "work_experience": [w.model_dump() for w in config.work_experience],
         "education": config.education.model_dump(),
         "certifications": config.certifications,
+        "languages": [l.model_dump() for l in config.languages],
     }
 
 
@@ -417,6 +418,7 @@ def agent_update_profile(data: ProfileUpdate, request: Request):
     if data.work_experience is not None: config.work_experience = data.work_experience
     if data.education is not None: config.education = data.education
     if data.certifications is not None: config.certifications = data.certifications
+    if data.languages is not None: config.languages = data.languages
     storage.save_config(admin_id, config)
     return agent_get_profile(request)
 
@@ -2177,6 +2179,7 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     config.work_experience = existing.work_experience
     config.education       = existing.education
     config.certifications  = existing.certifications
+    config.languages       = existing.languages
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
     if config.auto_approve_enabled:
@@ -2230,6 +2233,7 @@ def get_profile(user: User = Depends(get_current_user)):
         "work_experience": [w.model_dump() for w in config.work_experience],
         "education": config.education.model_dump(),
         "certifications": config.certifications,
+        "languages": [l.model_dump() for l in config.languages],
     }
 
 
@@ -2251,6 +2255,7 @@ def update_profile(data: ProfileUpdate, user: User = Depends(get_current_user)):
     if data.work_experience is not None: config.work_experience = data.work_experience
     if data.education is not None: config.education = data.education
     if data.certifications is not None: config.certifications = data.certifications
+    if data.languages is not None: config.languages = data.languages
     storage.save_config(user.id, config)
     return get_profile(user)
 
