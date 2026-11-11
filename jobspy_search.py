@@ -6,6 +6,8 @@ Scrapes LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter for job postings.
 import logging
 import re
 import math
+import threading
+import multiprocessing
 from datetime import datetime
 from pydantic import BaseModel
 from jobspy import scrape_jobs
@@ -58,6 +60,7 @@ class JobSearchResult(BaseModel):
     skipped: list[dict] = []
     errors: list[dict] = []
     total_scraped: int = 0
+    cancelled: bool = False
 
 
 def find_existing(dedup_index: list[dict], title: str, company: str, url: str) -> dict | None:
@@ -66,8 +69,41 @@ def find_existing(dedup_index: list[dict], title: str, company: str, url: str) -
     return storage.find_in_dedup_index(dedup_index, title, company, url)
 
 
-def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
-    """Execute a JobSpy search and import results into the job tracker."""
+MAX_SCRAPE_SECONDS = 600
+
+
+def _scrape_cancellable(kwargs: dict, cancel: threading.Event, target=None):
+    """scrape_jobs() in a child process so Stop can kill it. Returns the DataFrame, or None if cancelled."""
+    import search_worker
+    ctx = multiprocessing.get_context("spawn")
+    recv, send = ctx.Pipe(duplex=False)
+    proc = ctx.Process(target=target or search_worker.scrape, args=(kwargs, send), daemon=True)
+    proc.start()
+    send.close()
+    deadline = datetime.now().timestamp() + MAX_SCRAPE_SECONDS
+    try:
+        while True:
+            if cancel.is_set():
+                return None
+            if recv.poll(0.5):
+                kind, payload = recv.recv()
+                if kind == "err":
+                    raise RuntimeError(payload)
+                return payload
+            if not proc.is_alive() and not recv.poll():
+                raise RuntimeError("search process exited unexpectedly")
+            if datetime.now().timestamp() > deadline:
+                raise RuntimeError(f"search timed out after {MAX_SCRAPE_SECONDS // 60} minutes")
+    finally:
+        if proc.is_alive():
+            proc.terminate()
+        proc.join(5)
+        recv.close()
+
+
+def run_search(req: JobSearchRequest, user_id: str, cancel: threading.Event | None = None) -> JobSearchResult:
+    """Execute a JobSpy search and import results into the job tracker.
+    With a cancel event the scrape runs in a killable child process and the import stops when set."""
 
     remote_only = req.work_modes == ["remote"] or (not req.work_modes and req.is_remote)
     # Build scrape_jobs kwargs
@@ -95,10 +131,12 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
     # Run the scrape
     logger.info(f"JobSpy search: sites={req.sites}, term='{req.search_term}', location='{req.location}'")
     try:
-        df = scrape_jobs(**kwargs)
+        df = scrape_jobs(**kwargs) if cancel is None else _scrape_cancellable(kwargs, cancel)
     except Exception as e:
         logger.error(f"JobSpy scrape failed: {e}", exc_info=True)
         return JobSearchResult(errors=[{"error": f"Scrape failed: {str(e)}"}])
+    if cancel is not None and cancel.is_set():
+        return JobSearchResult(cancelled=True)
 
     if df is None or df.empty:
         logger.info("JobSpy returned 0 results")
@@ -114,6 +152,9 @@ def run_search(req: JobSearchRequest, user_id: str) -> JobSearchResult:
     dedup_index = storage.load_dedup_index(user_id) if req.skip_existing else []
 
     for _, row in df.iterrows():
+        if cancel is not None and cancel.is_set():
+            result.cancelled = True
+            break
         try:
             title = str(row.get("title", "")).strip()
             company = str(row.get("company", "")).strip()

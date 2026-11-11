@@ -651,6 +651,33 @@ def search_jobs(
         raise HTTPException(500, f"Search failed: {str(e)}")
 
 
+@app.post("/api/search/start")
+def search_start(req: jobspy_search.JobSearchRequest, user: User = Depends(get_current_user)):
+    """Start a board search in the background (poll /api/search/status/{id}; stop with /api/search/cancel)."""
+    require_search_active(user.id)
+    import search_tasks
+    try:
+        return {"task_id": search_tasks.start(req, user.id, jobspy_search.run_search)}
+    except search_tasks.TooManySearches as e:
+        raise HTTPException(429, str(e))
+
+
+@app.get("/api/search/status/{task_id}")
+def search_status(task_id: str, user: User = Depends(get_current_user)):
+    import search_tasks
+    st = search_tasks.status(task_id, user.id)
+    if st is None:
+        raise HTTPException(404, "Unknown or expired search")
+    return st
+
+
+@app.post("/api/search/cancel")
+def search_cancel(body: dict | None = None, user: User = Depends(get_current_user)):
+    import search_tasks
+    ids = (body or {}).get("task_ids") or None
+    return {"cancelled": search_tasks.cancel(user.id, ids)}
+
+
 # ── Batch scoring (before /{job_id} routes) ───────────────────────────────────
 
 # ── Background scoring state ───────────────────────────────────────────────────

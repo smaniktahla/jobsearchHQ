@@ -174,6 +174,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <div class="flex gap-8 mt-16">
       <button class="btn btn-primary" id="btn-search" onclick="runSearch()">Search</button>
+      <button class="btn btn-danger" id="btn-search-stop" onclick="stopSearch()" style="display:none;margin-left:8px">■ Stop search</button>
     </div>
     <div id="board-status" class="mt-8" style="display:none"></div>
   </div>
@@ -924,7 +925,7 @@ function closeSidebar(){document.getElementById('sidebar')?.classList.remove('op
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).style.display='block'}));
 async function _api(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});if(res.status===401){window.location.href='/auth/login';return;}if(res.status===503){window.location.href='/setup';return;}if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||res.statusText)}return res.json()}
 let _inflight=0,_topTimer=null;
-const _QUIET=/\/status(\?|$)|^\/api\/activity|^\/api\/resumes\/missing/;
+const _QUIET=/\/status(\?|$)|^\/api\/search\/status\/|^\/api\/activity|^\/api\/resumes\/missing/;
 async function api(path,opts){const q=_QUIET.test(path);if(!q)_busyBar(1);try{return await _api(path,opts)}finally{if(!q)_busyBar(-1)}}
 function _busyBar(d){_inflight+=d;const b=document.getElementById('topbar');if(_inflight>0){if(!_topTimer)_topTimer=setTimeout(()=>b.classList.add('on'),150)}else{_inflight=0;clearTimeout(_topTimer);_topTimer=null;b.classList.remove('on')}}
 function skelRows(n){return Array.from({length:n},()=>'<div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>').join('')}
@@ -973,10 +974,11 @@ function updateBoardStatus(statuses){
   const el=document.getElementById('board-status');
   el.style.display='block';
   el.innerHTML=`<div class="flex gap-8" style="flex-wrap:wrap">${Object.entries(statuses).map(([board,s])=>{
-    const icon=s.status==='done'?'✓':s.status==='error'?'✕':s.status==='searching'?'<span class="spinner"></span>':'⏳';
-    const color=s.status==='done'?'var(--green)':s.status==='error'?'var(--red)':s.status==='searching'?'var(--accent)':'var(--text-dim)';
-    const detail=s.status==='done'?`${s.created} found`+(s.skipped?`, ${s.skipped} dupes`:''):s.status==='error'?'failed':s.status==='searching'?'searching...':'queued';
-    return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 14px;min-width:140px"><div style="color:${color};font-weight:600;font-size:13px">${icon} ${BOARD_LABELS[board]||board}</div><div class="text-dim" style="font-size:11px">${detail}${s.time?' · '+s.time:''}</div></div>`;
+    const icon=s.status==='done'?'✓':s.status==='error'?'✕':s.status==='cancelled'?'■':s.status==='searching'?'<span class="spinner"></span>':'⏳';
+    const color=s.status==='done'?(s.note&&!s.created?'var(--yellow)':'var(--green)'):s.status==='error'?'var(--red)':s.status==='searching'?'var(--accent)':'var(--text-dim)';
+    const note=s.note?`<div style="margin-top:2px;white-space:normal;max-width:260px">${esc(String(s.note).slice(0,140))}</div>`:'';
+    const detail=(s.status==='done'?`${s.created} found`+(s.skipped?`, ${s.skipped} dupes`:''):s.status==='error'?'failed':s.status==='cancelled'?`stopped${s.created?' · '+s.created+' imported':''}`:s.status==='searching'?'searching...':'queued')+(s.time?'':'');
+    return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 14px;min-width:140px"><div style="color:${color};font-weight:600;font-size:13px">${icon} ${BOARD_LABELS[board]||board}</div><div class="text-dim" style="font-size:11px">${detail}${s.time?' · '+s.time:''}${note}</div></div>`;
   }).join('')}</div>`;
 }
 function renderSearchResults(){
@@ -1030,46 +1032,47 @@ async function runSearch(){
     auto_score:document.getElementById('search-autoscore').checked,
     skip_existing:true,
   };
-  const promises=sites.map(async(site)=>{
-    statuses[site].status='searching';
-    updateBoardStatus(statuses);
-    const start=Date.now();
-    try{
-      const res=await api('/api/search',{method:'POST',body:{...baseParams,sites:[site]}});
-      const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
-      const created=res.created||[];
-      const skipped=res.skipped||[];
-      statuses[site]={status:'done',created:created.length,skipped:skipped.length,time:elapsed};
-      lastSearchResults.push(...created);
-      renderSearchResults();
-    }catch(e){
-      const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
-      statuses[site]={status:'error',created:0,skipped:0,time:elapsed};
-    }
-    updateBoardStatus(statuses);
-  });
-  if(companySites.length){
-    promises.push((async()=>{
-      statuses.company_site.status='searching';
-      updateBoardStatus(statuses);
-      const start=Date.now();
-      try{
-        const res=await api('/api/search',{method:'POST',body:{...baseParams,sites:[],company_sites:companySites}});
-        const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
-        const created=res.created||[];
-        const skipped=res.skipped||[];
-        statuses.company_site={status:'done',created:created.length,skipped:skipped.length,time:elapsed};
-        lastSearchResults.push(...created);
-        renderSearchResults();
-      }catch(e){
-        const elapsed=((Date.now()-start)/1000).toFixed(1)+'s';
-        statuses.company_site={status:'error',created:0,skipped:0,time:elapsed};
-      }
-      updateBoardStatus(statuses);
-    })());
-  }
-  await Promise.all(promises);
+  _searchTasks=[];_searchStopped=false;
+  const stopBtn=document.getElementById('btn-search-stop');stopBtn.style.display='';stopBtn.disabled=false;stopBtn.textContent='■ Stop search';
+  const jobs=sites.map(site=>runBoardTask(site,{...baseParams,sites:[site]},statuses));
+  if(companySites.length)jobs.push(runBoardTask('company_site',{...baseParams,sites:[],company_sites:companySites},statuses));
+  await Promise.all(jobs);
+  stopBtn.style.display='none';
   document.getElementById('btn-search').disabled=false;
+}
+let _searchTasks=[],_searchStopped=false;
+// Each board runs as a background task on the server; we poll short status requests, so a slow
+// board can't be cut off by a proxy timeout, and Stop can cancel it.
+async function runBoardTask(key,body,statuses){
+  statuses[key]={status:'searching',created:0,skipped:0,time:'',note:''};
+  updateBoardStatus(statuses);
+  const start=Date.now(),secs=()=>((Date.now()-start)/1000).toFixed(1)+'s';
+  try{
+    const {task_id}=await api('/api/search/start',{method:'POST',body});
+    _searchTasks.push(task_id);
+    let fails=0;
+    for(;;){
+      await new Promise(r=>setTimeout(r,1500));
+      let st;
+      try{st=await api('/api/search/status/'+task_id);fails=0}
+      catch(e){if(/expired/i.test(e.message)||++fails>=5)throw e;continue}
+      if(st.state==='running'){statuses[key].time=secs();updateBoardStatus(statuses);continue}
+      const res=st.result||{},created=res.created||[],skipped=res.skipped||[];
+      lastSearchResults.push(...created);
+      const reason=(st.error||(res.errors&&res.errors[0]&&res.errors[0].error)||'');
+      statuses[key]={status:st.state==='cancelled'?'cancelled':st.state==='error'?'error':'done',created:created.length,skipped:skipped.length,time:secs(),note:reason};
+      if(created.length)renderSearchResults();
+      break;
+    }
+  }catch(e){
+    statuses[key]={status:'error',created:0,skipped:0,time:secs(),note:e.message||'request failed'};
+  }
+  updateBoardStatus(statuses);
+}
+async function stopSearch(){
+  _searchStopped=true;
+  const b=document.getElementById('btn-search-stop');b.disabled=true;b.textContent='Stopping…';
+  try{await api('/api/search/cancel',{method:'POST',body:{task_ids:_searchTasks}})}catch(e){toast('Could not stop: '+e.message)}
 }
 async function scoreAllSearchResults(){
   const toScore=lastSearchResults.filter(j=>j.has_description&&!j.score).map(j=>j.id);
