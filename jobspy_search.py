@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from jobspy import scrape_jobs
 
 from models import Job, JobStatus, MarketLane, IntakeSource
+import company_site_search
 import storage
 import scoring
 
@@ -23,6 +24,8 @@ class JobSearchRequest(BaseModel):
     search_term: str
     location: str = ""
     sites: list[str] = ["indeed", "linkedin", "google"]
+    # Company career pages to scrape (search_company_sites). Searched in addition to / instead of the boards.
+    company_sites: list[company_site_search.CompanySiteRequest] = []
     results_wanted: int = 25
     hours_old: int = 72
     is_remote: bool = True
@@ -102,8 +105,43 @@ def _scrape_cancellable(kwargs: dict, cancel: threading.Event, target=None):
 
 
 def run_search(req: JobSearchRequest, user_id: str, cancel: threading.Event | None = None) -> JobSearchResult:
-    """Execute a JobSpy search and import results into the job tracker.
-    With a cancel event the scrape runs in a killable child process and the import stops when set."""
+    """Search company career pages (req.company_sites) and the job boards (req.sites) and import results.
+    With a cancel event the board scrape runs in a killable child process and importing stops when set."""
+    board_sites = [s for s in req.sites if s != "company_site"]
+    result = JobSearchResult()
+
+    if req.company_sites:
+        company_result = company_site_search.search_company_sites(
+            sites=req.company_sites,
+            search_term=req.search_term,
+            user_id=user_id,
+            results_wanted=req.results_wanted,
+            auto_score=req.auto_score,
+            skip_existing=req.skip_existing,
+            should_stop=(cancel.is_set if cancel is not None else None),
+        )
+        result.created.extend(company_result.get("created", []))
+        result.skipped.extend(company_result.get("skipped", []))
+        result.errors.extend(company_result.get("errors", []))
+        result.total_scraped += company_result.get("total_scraped", 0)
+
+    if cancel is not None and cancel.is_set():
+        result.cancelled = True
+        return result
+    if not board_sites:
+        return result
+
+    boards = _run_board_search(req.model_copy(update={"sites": board_sites}), user_id, cancel)
+    result.created.extend(boards.created)
+    result.skipped.extend(boards.skipped)
+    result.errors.extend(boards.errors)
+    result.total_scraped += boards.total_scraped
+    result.cancelled = boards.cancelled
+    return result
+
+
+def _run_board_search(req: JobSearchRequest, user_id: str, cancel: threading.Event | None = None) -> JobSearchResult:
+    """The JobSpy board half of run_search (req.sites are boards only)."""
 
     remote_only = req.work_modes == ["remote"] or (not req.work_modes and req.is_remote)
     # Build scrape_jobs kwargs

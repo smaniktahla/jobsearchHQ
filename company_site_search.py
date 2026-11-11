@@ -104,11 +104,14 @@ def search_company_sites(
     results_wanted: int = 25,
     auto_score: bool = False,
     skip_existing: bool = True,
+    should_stop=None,
 ) -> dict:
     result = {"created": [], "skipped": [], "errors": [], "total_scraped": 0}
     dedup_index = storage.load_dedup_index(user_id) if skip_existing else []
 
     for site in sites:
+        if should_stop is not None and should_stop():
+            break
         try:
             created, skipped, errors, total = _search_one_site(
                 site=site,
