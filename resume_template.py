@@ -14,6 +14,7 @@ Storage: data/users/<user_id>/resume_template.docx (+ resume_template.json).
 import copy
 import json
 import logging
+import os
 import re
 import zipfile
 from datetime import datetime, timezone
@@ -88,6 +89,26 @@ def template_info(user_id: str) -> dict:
     except Exception:
         pass
     return {"loaded": True, **meta}
+
+
+DEFAULT_TEMPLATE = Path(__file__).resolve().parent / "templates" / "default_ats_resume.docx"
+
+
+def install_default_template(user_id: str) -> bool:
+    """Give a brand-new account the bundled ATS-friendly template so its first generated
+    resume already looks right. No-op if the user has a template or the file is missing.
+    Never raises: a missing/invalid default must not block account creation."""
+    try:
+        if has_template(user_id):
+            return False
+        path = Path(os.environ.get("JSHQ_DEFAULT_TEMPLATE") or DEFAULT_TEMPLATE)
+        if not path.is_file():
+            return False
+        save_template(user_id, path.read_bytes(), "Default ATS template.docx")
+        return True
+    except Exception:
+        logger.exception("Could not install default resume template for %s", user_id)
+        return False
 
 
 def delete_template(user_id: str) -> None:
@@ -633,6 +654,10 @@ def render(tailored_text: str, user_id: str, out_path: Path) -> str:
             b.spacer()
         b.add(block)
         prev = kind
+    # Don't carry the template author's name (or anyone else's) into the file properties.
+    props = b.doc.core_properties
+    props.author = props.last_modified_by = config.author_name or ""
+    props.title = props.subject = props.comments = props.keywords = ""
     b.doc.save(str(out_path))
     _check_relationships(out_path)
     return str(out_path)

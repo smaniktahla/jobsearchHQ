@@ -92,3 +92,31 @@ def test_wizard_endpoints_round_trip(client):
     assert client.get('/api/config').json()['onboarding_completed'] is False
     assert client.get('/api/config').json()['scheduled_search_terms'] == ['PM', 'Ops Manager']  # reset keeps data
 
+
+
+def test_new_account_gets_default_ats_template_and_existing_ones_are_untouched(monkeypatch):
+    import resume_template as rt
+    assert rt.DEFAULT_TEMPLATE.is_file()
+    storage.load_config('fresh-user')                      # first touch creates the account's config
+    info = rt.template_info('fresh-user')
+    assert info['loaded'] and {'name', 'contact', 'section', 'bullet', 'org', 'title'} <= set(info['roles'])
+    out = rt.render_sample('fresh-user', Path(storage.get_user_dir('fresh-user')) / 'preview.docx')
+    from docx import Document
+    text = '\n'.join(p.text for p in Document(out).paragraphs)
+    assert 'JANE SAMPLE' in text and 'Jobby' not in text and 'SheetsResume' not in text
+    assert 'McIntosh' not in (Document(out).core_properties.author + Document(out).core_properties.last_modified_by)
+
+    rt.delete_template('fresh-user')                       # user removes it: it must not come back
+    storage.load_config('fresh-user')
+    assert not rt.has_template('fresh-user')
+
+    storage.save_config('old-user', AppConfig())           # pre-existing account: nothing installed
+    storage.load_config('old-user')
+    assert not rt.has_template('old-user')
+
+
+def test_missing_default_template_never_blocks_account_creation(monkeypatch):
+    import resume_template as rt
+    monkeypatch.setenv('JSHQ_DEFAULT_TEMPLATE', '/nonexistent.docx')
+    assert storage.load_config('another-new-user').onboarding_completed is False
+    assert not rt.has_template('another-new-user')
