@@ -33,8 +33,6 @@ MODEL_FAST = "claude-haiku-4-5-20251001"    # scoring, metadata extraction
 MODEL_STRONG = "claude-sonnet-4-5"   # resumes, cover letters
 
 # Default Ollama settings (overridden by AppConfig)
-DEFAULT_OLLAMA_URL = "http://10.10.10.105:11434"
-DEFAULT_OLLAMA_MODEL = "gemma4:e4b"
 
 
 def _is_local(config: AppConfig, tier: str = "fast") -> bool:
@@ -49,8 +47,10 @@ def _is_local(config: AppConfig, tier: str = "fast") -> bool:
 
 def ollama_chat(system: str, user_msg: str, config: AppConfig) -> str:
     """Call Ollama's OpenAI-compatible chat endpoint and return the text response."""
-    url = (config.ollama_url or DEFAULT_OLLAMA_URL).rstrip("/") + "/v1/chat/completions"
-    model = config.ollama_model or DEFAULT_OLLAMA_MODEL
+    if not (config.ollama_url or "").strip() or not (config.ollama_model or "").strip():
+        raise ValueError("Local server URL and model name are required. Add them in Settings → AI.")
+    url = config.ollama_url.rstrip("/") + "/v1/chat/completions"
+    model = config.ollama_model
 
     messages = []
     if system:
@@ -148,8 +148,8 @@ SCORING RUBRIC:
 - pay_alignment (0-2): Based on the stated or inferred pay range vs candidate targets. 2 = within range, 1 = close, 0 = way off or unstated.
 
 Candidate pay targets:
-- W2: ${w2_min:,} - ${w2_max:,}/year
-- Contract: ${hourly_min} - ${hourly_max}/hour
+- W2: {w2_range}
+- Contract: {hourly_range}
 
 Deal breakers (auto-flag if present): {deal_breakers}
 
@@ -196,11 +196,11 @@ def score_job(job: Job, user_id: str = None) -> ScoreBreakdown:
         resume_lanes=lanes.prompt_block(lane_list),
         lane_keys=lanes.keys_for_schema(lane_list),
         full_history=full_history,
-        w2_min=config.w2_salary_min,
-        w2_max=config.w2_salary_max,
-        hourly_min=config.contract_hourly_min,
-        hourly_max=config.contract_hourly_max,
-        deal_breakers=", ".join(config.deal_breakers),
+        w2_range=(f"${config.w2_salary_min:,} - ${config.w2_salary_max:,}/year"
+                  if config.w2_salary_max else "not specified (judge pay on market norms for the role)"),
+        hourly_range=(f"${config.contract_hourly_min} - ${config.contract_hourly_max}/hour"
+                      if config.contract_hourly_max else "not specified"),
+        deal_breakers=", ".join(config.deal_breakers) or "none specified",
     )
 
     user_msg = f"Score this job description:\n\n{job.raw_jd}"
@@ -541,46 +541,48 @@ def generate_linkedin_message(
     if is_hr:
         tone = (
             "HR/People leader. Mention you applied for the role and wanted to connect directly. "
-            "Warm and professional. Optionally mention you found their name via an AI job search "
-            "tool you built — frame as resourcefulness."
+            "Warm and professional. Optionally mention you found their name while researching the company."
         )
     elif is_data:
         tone = (
             "Data/analytics/tech peer or potential boss. Collegial, peer-to-peer tone. "
-            "Definitely mention you built an AI job search tool that identified them as a key "
-            "contact — this demonstrates exactly the skills relevant to the role. Make it a "
-            "conversation starter."
+            "Mention a specific, genuine reason you want to connect related to the role. "
+            "Make it a conversation starter."
         )
     elif is_csuite:
         tone = (
             "C-suite executive. Very brief, respectful of their time. "
-            "One sentence on who you are, one on the role. Skip the tool mention."
+            "One sentence on who you are, one on the role."
         )
     else:
         tone = (
-            "Professional and direct. Mention the role and your background briefly. "
-            "Optionally mention the AI tool if it fits naturally."
+            "Professional and direct. Mention the role and your background briefly."
         )
 
     first_name = contact_name.split()[0].replace("Dr.", "").strip()
-    author_first = author_name.split()[0] if author_name else "Salil"
+    author_first = author_name.split()[0] if author_name else ""
+    background = ""
+    if config and config.work_experience:
+        w = config.work_experience[0]
+        background = ", ".join(x for x in (w.title, w.company) if x)
 
     system = (
         "You generate LinkedIn connection request messages. "
         "HARD LIMIT: 300 characters total including spaces. Count carefully. "
         "Return ONLY the message text — no quotes, no preamble, no explanation. "
-        f"Sign off with just '{author_first}'."
+        + (f"Sign off with just '{author_first}'." if author_first else "Do not add a sign-off name.")
     )
 
     user_msg = (
         f"Write a LinkedIn connection request from {author_name} to "
         f"{contact_name} ({contact_title}) at {job.company}.\n\n"
         f"Role being applied for: {job.title}\n"
-        f"Sender background: Senior data & analytics leader, 30 years experience, "
-        f"currently leading federal ERP analytics modernization.\n\n"
+        + (f"Sender background: {background}.\n\n" if background else "")
+        + f"Sender: {author_name or 'the applicant'}.\n"
         f"Tone: {tone}\n\n"
         f"Open with their first name '{first_name}'. "
-        f"Sign off with '{author_first}'. STRICT 300 CHARACTER LIMIT."
+        + (f"Sign off with '{author_first}'. " if author_first else "")
+        + "STRICT 300 CHARACTER LIMIT."
     )
 
     if config:

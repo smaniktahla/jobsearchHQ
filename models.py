@@ -345,10 +345,19 @@ class AppConfig(BaseModel):
         return value
 
     # Scoring targets
-    w2_salary_min: int = 160000
-    w2_salary_max: int = 220000
-    contract_hourly_min: int = 85
-    contract_hourly_max: int = 125
+    # 0 = not set. New accounts start with no personal data at all (see storage.load_config).
+    w2_salary_min: int = 0
+    w2_salary_max: int = 0
+    contract_hourly_min: int = 0
+    contract_hourly_max: int = 0
+    # False only for accounts that have not finished the first-login setup wizard.
+    # Existing config files predate the field, so they default to "done".
+    onboarding_completed: bool = True
+    # Optional strict first-pass cuts for thin LinkedIn-alert listings (email_intake). 0/False = off.
+    prefilter_w2_floor: int = 0
+    prefilter_hourly_floor: int = 0
+    prefilter_dc_metro_only: bool = False
+    prefilter_manager_plus_only: bool = False   # reject W2 titles below Manager level
     follow_up_days: int = 14
     # Author / applicant profile (used in generated documents and application packages)
     author_name: str = ""
@@ -386,33 +395,15 @@ class AppConfig(BaseModel):
     }
     # What each resume lane is for (see lanes.py); blank entries fall back to the built-in descriptions.
     resume_lane_descriptions: dict[str, str] = {}
-    deal_breakers: list[str] = [
-        "must relocate",
-        "on-site only outside DC metro",
-        "requires TS/SCI",
-    ]
-    preferred_keywords: list[str] = [
-        "data architecture",
-        "analytics",
-        "BI",
-        "ERP",
-        "financial systems",
-        "data engineering",
-        "Python",
-        "SQL",
-        "Tableau",
-        "Power BI",
-    ]
+    deal_breakers: list[str] = []
+    preferred_keywords: list[str] = []
     # --- Scheduled Search ---
     scheduled_search_enabled: bool = False
     scheduled_search_time: str = "07:00"  # HH:MM in ET
-    scheduled_search_terms: list[str] = [
-        "senior director data analytics",
-        "data architecture manager",
-    ]
+    scheduled_search_terms: list[str] = []
     scheduled_search_sites: list[str] = ["indeed", "linkedin", "google"]
     scheduled_company_sites: list[dict[str, str]] = []
-    scheduled_search_location: str = "Washington, DC"
+    scheduled_search_location: str = ""
     scheduled_search_results: int = 25
     scheduled_search_hours_old: int = 24
     scheduled_search_remote: bool = True    # "Remote only" — exclusive of hybrid/onsite
@@ -448,8 +439,8 @@ class AppConfig(BaseModel):
     openai_base_url: str = ""           # blank = api.openai.com; set for any OpenAI-compatible server
     fast_model: str = ""                # override default fast model
     strong_model: str = ""              # override default strong model
-    ollama_url: str = "http://10.10.10.105:11434"
-    ollama_model: str = "gemma4:e4b"
+    ollama_url: str = ""
+    ollama_model: str = ""
     # Large slow runs (score-all, resume backfill, daily pipeline) go here when batch_ollama_url is
     # set, so a big queue doesn't occupy the interactive local server. Blank = no split.
     batch_ollama_url: str = ""
