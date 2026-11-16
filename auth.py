@@ -23,6 +23,7 @@ import secrets
 import threading
 import time
 from pathlib import Path
+from urllib.parse import quote, urlsplit
 from typing import Optional
 
 import httpx
@@ -58,17 +59,26 @@ def get_id_token(user_id: str) -> Optional[str]:
     return _id_tokens.get(user_id)
 
 
-def _store_state(state: str) -> None:
+# redirect_uri used when a login started, keyed by state; the token exchange must
+# present exactly the same value (RFC 6749 4.1.3).
+_state_redirects: dict = {}
+
+
+def _store_state(state: str, redirect_uri: Optional[str] = None) -> None:
     _pending_states[state] = time.time() + _STATE_TTL
+    if redirect_uri:
+        _state_redirects[state] = redirect_uri
     expired = [k for k, v in list(_pending_states.items()) if v < time.time()]
     for k in expired:
         del _pending_states[k]
+        _state_redirects.pop(k, None)
 
 
 def _consume_state(state: str) -> bool:
     """Return True and remove state if valid and unexpired."""
     expires = _pending_states.get(state)
     if not expires or time.time() > expires:
+        _state_redirects.pop(state, None)
         return False
     del _pending_states[state]
     return True
@@ -76,6 +86,30 @@ def _consume_state(state: str) -> bool:
 
 def _is_https(request: Request) -> bool:
     return request.headers.get("x-forwarded-proto", "").lower() == "https"
+
+
+def _request_host(request: Request) -> str:
+    """Host the browser used (reverse proxies pass it as X-Forwarded-Host)."""
+    raw = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    return raw.split(",")[0].strip().lower()
+
+
+def oidc_redirect_uri_for(request: Request, cfg: dict) -> str:
+    """Redirect URI for this login: the configured one, unless the browser came in on
+    another hostname that is explicitly allowed (cfg["oidc_extra_hosts"]). Unknown
+    hosts always fall back to the configured URI, so a spoofed Host header cannot
+    steer the callback anywhere unregistered. Each allowed host must also be
+    registered as a redirect URI at the identity provider."""
+    configured = cfg.get("oidc_redirect_uri", "")
+    host = _request_host(request)
+    if not host:
+        return configured
+    configured_host = urlsplit(configured).netloc.lower()
+    extras = {str(h).strip().lower() for h in (cfg.get("oidc_extra_hosts") or []) if str(h).strip()}
+    if host == configured_host or host not in extras:
+        return configured
+    scheme = "https" if _is_https(request) else "http"
+    return f"{scheme}://{host}/auth/callback"
 
 
 # ── System config ──────────────────────────────────────────────────────────────
@@ -360,14 +394,15 @@ async def sso_login_handler(request: Request):
     cfg = load_system_config()
     discovery = await get_discovery()
     state = secrets.token_urlsafe(32)
+    redirect_uri = oidc_redirect_uri_for(request, cfg)
     params = (
         f"?client_id={cfg['oidc_client_id']}"
-        f"&redirect_uri={cfg['oidc_redirect_uri']}"
+        f"&redirect_uri={quote(redirect_uri, safe='')}"
         f"&response_type=code"
         f"&scope=openid+profile+email"
         f"&state={state}"
     )
-    _store_state(state)
+    _store_state(state, redirect_uri)
     response = RedirectResponse(discovery["authorization_endpoint"] + params)
     return response
 
@@ -383,6 +418,7 @@ async def callback_handler(request: Request):
 
     cfg = load_system_config()
     discovery = await get_discovery()
+    redirect_uri = _state_redirects.pop(state, None) or cfg["oidc_redirect_uri"]
 
     async with httpx.AsyncClient() as client:
         # Exchange code for tokens
@@ -391,7 +427,7 @@ async def callback_handler(request: Request):
             data={
                 "grant_type": "authorization_code",
                 "code": code,
-                "redirect_uri": cfg["oidc_redirect_uri"],
+                "redirect_uri": redirect_uri,
                 "client_id": cfg["oidc_client_id"],
                 "client_secret": cfg["oidc_client_secret"],
             },
@@ -452,7 +488,7 @@ async def logout_handler(request: Request):
         end_session = discovery.get("end_session_endpoint")
         if end_session:
             cfg = load_system_config()
-            base_url = cfg.get("oidc_redirect_uri", "").rsplit("/auth/callback", 1)[0]
+            base_url = oidc_redirect_uri_for(request, cfg).rsplit("/auth/callback", 1)[0]
             from urllib.parse import urlencode
             logout_params: dict = {"post_logout_redirect_uri": base_url + "/auth/login"}
             # Pass id_token_hint so Authentik completes RP-initiated logout and redirects back
