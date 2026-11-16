@@ -38,6 +38,19 @@ Most people default to spreadsheets (or chaos).
 - **Multi-user auth** — local email/password accounts out of the box, optional OIDC SSO (Authentik, Keycloak, Auth0…), per-user data isolation.
 - **AI backend toggle** — Switch scoring between Anthropic API (Haiku) and local Ollama in Settings.
 
+### Search and application workflow
+
+- **Board and company-site searches** — run board searches in the background, view per-board progress and error details, or stop a search while keeping jobs already imported. Add company career sites to manual or scheduled searches. ([#42](https://github.com/smaniktahla/jobsearchHQ/pull/42), [#43](https://github.com/smaniktahla/jobsearchHQ/pull/43))
+- **Tracker and document readiness** — filter by work arrangement, check whether a posting is still open, and see which application documents are ready. Configured automation can mark jobs ready to apply after the required résumé and cover letters are generated. ([#7](https://github.com/smaniktahla/jobsearchHQ/pull/7), [#26](https://github.com/smaniktahla/jobsearchHQ/pull/26), [#28](https://github.com/smaniktahla/jobsearchHQ/pull/28), [#30](https://github.com/smaniktahla/jobsearchHQ/pull/30))
+- **Résumé templates and writing samples** — manage résumé variants and use a Word template for tailored output. Add optional writing samples to guide the style of generated documents. ([#9](https://github.com/smaniktahla/jobsearchHQ/pull/9), [#24](https://github.com/smaniktahla/jobsearchHQ/pull/24), [#35](https://github.com/smaniktahla/jobsearchHQ/pull/35))
+
+### Account and profile
+
+- **First-login setup** — the wizard walks new users through their profile, résumé, AI provider, and job preferences. Reopen it from **Settings → Account**. The AI settings include a provider setup guide. ([#38](https://github.com/smaniktahla/jobsearchHQ/pull/38), [#39](https://github.com/smaniktahla/jobsearchHQ/pull/39))
+- **Profile and appearance** — record speaking, reading, and writing proficiency per language. Choose Light, Dark, or Match device under **Settings → Profile → Appearance**. ([#41](https://github.com/smaniktahla/jobsearchHQ/pull/41), [#44](https://github.com/smaniktahla/jobsearchHQ/pull/44))
+- **Optional Network directory** — with `network_enabled` enabled, preview LinkedIn connections CSV imports, search and annotate contacts, review ambiguous matches, and export or delete contacts. ([#36](https://github.com/smaniktahla/jobsearchHQ/pull/36), [#37](https://github.com/smaniktahla/jobsearchHQ/pull/37), [#45](https://github.com/smaniktahla/jobsearchHQ/pull/45))
+- **Multiple sign-in hostnames** — set `oidc_extra_hosts` in `data/system_config.json` to allow additional OIDC callback hostnames. Register each callback URI with your identity provider. ([#46](https://github.com/smaniktahla/jobsearchHQ/pull/46))
+
 ## Screenshots
 
 <p align="center">
@@ -85,7 +98,7 @@ docker compose up -d --build
 
 ## First Run Setup
 
-1. Visit `/setup` and create your admin account (name, email, password). No identity provider needed. To restrict who can claim the admin account on a network-exposed install, set `JSHQ_SETUP_TOKEN` in the container environment; setup then requires it.
+1. Visit `/setup` and create your admin account (name, email, password). Run the first-login wizard to set up your profile and job preferences. No identity provider needed. To restrict who can claim the admin account on a network-exposed install, set `JSHQ_SETUP_TOKEN` in the container environment; setup then requires it.
    Add other users, or turn on optional OIDC single sign-on, from **Settings** afterwards.
 2. **Settings** → Set pay targets (W2 salary range, contract hourly rate)
 3. **Settings** → Add Gmail credentials for sending applications
