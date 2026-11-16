@@ -62,7 +62,7 @@ The supplied Compose file mounts `./data` for persistent settings, jobs, and gen
 
 Choose Anthropic, Google Gemini, OpenAI, or an Ollama endpoint in **Settings → AI**. The **Fast** tier handles tasks such as scoring and metadata extraction. The **Strong** tier handles drafting work such as résumés, cover letters, and outreach messages. The settings page includes setup instructions and connection tests.
 
-For an Anthropic deployment-wide default with the supplied Compose file, copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY`, and restart the service. You can also configure provider credentials in the app. Company research has its own web search workflow described below.
+For an Anthropic deployment-wide default with the supplied Compose file, copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY`, and run `docker compose up -d` to apply the new container environment. You can also configure provider credentials in the app. Company research has its own web search workflow described below.
 
 ### Accounts and sign-in
 
@@ -110,6 +110,15 @@ Browser endpoints use the signed-in session. Agent endpoints accept an `X-API-Ke
 | Agent application handoff | `GET /api/agent/jobs/{job_id}/package`, `POST /api/agent/jobs/{job_id}/application-result` |
 
 See [`main.py`](main.py) for the route definitions and [`network/api.py`](network/api.py) for the Network directory API.
+
+## Repository layout
+
+| Area | Entry points |
+| --- | --- |
+| Web app and API | [`static/index.html`](static/index.html), [`main.py`](main.py) |
+| Search and scheduling | [`jobspy_search.py`](jobspy_search.py), [`company_site_search.py`](company_site_search.py), [`scheduler.py`](scheduler.py) |
+| AI and documents | [`ai_router.py`](ai_router.py), [`scoring.py`](scoring.py), [`docx_builder.py`](docx_builder.py) |
+| Accounts and storage | [`auth.py`](auth.py), [`local_users.py`](local_users.py), [`storage.py`](storage.py) |
 
 ## Tech Stack
 
