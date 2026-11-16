@@ -53,6 +53,8 @@ Most people default to spreadsheets (or chaos).
 
 ## Screenshots
 
+Screenshots use fictional jobs and contacts from the demo tenant.
+
 <p align="center">
   <img src="docs/dashboard.png" alt="Dashboard" width="800"><br>
   <em>Dashboard — pipeline funnel, score distribution, recent jobs at a glance</em>
@@ -60,22 +62,17 @@ Most people default to spreadsheets (or chaos).
 
 <p align="center">
   <img src="docs/screenshot_search.png" alt="Search Boards" width="800"><br>
-  <em>Search Boards — scrape Indeed, LinkedIn, Google and more with per-board status</em>
+  <em>Search Boards — choose job boards, company career sites, and work-arrangement filters</em>
 </p>
 
 <p align="center">
   <img src="docs/screenshot_detail.png" alt="Job Detail" width="800"><br>
-  <em>Job Detail — AI score breakdown, tailored resume generation, cover letters, email</em>
+  <em>Job Detail — fit score, document readiness, and company research contacts</em>
 </p>
 
 <p align="center">
   <img src="docs/screenshot_tracker.png" alt="Tracker" width="800"><br>
-  <em>Tracker — sortable columns, filter by lane and status, follow-up tracking</em>
-</p>
-
-<p align="center">
-  <img src="docs/company-research.png" alt="Company Research" width="800"><br>
-  <em>Company Research — one click finds key contacts, their titles, relevance notes, and LinkedIn search links</em>
+  <em>Tracker — filter by lane, posting status, and document readiness, and see application follow-ups</em>
 </p>
 
 ## Quick Start
