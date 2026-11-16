@@ -2405,7 +2405,7 @@ function showLoading(m){
 function hideLoading(){clearInterval(_busyTimer);_busyTimer=null;document.getElementById('busy-overlay').classList.remove('show')}
 
 // Network: session-only API, local rendering, and explicit preview before commit.
-let networkEnabled=false, networkContacts=[], networkSnapshot={}, networkFile=null, networkEditing=null, networkBusy=false;
+let networkEnabled=false, networkContacts=[], networkSnapshot={}, networkFile=null, networkEditing=null, networkBusy=false, networkLoadVersion=0;
 const ne=id=>document.getElementById('network-'+id);
 function networkStatus(message){ne('status').textContent=message}
 function networkElement(tag,text){const el=document.createElement(tag);el.textContent=text;return el}
@@ -2418,14 +2418,16 @@ async function networkRequest(path,options={}){
   if(!response.ok){const detail=data.detail;throw new Error(typeof detail==='string'?detail:JSON.stringify(detail||'Network request failed'))}
   return data;
 }
-async function loadNetwork(){
+async function loadNetwork(successMessage=''){
   if(!networkEnabled)return;
+  const version=++networkLoadVersion;
   try{
-    const data=await networkRequest('/export');networkSnapshot=data;networkContacts=Object.values(data.contacts);
+    const data=await networkRequest('/export');if(version!==networkLoadVersion)return;networkSnapshot=data;networkContacts=Object.values(data.contacts);
     const employer=ne('employer').value;ne('employer').replaceChildren(new Option('All employers',''));
     [...new Set(networkContacts.map(c=>c.company).filter(Boolean))].sort().forEach(c=>ne('employer').add(new Option(c,c)));
-    ne('employer').value=employer;renderNetwork();renderNetworkReview();
-  }catch(e){networkStatus(e.message)}
+    ne('employer').value=[...ne('employer').options].some(o=>o.value===employer)?employer:'';renderNetwork();renderNetworkReview();
+    networkStatus(successMessage);
+  }catch(e){if(version===networkLoadVersion)networkStatus((successMessage?successMessage+'. Directory refresh failed: ':'Directory refresh failed: ')+e.message)}
 }
 function renderNetwork(){
   const q=ne('search').value.toLocaleLowerCase(),employer=ne('employer').value;
@@ -2434,7 +2436,7 @@ function renderNetwork(){
   for(const c of rows){const tr=document.createElement('tr');
     for(const value of [[c.first_name,c.last_name].filter(Boolean).join(' ')+' / '+(c.email||'No email'),[c.company,c.position].filter(Boolean).join(' / '),c.source+(c.connected_on?' · connected '+c.connected_on:'')])tr.append(networkElement('td',value));
     const verification=document.createElement('td'),badge=networkElement('span',c.verified?'Verified':'Unverified');badge.className='badge '+(c.verified?'badge-applied':'badge-ignore');verification.append(badge);tr.append(verification);
-    const actions=document.createElement('td');actions.append(networkButton('Edit notes / relationship',()=>editNetworkContact(c)),networkButton('Delete',async()=>{if(!confirm('Delete this contact and its relationships?'))return;await networkRequest('/contacts/'+encodeURIComponent(c.id),{method:'DELETE'});await loadNetwork();networkStatus('Contact deleted')}));tr.append(actions);ne('contacts').append(tr);
+    const actions=document.createElement('td');actions.append(networkButton('Edit notes / relationship',()=>editNetworkContact(c)),networkButton('Delete',async()=>{if(!confirm('Delete this contact and its relationships?'))return;await networkRequest('/contacts/'+encodeURIComponent(c.id),{method:'DELETE'});await loadNetwork('Contact deleted')}));tr.append(actions);ne('contacts').append(tr);
   }
   if(!rows.length){const td=networkElement('td',networkContacts.length?'No matching contacts.':'No contacts yet. Import a connections CSV to begin.');td.colSpan=5;const tr=document.createElement('tr');tr.append(td);ne('contacts').append(tr)}
 }
@@ -2445,16 +2447,19 @@ function renderNetworkReview(){
     card.append(networkElement('h3',[c.first_name,c.last_name].join(' ')),networkElement('p',[c.email,c.company,c.position,c.linkedin_url].filter(Boolean).join(' · ')),networkElement('p','Source: '+c.source+' · Unverified · '+item.reason));
     const select=document.createElement('select');select.setAttribute('aria-label','Merge target for '+c.first_name);select.add(new Option('Choose an existing contact',''));
     for(const candidate of item.candidate_ids){const existing=networkSnapshot.contacts[candidate];if(existing)select.add(new Option([existing.first_name,existing.last_name,existing.email,existing.company,existing.linkedin_url].filter(Boolean).join(' · '),candidate))}
-    async function resolve(target){await networkRequest('/review/'+encodeURIComponent(id)+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_id:target})});await loadNetwork();networkStatus('Identity review saved')}
+    async function resolve(target){await networkRequest('/review/'+encodeURIComponent(id)+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_id:target})});await loadNetwork('Identity review saved')}
     card.append(select,networkButton('Merge into selected contact',async()=>{if(!select.value)throw new Error('Choose a merge target first');if(confirm('Merge this imported record into the selected contact?'))await resolve(select.value)}),networkButton('Keep separate',()=>resolve(null)));root.append(card);
   }
 }
 function editNetworkContact(contact){networkEditing=contact.id;ne('edit-name').textContent=[contact.first_name,contact.last_name].join(' ');ne('notes').value=contact.notes;ne('verified').checked=contact.verified;ne('relationship').value=Object.values(networkSnapshot.relationships||{}).find(r=>r.contact_id===contact.id&&r.source==='manual')?.kind||'';ne('editor').showModal()}
 ne('edit-cancel').onclick=()=>ne('editor').close();
 ne('edit-form').onsubmit=e=>{e.preventDefault();networkAction(async()=>{
-  await networkRequest('/contacts/'+encodeURIComponent(networkEditing),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:ne('notes').value,verified:ne('verified').checked})});
-  await networkRequest('/contacts/'+encodeURIComponent(networkEditing)+'/relationship',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:ne('relationship').value.trim()})});
-  ne('editor').close();await loadNetwork();networkStatus('Contact saved');
+  const contactId=networkEditing,notes=ne('notes').value,verified=ne('verified').checked,kind=ne('relationship').value.trim();
+  await networkRequest('/contacts/'+encodeURIComponent(contactId),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes,verified})});
+  try{
+    await networkRequest('/contacts/'+encodeURIComponent(contactId)+'/relationship',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind})});
+  }catch(e){throw new Error('Notes and verification saved, but relationship was not saved. Retry Save. '+e.message)}
+  ne('editor').close();await loadNetwork('Contact saved');
 })};
 ne('search').oninput=renderNetwork;ne('employer').onchange=renderNetwork;
 ne('file').onchange=()=>{networkFile=null;ne('commit').disabled=true;ne('preview-result').textContent='Preview the selected file before importing.'};
@@ -2462,9 +2467,9 @@ ne('preview').onclick=()=>networkAction(async()=>{
   networkFile=null;ne('commit').disabled=true;const file=ne('file').files[0];if(!file)throw new Error('Choose a CSV file');if(file.size>10*1024*1024)throw new Error('CSV exceeds the 10 MB limit');
   const data=await networkRequest('/import/preview',{method:'POST',headers:{'Content-Type':'text/csv'},body:file});if(ne('file').files[0]!==file)throw new Error('File changed. Preview the selected file again.');networkFile=file;ne('preview-result').textContent=data.created+' new, '+data.updated+' updated, '+data.review+' requiring identity review. Nothing imported yet.';ne('commit').disabled=false;networkStatus('Preview ready');
 });
-ne('commit').onclick=()=>networkAction(async()=>{if(!networkFile)throw new Error('Preview a file first');ne('commit').disabled=true;const file=networkFile;networkFile=null;await networkRequest('/import/commit',{method:'POST',headers:{'Content-Type':'text/csv'},body:file});ne('preview-result').textContent='Import complete.';await loadNetwork();networkStatus('Import complete')});
+ne('commit').onclick=()=>networkAction(async()=>{if(!networkFile)throw new Error('Preview a file first');ne('commit').disabled=true;const file=networkFile;networkFile=null;await networkRequest('/import/commit',{method:'POST',headers:{'Content-Type':'text/csv'},body:file});ne('preview-result').textContent='Import complete.';await loadNetwork('Import complete')});
 ne('export').onclick=()=>networkAction(async()=>{const data=await networkRequest('/export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='network-export.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);networkStatus('Network exported')});
-ne('delete-all').onclick=()=>networkAction(async()=>{if(!confirm('Delete ALL network contacts, relationships, imports and review history? This cannot be undone.'))return;await networkRequest('/contacts',{method:'DELETE'});networkFile=null;ne('commit').disabled=true;await loadNetwork();networkStatus('All network data deleted')});
+ne('delete-all').onclick=()=>networkAction(async()=>{if(!confirm('Delete ALL network contacts, relationships, imports and review history? This cannot be undone.'))return;await networkRequest('/contacts',{method:'DELETE'});networkFile=null;ne('commit').disabled=true;await loadNetwork('All network data deleted')});
 
 // Init
 api('/api/config').then(c=>{if(c.resume_labels)resumeLabels=c.resume_labels;networkEnabled=c.network_enabled===true;document.getElementById('nav-network').style.display=networkEnabled?'':'none'}).catch(()=>{}).finally(()=>{
