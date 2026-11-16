@@ -4,52 +4,19 @@
   <img src="logo.png" alt="Job Search HQ" width="200">
 </p>
 
-A lightweight, self-hosted system for capturing, scoring, tracking, and managing job applications — built to bring structure and intelligence to the job search process.
+Job Search HQ (JSHQ) is a self-hosted workspace for finding jobs, evaluating fit, preparing application documents, and tracking outcomes and follow-ups. Run it with Docker Compose and configure your search, profile, and AI providers in the browser.
 
-![Dashboard](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS-blue) ![Python](https://img.shields.io/badge/python-3.11-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS-blue) ![Python](https://img.shields.io/badge/python-3.11-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-**Job searching is fragmented and messy**
+## What you can do
 
-* Roles live across LinkedIn, company sites, and job boards designed to make the process arduous
-* Applications get lost or duplicated
-* There's no clean way to track status, follow-ups, or notes
-* You have no idea who to contact at a company
-
-Most people default to spreadsheets (or chaos).
-
-**Job Search HQ** is a Docker-based app that lets you:
-* Scrape job listings from multiple boards at once
-* Automatically score each job against your background using Claude AI
-* Research key contacts at any company with one click
-* Track applications, follow-ups, and generated documents in one place
-
-## Features
-
-- **Multi-board job search** — Scrape Indeed, LinkedIn, Google, Glassdoor, ZipRecruiter via [python-jobspy](https://github.com/speedyapply/JobSpy). Per-board status, deduplication, sequential search (LinkedIn rate-limit aware).
-- **AI scoring** — Claude API scores each job against your employment history. Skills match (0–4), scope/impact (0–3), pay alignment (0–2), gut interest (0–1). Auto-assigns W2 Sniper / Contract / Ignore lanes.
-- **Company research** — One click finds key contacts at any company: Claude searches the web for the official domain, scrapes leadership pages, and extracts names/titles/relevance notes. Works on JS-rendered sites and IP-blocking sites. LinkedIn search links for every contact.
-- **Tailored resumes** — Generates a resume customized to each JD, output as a downloadable `.docx` in your template format.
-- **Cover letters** — 3 variants per job (direct, consultative, brief) as `.docx` files.
-- **Email integration** — Send applications with `.docx` attachments via Gmail SMTP. Parse confirmation emails to extract recruiter contact info.
-- **Follow-up tracking** — Auto-schedules follow-ups when you mark "Applied." Snooze, mark done, email digest.
-- **Application tracker** — Pipeline view with sortable columns. Filter by lane and status.
-- **Batch scoring** — Score all unscored jobs with descriptions in one click.
-- **Scheduled automation** — Daily job search at a configured time, auto-score new results, auto-generate docs above a score threshold.
-- **Multi-user auth** — local email/password accounts out of the box, optional OIDC SSO (Authentik, Keycloak, Auth0…), per-user data isolation.
-- **AI backend toggle** — Switch scoring between Anthropic API (Haiku) and local Ollama in Settings.
-
-### Search and application workflow
-
-- **Board and company-site searches** — run board searches in the background, view per-board progress and error details, or stop a search while keeping jobs already imported. Add company career sites to manual or scheduled searches. ([#42](https://github.com/smaniktahla/jobsearchHQ/pull/42), [#43](https://github.com/smaniktahla/jobsearchHQ/pull/43))
-- **Tracker and document readiness** — filter by work arrangement, check whether a posting is still open, and see which application documents are ready. Configured automation can mark jobs ready to apply after the required résumé and cover letters are generated. ([#7](https://github.com/smaniktahla/jobsearchHQ/pull/7), [#26](https://github.com/smaniktahla/jobsearchHQ/pull/26), [#28](https://github.com/smaniktahla/jobsearchHQ/pull/28), [#30](https://github.com/smaniktahla/jobsearchHQ/pull/30))
-- **Résumé templates and writing samples** — manage résumé variants and use a Word template for tailored output. Add optional writing samples to guide the style of generated documents. ([#9](https://github.com/smaniktahla/jobsearchHQ/pull/9), [#24](https://github.com/smaniktahla/jobsearchHQ/pull/24), [#35](https://github.com/smaniktahla/jobsearchHQ/pull/35))
-
-### Account and profile
-
-- **First-login setup** — the wizard walks new users through their profile, résumé, AI provider, and job preferences. Reopen it from **Settings → Account**. The AI settings include a provider setup guide. ([#38](https://github.com/smaniktahla/jobsearchHQ/pull/38), [#39](https://github.com/smaniktahla/jobsearchHQ/pull/39))
-- **Profile and appearance** — record speaking, reading, and writing proficiency per language. Choose Light, Dark, or Match device under **Settings → Profile → Appearance**. ([#41](https://github.com/smaniktahla/jobsearchHQ/pull/41), [#44](https://github.com/smaniktahla/jobsearchHQ/pull/44))
-- **Optional Network directory** — with `network_enabled` enabled, preview LinkedIn connections CSV imports, search and annotate contacts, review ambiguous matches, and export or delete contacts. ([#36](https://github.com/smaniktahla/jobsearchHQ/pull/36), [#37](https://github.com/smaniktahla/jobsearchHQ/pull/37), [#45](https://github.com/smaniktahla/jobsearchHQ/pull/45))
-- **Multiple sign-in hostnames** — set `oidc_extra_hosts` in `data/system_config.json` to allow additional OIDC callback hostnames. Register each callback URI with your identity provider. ([#46](https://github.com/smaniktahla/jobsearchHQ/pull/46))
+- **Find and capture jobs.** Search Indeed, LinkedIn, Google, Glassdoor, and ZipRecruiter through [JobSpy](https://github.com/speedyapply/JobSpy), add company career sites, or bring in individual jobs by URL, email, or manual entry. Manual board searches run in the background with status per board. Stop a search at any time and keep the jobs already imported.
+- **Score and prioritize.** Score jobs against your work history, role scope, compensation targets, and interest. Review the score breakdown on the job page or batch score the tracker.
+- **Research companies and manage contacts.** Find relevant contacts from a job page. The optional Network directory lets you preview a LinkedIn connections CSV import, search contacts, add notes, resolve possible duplicates, and export or delete imported data. The directory is off by default.
+- **Prepare application documents.** Generate a tailored résumé and up to three cover-letter variants as Word files. Choose among uploaded résumé variants, apply your own Word template, and use optional writing samples to guide tone and style.
+- **Track applications and follow-ups.** Filter the tracker by lane, posting status, application status, or document readiness. Check whether a job is still open, archive closed postings, and manage reminders when an application is marked applied. Optional Gmail integration sends application emails and processes supported confirmation and rejection messages.
+- **Automate repeat work.** Schedule board and company-site searches, score new jobs, and configure thresholds for document generation, research, and approval. The tracker shows which documents are available and which jobs are ready to apply.
+- **Set up your account.** The first-login wizard covers profile, résumé, AI provider, and job preferences. Reopen it from **Settings → Account**. In **Settings → Profile**, you can record language proficiency and choose Light, Dark, or Match device.
 
 ## Screenshots
 
@@ -75,62 +42,37 @@ Screenshots use fictional jobs and contacts from the demo tenant.
   <em>Tracker — filter by lane, posting status, and document readiness, and see application follow-ups</em>
 </p>
 
-## Quick Start
+## Quick start
+
+Requires Docker with the Compose plugin.
 
 ```bash
 git clone https://github.com/smaniktahla/jobsearchHQ.git
 cd jobsearchHQ
-
-# Configure
-cp .env.example .env
-# Edit .env — add your Anthropic API key:
-#   ANTHROPIC_API_KEY=sk-ant-...
-
-# Launch
 docker compose up -d --build
-
-# Access at http://localhost:8094
-# First run: visit /setup to create your admin account
 ```
 
-## First Run Setup
+1. Open [http://localhost:8094/setup](http://localhost:8094/setup) and create the first admin account.
+2. Use the first-login wizard to enter your profile, add a résumé, choose AI providers, and set job preferences.
+3. Run a search from **Search Boards** or add a known listing through **Add Job**. Open it in the tracker to score it, research the company, or generate documents.
 
-1. Visit `/setup` and create your admin account (name, email, password). Run the first-login wizard to set up your profile and job preferences. No identity provider needed. To restrict who can claim the admin account on a network-exposed install, set `JSHQ_SETUP_TOKEN` in the container environment; setup then requires it.
-   Add other users, or turn on optional OIDC single sign-on, from **Settings** afterwards.
-2. **Settings** → Set pay targets (W2 salary range, contract hourly rate)
-3. **Settings** → Add Gmail credentials for sending applications
-4. **Settings** → Upload "Full Employment History" text (used for AI scoring)
-5. **Settings** → Optionally upload resume variants (Director, Base, Contract)
-6. **Search Boards** → Run your first search
+The supplied Compose file mounts `./data` for persistent settings, jobs, and generated documents. Back up this directory to preserve your workspace. For a network-accessible first launch, set `JSHQ_SETUP_TOKEN` in the **container environment** through a Compose override or your deployment configuration before exposing the service. The setup form then requires that token.
 
-## Architecture
+### AI providers
 
-```
-├── main.py              # FastAPI app (30+ endpoints)
-├── models.py            # Pydantic data models
-├── scoring.py           # Claude API: scoring, cover letters, tailored resumes
-├── company_research.py  # Claude web search: find company contacts
-├── jobspy_search.py     # python-jobspy multi-board search wrapper
-├── docx_builder.py      # .docx generation (resumes + cover letters)
-├── email_service.py     # Gmail SMTP send + confirmation email parser
-├── auth.py              # Sessions, first-run admin setup, optional OIDC
-├── local_users.py       # Local accounts (scrypt-hashed passwords)
-├── intake.py            # Pluggable intake handlers (manual/URL/email)
-├── storage.py           # Per-user JSON file persistence
-├── scheduler.py         # APScheduler daily pipeline (per-user)
-├── static/
-│   └── index.html       # Complete SPA frontend (dark theme)
-├── data/
-│   └── users/           # Per-user data (gitignored)
-│       └── {oidc_sub}/
-│           ├── jobs/
-│           ├── resumes/
-│           ├── generated/
-│           └── config.json
-├── Dockerfile
-├── docker-compose.yaml
-└── requirements.txt
-```
+Choose Anthropic, Google Gemini, OpenAI, or an Ollama endpoint in **Settings → AI**. The **Fast** tier handles tasks such as scoring and metadata extraction. The **Strong** tier handles drafting work such as résumés, cover letters, and outreach messages. The settings page includes setup instructions and connection tests.
+
+For an Anthropic deployment-wide default with the supplied Compose file, copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY`, and restart the service. You can also configure provider credentials in the app. Company research has its own web search workflow described below.
+
+### Accounts and sign-in
+
+JSHQ supports local accounts with per-user data and optional OIDC single sign-on. For an additional sign-in hostname, configure `oidc_extra_hosts` in `data/system_config.json` and register its callback URL with your identity provider.
+
+## JobPilot integration
+
+JSHQ works hand-in-hand with JobPilot to automate the other half of your job search: the painful process of applying for jobs!
+
+JSHQ prepares the application package and exposes its ready-to-apply queue. JobPilot can read the applicant profile, retrieve the résumé and cover letter, and record the outcome of an application attempt back in JSHQ. The agent API requires an `X-API-Key` and operates on the configured admin's data.
 
 ## Scoring Rubric
 
@@ -141,66 +83,39 @@ docker compose up -d --build
 | Pay Alignment | 0–2 | Comp range vs your targets |
 | Gut Interest | 0–1 | Your manual assessment |
 
-**Lane assignment:** 8–10 → W2 Sniper, 5–7 → Contract, <5 → Ignore
+The scorer recommends a market lane based on the job type and fit. Market lanes include W2 Sniper, Contract, Contract-to-hire, and Ignore. The résumé variant is a separate recommendation that you can override on the job detail page.
 
-## Company Research
+## Company research
 
-Click **Research Company** on any job detail page. The system:
+On a job detail page, select **Research Company** to look up the official company domain and relevant people. Results can include names, roles, relevance notes, and LinkedIn search links. Research uses Claude web search and can fall back to SearXNG and a local model when configured. Results depend on the sources available for each company.
 
-1. Uses Claude with web search to find the company's official domain
-2. Searches for leadership team members relevant to your target role (data/analytics leadership, HR/talent acquisition, C-suite)
-3. Attempts direct site scraping for additional enrichment
-4. Returns contacts with name, title, relevance note, and a LinkedIn search link
+## Job board coverage
 
-Works regardless of whether the company site is plain HTML, JS-rendered, or blocks automated access — because Claude's web search runs from Anthropic's infrastructure.
+JobSpy queries the boards selected on the **Search Boards** page. Availability, detail, and result counts depend on the source and query. The search view shows per-board failures and empty results. Company career sites can also be configured for manual and scheduled searches.
 
-## Job Board Notes
+## API overview
 
-| Board | Status | Notes |
-|-------|--------|-------|
-| Indeed | ✅ Best | No rate limiting, full descriptions, salary data |
-| LinkedIn | ✅ Works | Sequential search with delay avoids rate limits |
-| Google | ⚠️ Varies | Auto-generated search from your query |
-| Glassdoor | ❌ Broken | API changes broke JobSpy scraper |
-| ZipRecruiter | ⚠️ Varies | Results depend on search terms |
+Browser endpoints use the signed-in session. Agent endpoints accept an `X-API-Key` and use the configured admin's data.
 
-## API Endpoints
+| Workflow | Method and endpoint |
+| --- | --- |
+| Search | `POST /api/search/start`, `GET /api/search/status/{task_id}`, `POST /api/search/cancel` |
+| Job intake and tracker | `POST /api/intake`, `GET /api/jobs`, `GET/PATCH /api/jobs/{job_id}` |
+| Score and research | `POST /api/jobs/{job_id}/score`, `POST /api/jobs/{job_id}/research` |
+| Generate documents | `POST /api/jobs/{job_id}/generate-docs` |
+| Account profile | `GET/PUT /api/profile` |
+| Follow-ups | `GET /api/follow-ups`, `POST /api/jobs/{job_id}/mark-followed-up` |
+| Scheduler | `GET /api/scheduler/status`, `POST /api/scheduler/run-now` |
+| Agent queue and profile | `GET /api/agent/ready-queue`, `GET /api/agent/profile` |
+| Agent application handoff | `GET /api/agent/jobs/{job_id}/package`, `POST /api/agent/jobs/{job_id}/application-result` |
 
-<details>
-<summary>Click to expand</summary>
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/search` | POST | Search job boards via JobSpy |
-| `/api/jobs` | GET | List jobs (filter by status/lane) |
-| `/api/intake` | POST | Add job via manual/URL/email |
-| `/api/jobs/{id}` | GET/PATCH/DELETE | Job CRUD |
-| `/api/jobs/{id}/score` | POST | Score job with Claude |
-| `/api/jobs/{id}/research` | POST | Research company contacts |
-| `/api/jobs/{id}/tailored-resume` | POST | Generate tailored resume + .docx |
-| `/api/jobs/{id}/download-resume` | GET | Download .docx resume |
-| `/api/jobs/{id}/cover-letters` | POST | Generate 3 cover letter variants |
-| `/api/jobs/{id}/cover-letters/{lid}/download` | GET | Download cover letter .docx |
-| `/api/jobs/{id}/send-email` | POST | Send email with attachments |
-| `/api/jobs/{id}/parse-confirmation` | POST | Parse confirmation email |
-| `/api/jobs/{id}/mark-followed-up` | POST | Mark follow-up complete |
-| `/api/jobs/{id}/snooze-follow-up` | POST | Snooze follow-up N days |
-| `/api/jobs/score-batch` | POST | Batch score multiple jobs |
-| `/api/follow-ups` | GET | Get due/upcoming follow-ups |
-| `/api/follow-ups/send-digest` | POST | Send follow-up email digest |
-| `/api/config` | GET/PUT | App configuration |
-| `/api/resumes` | GET | List resume variants |
-| `/api/resumes/{variant}` | PUT | Upload resume text |
-| `/api/scheduler/status` | GET | Scheduler status |
-| `/api/scheduler/run-now` | POST | Trigger pipeline manually |
-
-</details>
+See [`main.py`](main.py) for the route definitions and [`network/api.py`](network/api.py) for the Network directory API.
 
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.11)
 - **Frontend:** Vanilla HTML/JS/CSS (no build step)
-- **AI:** Anthropic Claude API (Haiku for scoring/research, Sonnet for generation)
+- **AI:** Anthropic, Google Gemini, OpenAI, and Ollama through a shared provider interface
 - **Scraping:** [python-jobspy](https://github.com/speedyapply/JobSpy)
 - **Documents:** python-docx
 - **Storage:** JSON files (no database)
