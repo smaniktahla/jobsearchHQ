@@ -140,3 +140,18 @@ See [`main.py`](main.py) for the route definitions and [`network/api.py`](networ
 ## License
 
 MIT
+
+## Optional: in-app feedback
+The Help drawer can offer three buttons (**I need more help**, **Something isn't right**, **I have an idea**) that send a
+message to a ticket service. It is off unless both variables are set (put them in `.env`; `docker-compose.yaml` passes them through):
+
+| Variable | Meaning |
+|---|---|
+| `ATQ_TICKETS_URL` | Base URL of the ticket service, for example `http://tickets.example:8700` |
+| `ATQ_TICKETS_TOKEN` | Bearer token that service issued for JSHQ |
+| `JSHQ_FEEDBACK_PROJECT` | Optional project label on each ticket (default `jobsearchHQ`) |
+
+The service must provide `POST /tickets` (multipart: `type`, `title`, `body`, `requester_ref`, `requester_contact`, `project`,
+`context`, optional `screenshot`) and `GET /tickets/mine?requester_ref=...`. JSHQ keeps no copy of messages: they are forwarded.
+The requester is taken from the signed-in session, so people only ever see their own tickets. Failures never expose the
+service's address or token to the browser.

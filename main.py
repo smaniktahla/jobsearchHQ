@@ -70,10 +70,12 @@ import jd_cleanup
 import job_liveness
 
 from network.api import router as network_router
+from feedback import router as feedback_router
 
 app = FastAPI(title="Job Search HQ", version="2.2")
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.include_router(network_router)
+app.include_router(feedback_router)
 
 
 # ── Lifecycle ──────────────────────────────────────────────────────────────────

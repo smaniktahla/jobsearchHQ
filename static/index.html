@@ -112,6 +112,16 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 .help-topics button:hover{text-decoration:underline}
 .help-foot{border-top:1px solid var(--border);padding:10px 18px;display:flex;flex-direction:column;gap:8px}
 .help-feedback[hidden]{display:none}
+.help-fb{display:flex;flex-direction:column;gap:6px}
+.help-fb-title{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);font-weight:700}
+.help-fb .btn{justify-content:center}
+.fb-text{width:100%;min-height:150px;resize:vertical}
+.fb-form details{margin:10px 0}
+.fb-err{color:var(--red);font-size:13px;min-height:18px;margin:6px 0}
+.fb-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.fb-card{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0;background:var(--surface2)}
+.fb-meta{font-size:12px;color:var(--text-dim);margin-bottom:4px}
+.fb-reply{border-left:3px solid var(--accent);padding-left:8px;margin:8px 0;white-space:pre-wrap}
 .help-backdrop{display:none}
 @media(min-width:1100px){body.help-open .main{margin-right:380px;min-width:0;overflow-x:auto}}   /* wide tables scroll inside the page instead of hiding under the drawer */
 @media(max-width:1099px){.help-backdrop.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:75}}
@@ -134,7 +144,13 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
   <div class="help-body" id="help-body" tabindex="0"></div>
   <div class="help-foot">
     <button class="btn btn-ghost btn-sm" onclick="helpGo('index')">All help topics</button>
-    <div id="help-feedback" class="help-feedback" hidden></div>
+    <div id="help-feedback" class="help-feedback help-fb" hidden>
+      <div class="help-fb-title">Need something else?</div>
+      <button type="button" class="btn btn-ghost btn-sm" data-fb="help">I need more help</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-fb="bug">Something isn't right</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-fb="idea">I have an idea</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-fb="mine" style="border:0;color:var(--accent)">See what I've sent</button>
+    </div>
   </div>
 </aside>
 <div id="help-backdrop" class="help-backdrop" onclick="helpClose()"></div>
@@ -2776,11 +2792,12 @@ const HELP_TOPICS={
   'settings-email':'Email & Follow-Up',
   'settings-account':'Account',
   'settings-admin':'Admin',
-  'wizard':'Setup wizard'
+  'wizard':'Setup wizard',
+  'feedback':'Sending feedback'
 };
 const HELP_GROUPS=[['Pages',['dashboard','add','search','tracker','detail','followups','activity','archive','network']],
   ['Settings',['settings-profile','settings-resumes','settings-automation','settings-ai','settings-email','settings-account','settings-admin']],
-  ['Getting started',['wizard']]];
+  ['Getting started',['wizard','feedback']]];
 const HELP_WIDE='(min-width:1100px)';
 let _helpOpen=false,_helpTopic=null;const _helpCache={};
 function helpStore(v){try{if(v===undefined)return localStorage.getItem('jshqHelpOpen');localStorage.setItem('jshqHelpOpen',v)}catch(e){return null}}
@@ -2824,7 +2841,7 @@ function helpOpen(id,quiet){
   _helpOpen=true;d.classList.add('open');d.setAttribute('aria-hidden','false');document.body.classList.add('help-open');
   const nb=document.getElementById('nav-help');if(nb){nb.classList.add('active');nb.setAttribute('aria-expanded','true')}
   if(!window.matchMedia(HELP_WIDE).matches)document.getElementById('help-backdrop').classList.add('show');
-  helpLoad(id||helpTopicFor());helpStore('1');
+  helpLoad(id||helpTopicFor());helpStore('1');fbCheck();
   if(!quiet)d.focus({preventScroll:true});
 }
 function helpClose(){
@@ -2835,10 +2852,10 @@ function helpClose(){
   helpStore('0');
 }
 function helpToggle(){_helpOpen?helpClose():helpOpen()}
-function helpUpdate(){if(_helpOpen)helpLoad(helpTopicFor())}
+function helpUpdate(){if(_helpOpen&&!/^feedback:(help|bug|idea)$/.test(_helpTopic||''))helpLoad(helpTopicFor())}   // never wipe a form someone is typing in
 function helpGo(id,fromIndex){
   if(id==='index'){helpLoad('index');return}
-  if(id==='wizard'||id==='detail'){helpLoad(id);return}                 // topics without a page to jump to
+  if(id==='wizard'||id==='detail'||id==='feedback'){helpLoad(id);return}                 // topics without a page to jump to
   if(fromIndex&&!_helpOpen)helpOpen(id);
   if(id.startsWith('settings-'))showSettingsPage(id.slice(9));else showView(id);
   helpLoad(id);
@@ -2853,6 +2870,84 @@ window.matchMedia(HELP_WIDE).addEventListener('change',()=>{if(_helpOpen)documen
 // follow the page: reload the drawer whenever the view or the settings sub-page changes
 const _helpShowView=showView;showView=function(n){_helpShowView(n);helpUpdate()};
 const _helpApplySP=applySettingsPage;applySettingsPage=function(){_helpApplySP.apply(this,arguments);helpUpdate()};
+// ── Feedback: three buttons in the drawer footer -> a short form -> the JSHQ server -> the ticket service ──
+// Only shown when the server has feedback switched on (GET /api/feedback/status). All text from the user or from
+// tickets is rendered with textContent only, never as markup.
+const FB_TYPES={
+  help:{title:'I need more help',label:'What do you need help with?',ph:"For example: I can't find where to upload my resume."},
+  bug:{title:"Something isn't right",label:'What happened?',ph:'What did you expect, and what happened instead?'},
+  idea:{title:'I have an idea',label:"What's your idea?",ph:'What would make JSHQ better for you?'}
+};
+const FB_KIND={help:'Help',bug:'Problem',idea:'Idea'};
+const FB_STATUS={received:'Received',planned:'Planned',in_progress:'Being worked on',fixed:'Fixed',closed:'Closed'};
+const FB_DOWN="We couldn't send that right now. Please try again in a few minutes.";
+let _fbEnabled=null,_fbFrom='dashboard';const _fbErrors=[],_fbFailed=[],_fbDraft={};
+function _fbPush(a,v){a.push(v);if(a.length>10)a.shift()}
+window.addEventListener('error',e=>_fbPush(_fbErrors,String(e.message||'').slice(0,200)));
+window.addEventListener('unhandledrejection',e=>_fbPush(_fbErrors,('Unhandled: '+((e.reason&&e.reason.message)||e.reason||'')).slice(0,200)));
+const _fbFetch=window.fetch.bind(window);     // remember failed requests (method, path, status: never the query string or any content)
+window.fetch=function(input,init){return _fbFetch(input,init).then(r=>{if(!r.ok){try{const u=new URL(typeof input==='string'?input:input.url,location.href);_fbPush(_fbFailed,((init&&init.method)||'GET')+' '+u.pathname+' '+r.status)}catch(e){}}return r})};
+function _fbEl(tag,props,...kids){const e=document.createElement(tag);Object.assign(e,props||{});kids.forEach(k=>e.append(k));return e}
+function fbContext(){
+  return {page:HELP_TOPICS[_fbFrom]||'',topic:_fbFrom,hash:location.hash.slice(0,100),viewport:innerWidth+'x'+innerHeight,screen:screen.width+'x'+screen.height,
+    language:navigator.language,timezone:(Intl.DateTimeFormat().resolvedOptions().timeZone||''),user_agent:navigator.userAgent.slice(0,200),
+    recent_errors:_fbErrors.slice(),recent_failed_requests:_fbFailed.slice()};
+}
+async function fbCheck(){
+  if(_fbEnabled===null){try{const r=await fetch('/api/feedback/status');_fbEnabled=r.ok&&(await r.json()).enabled===true}catch(e){_fbEnabled=false}}
+  const f=document.getElementById('help-feedback');if(f)f.hidden=!_fbEnabled;
+}
+function fbShow(title,node){document.getElementById('help-title').textContent=title;const b=document.getElementById('help-body');b.replaceChildren(node);b.scrollTop=0}
+function fbBack(){return _fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Back to help',onclick:()=>helpLoad(helpTopicFor())})}
+function fbOpen(type){
+  const t=FB_TYPES[type];_helpTopic='feedback:'+type;_fbFrom=helpTopicFor();
+  const ta=_fbEl('textarea',{rows:8,maxLength:5000,placeholder:t.ph,value:_fbDraft[type]||'',className:'fb-text'});
+  ta.setAttribute('aria-label',t.label);ta.oninput=()=>{_fbDraft[type]=ta.value};
+  const err=_fbEl('div',{className:'fb-err',role:'alert'});
+  const send=_fbEl('button',{type:'submit',className:'btn btn-primary btn-sm',textContent:'Send'});
+  const sent=_fbEl('details',{className:'fb-sent'},_fbEl('summary',{textContent:'What gets sent?'}),
+    _fbEl('p',{textContent:'Your message, the name of the page you were on ('+(HELP_TOPICS[_fbFrom]||'this page')+'), your browser and screen size, and a short list of recent error messages if there were any. Never your password or your resume.'}));
+  const f=_fbEl('form',{className:'fb-form',noValidate:true},_fbEl('p',{className:'help-lead',textContent:t.label}),ta,sent,err,
+    _fbEl('div',{className:'fb-actions'},send,_fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Back',onclick:()=>helpLoad(helpTopicFor())})));
+  f.onsubmit=async ev=>{
+    ev.preventDefault();const text=ta.value.trim();err.textContent='';
+    if(!text){err.textContent='Please tell us a little about it first.';ta.focus();return}
+    send.disabled=true;send.textContent='Sending…';
+    const fd=new FormData();fd.append('type',type);fd.append('message',text);fd.append('context',JSON.stringify(fbContext()));
+    try{
+      const r=await fetch('/api/feedback',{method:'POST',body:fd});
+      if(r.status===401){location.href='/auth/login';return}
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok){err.textContent=(typeof j.detail==='string'&&j.detail)||'Something went wrong. Please try again.';send.disabled=false;send.textContent='Send';return}
+      delete _fbDraft[type];fbThanks(j.id);
+    }catch(e){err.textContent=FB_DOWN;send.disabled=false;send.textContent='Send'}
+  };
+  fbShow(t.title,f);ta.focus();
+}
+function fbThanks(id){
+  _helpTopic='feedback:thanks';
+  fbShow('Thank you',_fbEl('div',{},_fbEl('p',{className:'help-lead',textContent:'Thank you. Your message was sent.'}),
+    _fbEl('p',{textContent:(id?'Reference: '+id+'. ':'')+'We read everything. We will get back to you when there is something useful to tell you, so it can take a little while.'}),
+    _fbEl('div',{className:'fb-actions'},_fbEl('button',{type:'button',className:'btn btn-primary btn-sm',textContent:"See what I've sent",onclick:fbMine}),fbBack())));
+}
+async function fbMine(){
+  _helpTopic='feedback:mine';fbShow("What I've sent",_fbEl('p',{textContent:'Loading…'}));
+  let list;
+  try{const r=await fetch('/api/feedback/mine');if(!r.ok)throw new Error('x');list=(await r.json()).tickets||[]}
+  catch(e){if(_helpTopic==='feedback:mine')fbShow("What I've sent",_fbEl('div',{},_fbEl('p',{textContent:FB_DOWN}),fbBack()));return}
+  if(_helpTopic!=='feedback:mine')return;
+  const root=_fbEl('div');
+  if(!list.length)root.append(_fbEl('p',{textContent:"You haven't sent any feedback yet."}));
+  list.forEach(t=>{
+    const when=t.created_at?new Date(t.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
+    const card=_fbEl('div',{className:'fb-card'},_fbEl('div',{className:'fb-meta',textContent:(FB_KIND[t.type]||'Feedback')+' · '+(FB_STATUS[t.status]||'Received')+(when?' · '+when:'')+(t.id?' · '+t.id:'')}),_fbEl('div',{textContent:t.title||''}));
+    (t.replies||[]).forEach(rp=>card.append(_fbEl('div',{className:'fb-reply',textContent:rp.body||''})));
+    root.append(card);
+  });
+  root.append(_fbEl('div',{className:'fb-actions'},fbBack()));
+  fbShow("What I've sent",root);
+}
+document.getElementById('help-feedback').addEventListener('click',e=>{const b=e.target.closest('[data-fb]');if(!b)return;b.dataset.fb==='mine'?fbMine():fbOpen(b.dataset.fb)});
 // restore "open" on wide screens (never steal focus); on narrow screens the drawer starts closed
 if(helpStore()==='1'&&window.matchMedia(HELP_WIDE).matches){
   const d=document.getElementById('help-drawer');d.style.transition='none';helpOpen(null,true);       // restore instantly: no slide-in on every page load
