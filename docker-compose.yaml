@@ -14,3 +14,6 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - APP_PORT=8094
+      # Optional in-app feedback: set BOTH (in .env) to switch it on; empty = off and the buttons stay hidden
+      - ATQ_TICKETS_URL=${ATQ_TICKETS_URL:-}
+      - ATQ_TICKETS_TOKEN=${ATQ_TICKETS_TOKEN:-}
