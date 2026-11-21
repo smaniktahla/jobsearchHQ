@@ -457,6 +457,7 @@ def list_jobs(
     has_docs: bool | None = None,
     ready_to_apply: bool | None = None,
     slim: bool = False,
+    resume_lane: str | None = None,
     user: User = Depends(get_current_user),
 ):
     jobs = storage.load_all_jobs(user.id, copy=False)
@@ -470,9 +471,16 @@ def list_jobs(
         jobs = [j for j in jobs if bool(j.tailored_resume_docx) == has_docs]
     if ready_to_apply is not None:
         jobs = [j for j in jobs if j.ready_to_apply == ready_to_apply]
-    if slim:
-        return [slim_job(enrich_job(j)) for j in jobs]
-    return [enrich_job(j) for j in jobs]
+    # Each row carries its effective resume lane (manual override > scorer > default).
+    loaded = lanes.loaded_keys(user.id)
+    out = []
+    for j in jobs:
+        d = enrich_job(j)
+        d["resume_lane"] = lanes.resolve(j, user.id, loaded)[0]
+        if resume_lane and d["resume_lane"] != resume_lane:
+            continue
+        out.append(slim_job(d) if slim else d)
+    return out
 
 
 # Rendered-response cache for the list views. Keyed on the filters + a fingerprint
@@ -490,15 +498,18 @@ def list_jobs_cached(
     has_docs: bool | None = None,
     ready_to_apply: bool | None = None,
     slim: bool = False,
+    resume_lane: str | None = None,
     user: User = Depends(get_current_user),
 ):
-    key = (user.id, status, lane, min_score, has_docs, ready_to_apply, slim)
+    # loaded resume keys are part of the key: uploading/deleting a resume changes every row's lane
+    key = (user.id, status, lane, min_score, has_docs, ready_to_apply, slim, resume_lane,
+           tuple(lanes.loaded_keys(user.id)))
     sig = (storage.jobs_signature(user.id), datetime.now().date().isoformat())
     hit = _list_cache.get(key)
     if hit and hit[0] == repr(sig):
         etag, body = f'W/"{hash((key, repr(sig))) & 0xffffffffffff:x}"', hit[1]
     else:
-        data = list_jobs(status, lane, min_score, has_docs, ready_to_apply, slim, user)
+        data = list_jobs(status, lane, min_score, has_docs, ready_to_apply, slim, resume_lane, user)
         body = json.dumps(data, default=str).encode()
         etag = f'W/"{hash((key, repr(sig))) & 0xffffffffffff:x}"'
         _list_cache[key] = (repr(sig), body)
