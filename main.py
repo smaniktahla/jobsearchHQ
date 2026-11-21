@@ -95,6 +95,8 @@ def on_shutdown():
 def enrich_job(job: Job) -> dict:
     d = job.model_dump()
     d["follow_up_due"] = job.follow_up_due
+    d["effective_total"] = job.effective_total
+    d["score_is_user"] = job.score_is_user
     d["days_since_applied"] = job.days_since_applied
     d["ready_to_apply"] = job.ready_to_apply
     # Computed here because slim list responses drop cover_letters / tailored_resume.
@@ -105,7 +107,7 @@ def enrich_job(job: Job) -> dict:
 
 # Heavy per-job fields the list views never render (raw_jd alone is ~75% of the
 # full /api/jobs payload — 47 of 64 MB at ~5.9k jobs). Detail view fetches them per job.
-_SLIM_DROP = ("raw_jd", "tailored_resume", "cover_letters", "status_history", "notes")
+_SLIM_DROP = ("raw_jd", "tailored_resume", "cover_letters", "status_history", "notes", "score_history")
 
 
 def slim_job(d: dict) -> dict:
@@ -466,7 +468,7 @@ def list_jobs(
     if lane:
         jobs = [j for j in jobs if j.market_lane == lane]
     if min_score is not None:
-        jobs = [j for j in jobs if j.score and j.score.total >= min_score]
+        jobs = [j for j in jobs if j.effective_total is not None and j.effective_total >= min_score]
     if has_docs is not None:
         jobs = [j for j in jobs if bool(j.tailored_resume_docx) == has_docs]
     if ready_to_apply is not None:
@@ -728,7 +730,7 @@ def _run_score_all(user_id: str):
         _score_task["current"] = f"{job.company}: {job.title}"
         try:
             score_result = scoring.score_job(job, user_id)
-            job.score = score_result
+            job.set_model_score(score_result)
             job.update_status(JobStatus.SCORED)
             if score_result.recommended_lane:
                 job.market_lane = score_result.recommended_lane
@@ -860,7 +862,7 @@ async def score_batch(request: Request, user: User = Depends(get_current_user)):
             continue
         try:
             score_result = scoring.score_job(job, user.id)
-            job.score = score_result
+            job.set_model_score(score_result)
             job.update_status(JobStatus.SCORED)
             if score_result.recommended_lane:
                 job.market_lane = score_result.recommended_lane
@@ -917,11 +919,11 @@ def send_scored_digest(request: Request):
     threshold = config.auto_generate_threshold or 7
     eligible = [
         j for j in jobs
-        if j.score and j.score.total >= threshold
+        if j.effective_total is not None and j.effective_total >= threshold
         and j.review_status == ReviewStatus.PENDING
         and j.status not in (JobStatus.APPLIED, JobStatus.REJECTED, JobStatus.PASSED)
     ]
-    eligible.sort(key=lambda j: j.score.total, reverse=True)
+    eligible.sort(key=lambda j: j.effective_total, reverse=True)
 
     if not eligible:
         return {"sent": False, "reason": "No pending high-score jobs", "count": 0}
@@ -931,7 +933,7 @@ def send_scored_digest(request: Request):
     # ── Plain-text fallback ───────────────────────────────────────────────────
     lines = [f"Job Search HQ: {len(eligible)} job(s) scored >={threshold} awaiting review", ""]
     for j in eligible:
-        score_str = f"{j.score.total}/10" if j.score else "?"
+        score_str = f"{j.effective_total}/10" if j.effective_total is not None else "?"
         pay = j.pay_range if j.pay_range and "nan" not in j.pay_range.lower() else ""
         lines.append(f"[{score_str}] {j.title} @ {j.company}")
         if pay:
@@ -952,7 +954,7 @@ def send_scored_digest(request: Request):
 
     cards_html = []
     for j in eligible:
-        total = j.score.total if j.score else 0
+        total = j.effective_total if j.effective_total is not None else 0
         pay = j.pay_range if j.pay_range and "nan" not in j.pay_range.lower() else ""
         analysis = (j.score.raw_analysis[:280] + "...") if j.score and j.score.raw_analysis else ""
         sc = score_color(total)
@@ -1050,7 +1052,7 @@ def digest_action_confirm(token: str):
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="{_DIGEST_PAGE_STYLE}">
   <div style="{_DIGEST_CARD_STYLE}">
-    <div style="font-size:13px;color:#8b8fa3;margin-bottom:8px;">{job.score.total if job.score else '?'}/10</div>
+    <div style="font-size:13px;color:#8b8fa3;margin-bottom:8px;">{job.effective_total if job.effective_total is not None else '?'}/10</div>
     <div style="font-size:18px;font-weight:600;margin-bottom:4px;">{job.title}</div>
     <div style="font-size:14px;color:#8b8fa3;margin-bottom:24px;">{job.company}</div>
     <form method="post" action="/api/digest-action?token={token}">
@@ -1131,6 +1133,41 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
     job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(user.id, job)
     return enrich_job(job)
+
+
+class ScoreOverrideRequest(BaseModel):
+    total: int
+    note: str = ""
+
+
+@app.put("/api/jobs/{job_id}/score-override")
+def put_score_override(job_id: str, data: ScoreOverrideRequest, user: User = Depends(get_current_user)):
+    """The user's own score for a job. The model's score and every earlier score stay in the history."""
+    if not 0 <= data.total <= 10:
+        raise HTTPException(400, "Score must be a whole number from 0 to 10.")
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.set_user_score(data.total, data.note.strip()[:500])
+    job.updated_at = datetime.now(timezone.utc).isoformat()
+    storage.save_job(user.id, job)
+    d = enrich_job(job)
+    d.update(_lane_info(job, user.id))
+    return d
+
+
+@app.delete("/api/jobs/{job_id}/score-override")
+def delete_score_override(job_id: str, user: User = Depends(get_current_user)):
+    """Go back to the AI score (the override is recorded in the history)."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.clear_user_score()
+    job.updated_at = datetime.now(timezone.utc).isoformat()
+    storage.save_job(user.id, job)
+    d = enrich_job(job)
+    d.update(_lane_info(job, user.id))
+    return d
 
 
 @app.get("/api/intake/debug-url")
@@ -1300,7 +1337,7 @@ def score_job(job_id: str, user: User = Depends(get_current_user)):
         raise HTTPException(400, "No JD text to score")
     try:
         result = scoring.score_job(job, user.id)
-        job.score = result
+        job.set_model_score(result)
         job.update_status(JobStatus.SCORED)
         if result.recommended_lane:
             job.market_lane = result.recommended_lane
@@ -1482,7 +1519,7 @@ def get_job_status(job_id: str, user: User = Depends(get_current_user)):
         "company": job.company,
         "status": job.status,
         "market_lane": job.market_lane,
-        "score": job.score.total if job.score else None,
+        "score": job.effective_total, "model_score": job.score.total if job.score else None, "score_is_user": job.score_override is not None,
         "has_resume": bool(job.tailored_resume_docx),
         "has_cover_letters": len(job.cover_letters) > 0,
         "ready_to_apply": job.ready_to_apply,
@@ -1573,7 +1610,7 @@ def get_job_package(job_id: str, request: Request):
             "company": job.company,
             "url": job.url,
             "ats_url": job.ats_url,
-            "score": job.score.total if job.score else None,
+            "score": job.effective_total, "model_score": job.score.total if job.score else None, "score_is_user": job.score_override is not None,
             "lane": job.market_lane,
             "recommended_resume": choice["lane"] or (job.score.recommended_resume if job.score else "base"),
             "resume_lane": choice["lane"],
@@ -1873,7 +1910,7 @@ def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, reques
     op_id = activity.start("refresh-and-score", job_id=job_id, detail=f"{job.company}: {job.title}")
     try:
         result = scoring.score_job(job, admin_id)
-        job.score = result
+        job.set_model_score(result)
         job.update_status(JobStatus.SCORED)
         if result.recommended_lane:
             job.market_lane = result.recommended_lane
@@ -2579,8 +2616,8 @@ def dashboard_stats(user: User = Depends(get_current_user)):
     for j in jobs:
         by_status[j.status] = by_status.get(j.status, 0) + 1
         by_lane[j.market_lane] = by_lane.get(j.market_lane, 0) + 1
-        if j.score:
-            scores.append(j.score.total)
+        if j.effective_total is not None:
+            scores.append(j.effective_total)
         if j.follow_up_due:
             follow_ups_due += 1
         if j.ready_to_apply:

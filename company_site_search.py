@@ -207,7 +207,7 @@ def _search_one_site(
                 if auto_score and len(saved.raw_jd) > 200:
                     try:
                         score_result = scoring.score_job(saved, user_id)
-                        saved.score = score_result
+                        saved.set_model_score(score_result)
                         saved.update_status(JobStatus.SCORED)
                         if score_result.recommended_lane:
                             saved.market_lane = score_result.recommended_lane

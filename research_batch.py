@@ -42,16 +42,16 @@ def find_unresearched(user_id: str, threshold: int) -> list:
     """Active, scored jobs at/above threshold with a company name and no (usable) research, best score first."""
     found = []
     for job in storage.load_all_jobs(user_id, copy=False):
-        if not job.score or job.score.total < threshold:
+        if job.effective_total is None or job.effective_total < threshold:
             continue
-        if job.status in _CLOSED or job.market_lane == MarketLane.IGNORE:
+        if job.status in _CLOSED or job.ai_skipped:
             continue
         if not job.company or job.company.lower() in ("nan", "unknown", ""):
             continue
         if not _needs_research(job):
             continue
         found.append(job)
-    found.sort(key=lambda j: (-j.score.total, j.created_at))
+    found.sort(key=lambda j: (-j.effective_total, j.created_at))
     return found
 
 
@@ -60,7 +60,7 @@ def summarize(user_id: str, threshold: int) -> dict:
     return {
         "threshold": threshold,
         "count": len(jobs),
-        "jobs": [{"id": j.id, "company": j.company, "title": j.title, "total": j.score.total} for j in jobs[:50]],
+        "jobs": [{"id": j.id, "company": j.company, "title": j.title, "total": j.effective_total} for j in jobs[:50]],
         "run": status(user_id),
     }
 

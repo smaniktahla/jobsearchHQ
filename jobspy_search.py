@@ -319,7 +319,7 @@ def _run_board_search(req: JobSearchRequest, user_id: str, cancel: threading.Eve
             if req.auto_score and len(raw_jd) > 200:
                 try:
                     score_result = scoring.score_job(job, user_id)
-                    job.score = score_result
+                    job.set_model_score(score_result)
                     job.update_status(JobStatus.SCORED)
                     if score_result.recommended_lane:
                         job.market_lane = score_result.recommended_lane

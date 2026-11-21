@@ -20,9 +20,9 @@ NOTE_PREFIX = "auto-approved"
 
 def is_eligible(job, threshold: int) -> bool:
     return bool(
-        job.score and job.score.total >= threshold
+        job.effective_total is not None and job.effective_total >= threshold
         and job.review_status == ReviewStatus.PENDING
-        and job.market_lane != MarketLane.IGNORE
+        and not job.ai_skipped
         and job.posting_status != "closed"
         and job.status not in _CLOSED
         and job.cover_letters
@@ -55,7 +55,7 @@ def run(user_id: str, config: AppConfig | None = None, notify: bool = True) -> d
     threshold = config.auto_approve_threshold
     jobs = storage.load_all_jobs(user_id, copy=False)
     eligible = sorted((j for j in jobs if is_eligible(j, threshold)),
-                      key=lambda j: (-j.score.total, j.created_at))
+                      key=lambda j: (-j.effective_total, j.created_at))
     room = max(0, config.auto_approve_daily_cap - _approved_last_24h(jobs))
     approved = []
     for stale in eligible[:room]:
@@ -65,10 +65,10 @@ def run(user_id: str, config: AppConfig | None = None, notify: bool = True) -> d
         job.review_status = ReviewStatus.APPROVED
         job.agent_log.append(AgentEvent(
             event_type=AgentEventType.RESOLVE, success=True,
-            notes=f"{NOTE_PREFIX} (score {job.score.total} ≥ {threshold})"))
+            notes=f"{NOTE_PREFIX} (score {job.effective_total}{' (user)' if job.score_is_user else ''} ≥ {threshold})"))
         job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user_id, job)
-        approved.append({"id": job.id, "company": job.company, "title": job.title, "total": job.score.total})
+        approved.append({"id": job.id, "company": job.company, "title": job.title, "total": job.effective_total})
     waiting = len(eligible) - len(approved)
     if approved and notify:
         send_summary(config, approved, waiting)

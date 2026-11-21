@@ -298,6 +298,7 @@ No markdown. No explanation. No extra keys. ONLY the JSON object.""".replace("{l
         raw_analysis=str(data.get("raw_analysis", "")),
     )
     _apply_deal_breaker_override(score, job.raw_jd, config.deal_breakers)
+    score.model = ai_router.get_last_model("fast")
     return score
 
 
