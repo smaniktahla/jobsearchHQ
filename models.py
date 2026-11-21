@@ -61,6 +61,30 @@ class ScoreBreakdown(BaseModel):
     recommended_resume: str = ""
     recommended_lane: MarketLane = MarketLane.IGNORE
     raw_analysis: str = ""
+    model: str = ""   # provider/model that produced this score, e.g. "gemini/gemini-3.5-flash-lite"
+
+
+class ScoreEntry(BaseModel):
+    """One line of a job's score history: every model score, and every user change."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    source: str = "model"          # "model" | "user" | "user_cleared"
+    model: str = ""
+    total: int = 0
+    skills_match: Optional[int] = None
+    scope_impact: Optional[int] = None
+    pay_alignment: Optional[int] = None
+    gut_interest: Optional[int] = None
+    recommended_lane: str = ""
+    recommended_resume: str = ""
+    note: str = ""
+
+
+class ScoreOverride(BaseModel):
+    """The user's own score. Wins over the model's wherever a score is used; the model's stays on record."""
+    total: int = Field(ge=0, le=10)
+    note: str = ""
+    at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class CoverLetter(BaseModel):
@@ -150,7 +174,9 @@ class Job(BaseModel):
     market_lane: MarketLane = MarketLane.CONTRACT
     resume_lane_override: str = ""   # manual resume lane (director/base/contract); blank = use the scorer's
     status: JobStatus = JobStatus.NEW
-    score: Optional[ScoreBreakdown] = None
+    score: Optional[ScoreBreakdown] = None          # latest MODEL score (never edited by the user's override)
+    score_history: list[ScoreEntry] = []             # every model score + user change, oldest first
+    score_override: Optional[ScoreOverride] = None   # the user's own score, if they disagree with the model
     cover_letters: list[CoverLetter] = []
     tailored_resume: str = ""
     tailored_resume_docx: str = ""
@@ -194,6 +220,58 @@ class Job(BaseModel):
                 self.follow_up.count = 0
                 self.follow_up.sent_at = ""
 
+    # ── Scores: the model's, the user's override, and the history ─────────────
+    @property
+    def effective_total(self) -> Optional[int]:
+        """The score everything should act on: the user's if they set one, else the model's."""
+        if self.score_override is not None:
+            return self.score_override.total
+        return self.score.total if self.score is not None else None
+
+    @property
+    def score_is_user(self) -> bool:
+        return self.score_override is not None
+
+    @property
+    def ai_skipped(self) -> bool:
+        """The model put this job in the 'ignore' lane and the user hasn't overruled it with their own score."""
+        return self.market_lane == MarketLane.IGNORE and self.score_override is None
+
+    def _seed_score_history(self) -> None:
+        """Jobs scored before history existed: record their current score as the first entry."""
+        if not self.score_history and self.score is not None:
+            s = self.score
+            self.score_history.append(ScoreEntry(
+                at=self.updated_at or datetime.now(timezone.utc).isoformat(), source="model",
+                model=getattr(s, "model", "") or "", total=s.total, skills_match=s.skills_match,
+                scope_impact=s.scope_impact, pay_alignment=s.pay_alignment, gut_interest=s.gut_interest,
+                recommended_lane=getattr(s.recommended_lane, "value", str(s.recommended_lane)),
+                recommended_resume=s.recommended_resume, note="earlier score (recorded before history was kept)"))
+
+    def set_model_score(self, result: "ScoreBreakdown") -> None:
+        """Store a new model score and keep it in the history. Never touches the user's override."""
+        self._seed_score_history()
+        self.score = result
+        self.score_history.append(ScoreEntry(
+            source="model", model=getattr(result, "model", "") or "", total=result.total,
+            skills_match=result.skills_match, scope_impact=result.scope_impact,
+            pay_alignment=result.pay_alignment, gut_interest=result.gut_interest,
+            recommended_lane=getattr(result.recommended_lane, "value", str(result.recommended_lane)),
+            recommended_resume=result.recommended_resume))
+
+    def set_user_score(self, total: int, note: str = "") -> None:
+        self._seed_score_history()
+        self.score_override = ScoreOverride(total=total, note=note)
+        self.score_history.append(ScoreEntry(source="user", total=total, note=note))
+
+    def clear_user_score(self) -> None:
+        if self.score_override is None:
+            return
+        self._seed_score_history()
+        self.score_override = None
+        self.score_history.append(ScoreEntry(
+            source="user_cleared", total=self.score.total if self.score else 0, note="went back to the AI score"))
+
     @property
     def follow_up_due(self) -> bool:
         if self.status not in (JobStatus.APPLIED, JobStatus.INTERVIEW):
@@ -222,10 +300,10 @@ class Job(BaseModel):
         and it hasn't been actioned yet. review_status must be explicit APPROVED —
         score alone is never enough to greenlight an application."""
         return (
-            self.score is not None
-            and self.score.total >= 5
+            self.effective_total is not None
+            and self.effective_total >= 5
             and self.review_status == ReviewStatus.APPROVED
-            and self.market_lane != MarketLane.IGNORE
+            and not self.ai_skipped
             and self.posting_status != "closed"
             and bool(self.tailored_resume_docx)
             and bool(self.cover_letters)

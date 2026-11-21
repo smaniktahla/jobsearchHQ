@@ -159,7 +159,7 @@ def _due(job: Job, now: datetime, min_score: int = 0) -> bool:
         return False
     if job.posting_reason.startswith(MANUAL_REASON):   # set by hand; the nightly check must not overrule it
         return False
-    if job.score is None or job.score.total < min_score:
+    if job.effective_total is None or job.effective_total < min_score:
         return False
     if not job.posting_checked_at:
         return True
@@ -176,7 +176,7 @@ def due_jobs(user_id: str, limit: int) -> list[Job]:
     min_score = storage.load_config(user_id).tracking_min_score
     jobs = [j for j in storage.load_all_jobs(user_id, copy=False) if _due(j, now, min_score)]
     # never-checked first, then highest score, so the best leads are verified soonest
-    jobs.sort(key=lambda j: (bool(j.posting_checked_at), -(j.score.total if j.score else -1)))
+    jobs.sort(key=lambda j: (bool(j.posting_checked_at), -(j.effective_total if j.effective_total is not None else -1)))
     return jobs[:limit]
 
 

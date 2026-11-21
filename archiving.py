@@ -43,7 +43,7 @@ def is_archivable(job: Job, cutoff: datetime, min_score: int) -> bool:
         return False
     if job.status in TERMINAL_STATUSES:
         return True
-    if job.score is not None and job.score.total < min_score:
+    if job.effective_total is not None and job.effective_total < min_score:
         return True
     return False
 
@@ -57,7 +57,7 @@ SCORE_ARCHIVE_STATUSES = {JobStatus.NEW, JobStatus.SCORED}
 def below_tracking_threshold(job: Job, grace_cutoff: datetime, min_score: int) -> bool:
     """Scored under the threshold and not in any application stage. Unscored jobs
     are left alone (nothing to judge them by yet)."""
-    if job.score is None or job.score.total >= min_score:
+    if job.effective_total is None or job.effective_total >= min_score:
         return False
     if job.status not in SCORE_ARCHIVE_STATUSES:
         return False

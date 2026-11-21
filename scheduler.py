@@ -409,7 +409,7 @@ def run_daily_pipeline(user_id: str) -> dict:
                     continue
 
                 score_result = scoring.score_job(job, user_id)
-                job.score = score_result
+                job.set_model_score(score_result)
                 job.update_status(JobStatus.SCORED)
                 if score_result.recommended_lane:
                     job.market_lane = score_result.recommended_lane
@@ -440,7 +440,7 @@ def run_daily_pipeline(user_id: str) -> dict:
                 job = storage.load_job(user_id, job_id)
                 if not job or not job.score:
                     continue
-                if job.score.total < threshold:
+                if job.effective_total < threshold:
                     continue
 
                 # Generate tailored resume
@@ -475,7 +475,7 @@ def run_daily_pipeline(user_id: str) -> dict:
                     "id": job_id,
                     "title": job.title,
                     "company": job.company,
-                    "total": job.score.total,
+                    "total": job.effective_total,
                     "variant": job.score.recommended_resume if job.score else "base",
                 })
 

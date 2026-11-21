@@ -359,7 +359,22 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <div class="card mb-16" id="score-summary" style="display:none">
         <div id="score-total" class="score-big">-</div>
         <div style="text-align:center;margin-bottom:12px"><span id="score-resume-badge" class="badge"></span></div>
+        <div id="score-override-box" style="margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px">
+          <div id="score-ai-line" class="text-sm"></div>
+          <div class="flex gap-8 items-center mt-8">
+            <label class="text-sm" for="override-total">Your score</label>
+            <input type="number" id="override-total" min="0" max="10" step="1" style="width:68px">
+            <span class="text-sm text-dim">out of 10</span>
+          </div>
+          <input type="text" id="override-note" maxlength="500" placeholder="Why do you disagree? (optional)" style="margin-top:6px;width:100%">
+          <div class="flex gap-8 mt-8">
+            <button class="btn btn-primary btn-sm" onclick="saveScoreOverride()">Save my score</button>
+            <button class="btn btn-ghost btn-sm" id="override-clear" onclick="clearScoreOverride()" style="display:none">Use AI score instead</button>
+          </div>
+          <div id="override-msg" class="text-sm" style="margin-top:6px"></div>
+        </div>
         <div id="score-analysis" class="text-sm text-dim"></div>
+        <details id="score-history-box" style="margin-top:10px"><summary class="text-sm" style="cursor:pointer">Score history <span id="score-history-count" class="text-dim"></span></summary><div id="score-history" class="text-sm" style="margin-top:6px"></div></details>
       </div>
       <div class="card mb-16" id="gut-section" style="display:none"><div class="card-header">Gut Interest</div><div class="flex gap-8 mt-8"><button class="btn btn-ghost btn-sm" id="gut-0" onclick="setGut(0)">0 - Meh</button><button class="btn btn-primary btn-sm" id="gut-1" onclick="setGut(1)">1 - Interested</button></div></div>
       <div class="card mb-16" id="flags-section" style="display:none"><div class="card-header">Flags &amp; Gaps</div><div id="flags-content"></div></div>
@@ -983,7 +998,7 @@ function skelRows(n){return Array.from({length:n},()=>'<div class="skel-row"><di
 async function loadDashboard(){const rj=document.getElementById('recent-jobs');if(rj&&!rj.innerHTML.trim())rj.innerHTML=skelRows(5);const[stats,jobs,cfg]=await Promise.all([api('/api/stats'),api('/api/jobs?slim=true'),api('/api/config').catch(()=>null)]);allJobs=jobs;updateFollowUpBadges(stats.follow_ups_due);updateTrackerCountBadge(stats.total);const a=document.getElementById('followup-alert');if(stats.follow_ups_due>0){a.style.display='block';document.getElementById('followup-alert-count').textContent=stats.follow_ups_due}else a.style.display='none';if(cfg)updatePauseBanner(!!cfg.job_search_paused);
 document.getElementById('funnel').innerHTML=['new','scored','applied','interview','offer'].map(s=>`<div class="funnel-step"><div class="count">${stats.by_status[s]||0}</div><div class="label">${s}</div></div>`).join('');
 document.getElementById('stats-row').innerHTML=`<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.avg_score}</div><div class="stat-label">Avg Score</div></div><div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.score_distribution.high_8_10}</div><div class="stat-label">High (8-10)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${stats.score_distribution.mid_5_7}</div><div class="stat-label">Mid (5-7)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--accent)">${stats.ready_to_apply||0}</div><div class="stat-label">Ready to Apply</div></div><div class="stat-card"><div class="stat-value" style="color:var(--orange)">${stats.follow_ups_due}</div><div class="stat-label">Follow-Ups</div></div>`;
-const r=jobs.slice(0,8);document.getElementById('recent-jobs').innerHTML=r.length?`<table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Status</th><th>Follow-Up</th></tr></thead><tbody>${r.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${followUpBadge(j)}</td></tr>`).join('')}</tbody></table>`:'<p class="text-dim text-sm" style="padding:12px">No jobs yet.</p>'}
+const r=jobs.slice(0,8);document.getElementById('recent-jobs').innerHTML=r.length?`<table><thead><tr><th>Company</th><th>Title</th><th>Score</th><th>Status</th><th>Follow-Up</th></tr></thead><tbody>${r.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${scoreCell(j)}</td><td>${statusBadge(j.status)}</td><td>${followUpBadge(j)}</td></tr>`).join('')}</tbody></table>`:'<p class="text-dim text-sm" style="padding:12px">No jobs yet.</p>'}
 function updateFollowUpBadges(c){['nav-followup-badge','nav-followup-badge2'].forEach(id=>{const el=document.getElementById(id);if(c>0){el.style.display='inline';el.textContent=c}else el.style.display='none'})}
 function updateTrackerCountBadge(c){const el=document.getElementById('nav-tracker-count');if(!el)return;if(c>0){el.style.display='inline';el.textContent=c}else el.style.display='none'}
 // Add Job
@@ -1311,7 +1326,7 @@ function renderTracker(){
   const jobs=[...filtered].sort((a,b)=>{
     const d=trackerSort.dir;
     switch(trackerSort.col){
-      case 'score': return d*((a.score?.total??-1)-(b.score?.total??-1));
+      case 'score': return d*((a.effective_total??a.score?.total??-1)-(b.effective_total??b.score?.total??-1));
       case 'company': return d*(a.company||'').localeCompare(b.company||'');
       case 'title': return d*(a.title||'').localeCompare(b.title||'');
       case 'lane': return d*(a.resume_lane||'').localeCompare(b.resume_lane||'');
@@ -1321,13 +1336,13 @@ function renderTracker(){
       default: return 0;
     }
   });
-  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}${postingBadge(j)}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${laneBadge(j.resume_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${docsBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':(j.review_status==='approved'?'<span class="text-dim" style="font-size:10px">Approved</span>':'—')}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="11" class="text-dim">No jobs.</td></tr>';
+  document.getElementById('tracker-body').innerHTML=jobs.length?jobs.map(j=>`<tr onclick="showDetail('${j.id}')"><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}${postingBadge(j)}</td><td>${scoreCell(j)}</td><td>${laneBadge(j.resume_lane)}</td><td>${statusBadge(j.status)}</td><td>${j.created_at?new Date(j.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</td><td>${j.applied_at?daysAgo(j.applied_at):'—'}</td><td>${followUpBadge(j)}</td><td>${docsBadge(j)}</td><td>${j.ready_to_apply?'<span class="badge badge-applied" style="font-size:10px">✓ Ready</span>':(j.review_status==='approved'?'<span class="text-dim" style="font-size:10px">Approved</span>':'—')}</td><td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteJob('${j.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="11" class="text-dim">No jobs.</td></tr>';
 }
 // Archive
 async function loadArchive(){
   const jobs=await api('/api/jobs/archived');
   document.getElementById('archive-status').textContent=jobs.length+' archived';
-  document.getElementById('archive-body').innerHTML=jobs.length?jobs.map(j=>`<tr><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${j.score?scoreColor(j.score.total):'—'}</td><td>${statusBadge(j.status)}</td><td>${j.updated_at?new Date(j.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="unarchiveJob('${j.id}')">Unarchive</button></td></tr>`).join(''):'<tr><td colspan="6" class="text-dim">Nothing archived yet.</td></tr>';
+  document.getElementById('archive-body').innerHTML=jobs.length?jobs.map(j=>`<tr><td>${esc(j.company||'—')}</td><td>${esc(j.title||'(untitled)')}</td><td>${scoreCell(j)}</td><td>${statusBadge(j.status)}</td><td>${j.updated_at?new Date(j.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="unarchiveJob('${j.id}')">Unarchive</button></td></tr>`).join(''):'<tr><td colspan="6" class="text-dim">Nothing archived yet.</td></tr>';
 }
 async function unarchiveJob(id){await api(`/api/jobs/${id}/unarchive`,{method:'POST'});loadArchive()}
 async function runArchiveNow(){
@@ -1356,7 +1371,7 @@ if(j.applied_at){const d=j.days_since_applied||0;ai.innerHTML=`Applied ${new Dat
 const fu=document.getElementById('detail-followup-card');const showFu=j.follow_up_due||(j.follow_up?.due_at&&(j.status==='applied'||j.status==='interview'));fu.style.display=showFu?'block':'none';if(showFu){fu.className='card mb-16 follow-up-card'+(j.follow_up_due?' overdue':'');const dd=j.follow_up?.due_at?new Date(j.follow_up.due_at).toLocaleDateString():'Not set';document.getElementById('detail-followup-info').innerHTML=j.follow_up_due?`<span style="color:var(--red)">⚠ Overdue!</span> Due: ${dd}`:`Next: ${dd}`;
 const ci=document.getElementById('detail-contact-info');if(j.follow_up?.contact_email||j.follow_up?.contact_name||j.follow_up?.extracted_emails?.length){let cih=`<div class="contact-info">`;if(j.follow_up.contact_name||j.follow_up.contact_email){cih+=`<strong>Contact:</strong> ${esc(j.follow_up.contact_name||'')} ${j.follow_up.contact_email?`&lt;${esc(j.follow_up.contact_email)}&gt;`:''}${j.follow_up.contact_phone?` · ${esc(j.follow_up.contact_phone)}`:''}<br>`}if(j.follow_up.notes)cih+=`<em>${esc(j.follow_up.notes)}</em><br>`;if(j.follow_up.extracted_emails?.length)cih+=`<div class="mt-8" style="font-size:11px"><strong>Emails:</strong> ${j.follow_up.extracted_emails.map(e=>`<button class="btn btn-ghost btn-sm" onclick="setContactEmail('${esc(e)}')" style="font-size:10px;padding:2px 6px">${esc(e)}</button>`).join(' ')}</div>`;if(j.follow_up.extracted_links?.length)cih+=`<div class="mt-8" style="font-size:11px"><strong>Links:</strong> ${j.follow_up.extracted_links.map(u=>`<a href="${u.startsWith('http')?esc(u):'https://'+esc(u)}" target="_blank" style="color:var(--accent);font-size:10px;margin-right:8px">${esc(u)}</a>`).join('')}</div>`;cih+='</div>';ci.innerHTML=cih}else ci.innerHTML=''}
 const hs=!!j.score;['score-section','score-summary','gut-section','flags-section'].forEach(id=>document.getElementById(id).style.display=hs?'block':'none');document.getElementById('btn-cover').disabled=!hs;document.getElementById('btn-resume').disabled=!hs;document.getElementById('btn-email').disabled=!(hs||j.cover_letters?.length);document.getElementById('btn-score').textContent=hs?'Re-Score':'Score This Job';
-if(hs){const s=j.score;const cls=s.total>=8?'score-high':s.total>=5?'score-mid':'score-low';document.getElementById('score-total').className='score-big '+cls;document.getElementById('score-total').textContent=s.total+'/10';document.getElementById('score-resume-badge').className='badge badge-scored';document.getElementById('score-resume-badge').textContent='Resume lane: '+resumeLabel(j.resume_lane||s.recommended_resume);document.getElementById('score-analysis').textContent=s.raw_analysis;document.getElementById('score-breakdown').innerHTML=[scoreBar('Skills',s.skills_match,4,s.skills_rationale),scoreBar('Scope',s.scope_impact,3,s.scope_rationale),scoreBar('Pay',s.pay_alignment,2,s.pay_rationale),scoreBar('Gut',s.gut_interest,1,'Your assessment')].join('');document.getElementById('gut-0').className=s.gut_interest===0?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';document.getElementById('gut-1').className=s.gut_interest===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';let fh='';if(s.bullshit_flag)fh+=`<div style="color:var(--red);margin:8px 0">⚠ ${esc(s.bullshit_reason)}</div>`;if(s.red_flags?.length)fh+=`<div class="mt-8"><strong>Red Flags:</strong><ul style="margin:4px 0 0 16px">${s.red_flags.map(f=>`<li class="text-sm">${esc(f)}</li>`).join('')}</ul></div>`;if(s.keyword_gaps?.length)fh+=`<div class="mt-8"><strong>Gaps:</strong><ul style="margin:4px 0 0 16px">${s.keyword_gaps.map(g=>`<li class="text-sm">${esc(g)}</li>`).join('')}</ul></div>`;document.getElementById('flags-content').innerHTML=fh||'<p class="text-dim text-sm">None</p>'}
+if(hs){const s=j.score;renderScoreOverride(j);document.getElementById('score-resume-badge').className='badge badge-scored';document.getElementById('score-resume-badge').textContent='Resume lane: '+resumeLabel(j.resume_lane||s.recommended_resume);document.getElementById('score-analysis').textContent=s.raw_analysis;document.getElementById('score-breakdown').innerHTML=[scoreBar('Skills',s.skills_match,4,s.skills_rationale),scoreBar('Scope',s.scope_impact,3,s.scope_rationale),scoreBar('Pay',s.pay_alignment,2,s.pay_rationale),scoreBar('Gut',s.gut_interest,1,'Your assessment')].join('');document.getElementById('gut-0').className=s.gut_interest===0?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';document.getElementById('gut-1').className=s.gut_interest===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';let fh='';if(s.bullshit_flag)fh+=`<div style="color:var(--red);margin:8px 0">⚠ ${esc(s.bullshit_reason)}</div>`;if(s.red_flags?.length)fh+=`<div class="mt-8"><strong>Red Flags:</strong><ul style="margin:4px 0 0 16px">${s.red_flags.map(f=>`<li class="text-sm">${esc(f)}</li>`).join('')}</ul></div>`;if(s.keyword_gaps?.length)fh+=`<div class="mt-8"><strong>Gaps:</strong><ul style="margin:4px 0 0 16px">${s.keyword_gaps.map(g=>`<li class="text-sm">${esc(g)}</li>`).join('')}</ul></div>`;document.getElementById('flags-content').innerHTML=fh||'<p class="text-dim text-sm">None</p>'}
 const hr=!!j.tailored_resume;document.getElementById('tailored-resume-section').style.display=hr?'block':'none';if(hr){document.getElementById('tailored-resume-content').textContent=j.tailored_resume;const dl=document.getElementById('docx-download-link');if(j.tailored_resume_docx){dl.style.display='inline-flex';dl.href=`/api/jobs/${j.id}/download-resume`}else dl.style.display='none'}
 const hc=j.cover_letters?.length>0;document.getElementById('cover-letters-section').style.display=hc?'block':'none';if(hc)document.getElementById('cover-letters-content').innerHTML=j.cover_letters.map(cl=>`<div class="cl-variant-label mt-16">${esc(cl.variant)}</div><div class="cover-letter">${esc(cl.content)}</div><div class="flex gap-8">${cl.docx_path?`<a href="/api/jobs/${j.id}/cover-letters/${cl.id}/download" class="btn btn-success btn-sm" style="text-decoration:none" download>Download .docx</a>`:''}<button class="btn btn-ghost btn-sm" onclick="copyText(this,\`${escAttr(cl.content)}\`)">Copy</button></div>`).join('');
 const he=j.emails?.length>0;document.getElementById('email-history-section').style.display=he?'block':'none';if(he)document.getElementById('email-history-content').innerHTML=j.emails.map(e=>`<div style="border-left:2px solid ${e.direction==='sent'?'var(--accent)':'var(--green)'};padding:8px 12px;margin:8px 0"><div class="text-sm"><strong>${e.direction==='sent'?'Sent':'Received'}</strong> · ${new Date(e.sent_at).toLocaleDateString()}</div><div class="text-dim text-sm">${e.subject?esc(e.subject):''}</div></div>`).join('')}
@@ -1405,9 +1420,9 @@ function renderReadiness(j){
   const info=document.getElementById('detail-ready-info'),btn=document.getElementById('detail-approve');
   if(!info||!btn)return;
   const why=[];
-  if(!j.score||j.score.total<5)why.push('score below 5');
+  if((j.effective_total??j.score?.total)==null||(j.effective_total??j.score?.total)<5)why.push('score below 5');
   if(j.review_status!=='approved')why.push('not approved');
-  if(j.market_lane==='ignore')why.push('marked skip');
+  if(j.market_lane==='ignore'&&!j.score_is_user)why.push('marked skip');
   if(j.posting_status==='closed')why.push('posting closed');
   if(!j.has_resume)why.push('no tailored resume');
   if(!j.has_cover_letters)why.push('no cover letters');
@@ -2423,6 +2438,49 @@ function postingBadge(j){
   return'';
 }
 function statusBadge(s){return`<span class="badge badge-${s}">${s}</span>`}
+function scoreCell(j){
+  const t=j.effective_total!=null?j.effective_total:(j.score?j.score.total:null);
+  if(t==null)return '—';
+  return scoreColor(t)+(j.score_is_user?` <span title="Your own score (the AI scored it ${j.score?j.score.total:'?'}/10)" style="font-size:11px;color:var(--accent)">✎</span>`:'');
+}
+function fmtWhen(iso){try{return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}catch(e){return iso||''}}
+function renderScoreOverride(j){
+  const s=j.score;if(!s||!document.getElementById('score-override-box'))return;
+  const mine=!!j.score_is_user&&!!j.score_override,t=j.effective_total!=null?j.effective_total:s.total;
+  const el=document.getElementById('score-total');
+  el.className='score-big '+(t>=8?'score-high':t>=5?'score-mid':'score-low');
+  el.textContent=t+'/10'+(mine?' ✎':'');
+  document.getElementById('score-ai-line').innerHTML=mine
+    ?`Your score: <strong>${j.score_override.total}/10</strong> · the AI scored it <strong>${s.total}/10</strong>`+(j.score_override.note?`<div class="text-dim" style="margin-top:2px">“${esc(j.score_override.note)}”</div>`:'')
+    :`AI score: <strong>${s.total}/10</strong>${s.model?` <span class="text-dim">(${esc(s.model)})</span>`:''}<div class="text-dim" style="margin-top:2px">Disagree? Enter your own score below. The AI’s score stays on record.</div>`;
+  document.getElementById('override-total').value=mine?j.score_override.total:'';
+  document.getElementById('override-note').value=mine?(j.score_override.note||''):'';
+  document.getElementById('override-clear').style.display=mine?'':'none';
+  const m=document.getElementById('override-msg');m.textContent='';
+  renderScoreHistory(j);
+}
+function renderScoreHistory(j){
+  const h=[...(j.score_history||[])].reverse(),el=document.getElementById('score-history');if(!el)return;
+  document.getElementById('score-history-count').textContent=h.length?'('+h.length+')':'';
+  el.innerHTML=h.length?h.map(e=>{
+    const who=e.source==='model'?(e.model||'AI'):'You';
+    const what=e.source==='user_cleared'?'went back to the AI score':e.total+'/10';
+    const extra=e.source==='model'&&e.recommended_resume?' · resume: '+esc(resumeLabel(e.recommended_resume)):'';
+    return `<div style="padding:5px 0;border-top:1px solid var(--border)"><strong>${esc(what)}</strong> <span class="text-dim">— ${esc(who)}, ${esc(fmtWhen(e.at))}${extra}</span>${e.note?`<div class="text-dim">${esc(e.note)}</div>`:''}</div>`}).join('')
+    :'<div class="text-dim">No history yet.</div>';
+}
+async function saveScoreOverride(){
+  const v=document.getElementById('override-total').value.trim(),m=document.getElementById('override-msg');
+  if(!/^(10|[0-9])$/.test(v)){m.textContent='Enter a whole number from 0 to 10.';m.style.color='var(--red)';return}
+  m.textContent='Saving…';m.style.color='var(--text-dim)';
+  try{await api('/api/jobs/'+currentJobId+'/score-override',{method:'PUT',body:{total:+v,note:document.getElementById('override-note').value}});await showDetail(currentJobId);toast('Your score was saved')}
+  catch(e){m.textContent=e.message;m.style.color='var(--red)'}
+}
+async function clearScoreOverride(){
+  const m=document.getElementById('override-msg');m.textContent='Saving…';m.style.color='var(--text-dim)';
+  try{await api('/api/jobs/'+currentJobId+'/score-override',{method:'DELETE'});await showDetail(currentJobId);toast('Back to the AI score')}
+  catch(e){m.textContent=e.message;m.style.color='var(--red)'}
+}
 function scoreColor(t){const c=t>=8?'var(--green)':t>=5?'var(--yellow)':'var(--red)';return`<strong style="color:${c}">${t}/10</strong>`}
 function scoreBar(l,v,m,r){const p=(v/m*100).toFixed(0);const c=p>=75?'var(--green)':p>=50?'var(--yellow)':'var(--red)';return`<div class="score-bar"><div class="score-bar-label">${l} (${v}/${m})</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${p}%;background:${c}"></div></div></div><div style="font-size:11px;color:var(--text-dim);margin:0 0 8px 108px">${esc(r)}</div>`}
 function followUpBadge(j){if(j.follow_up_due)return'<span class="badge badge-followup">Follow Up!</span>';if(j.status==='applied'&&j.days_since_applied!=null)return`<span class="text-dim text-sm">${j.days_since_applied}d</span>`;return'—'}

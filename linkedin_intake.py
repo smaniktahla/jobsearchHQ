@@ -163,7 +163,7 @@ def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
                 if capture.auto_score:
                     try:
                         result = scoring.score_job(job, user_id)
-                        job.score = result
+                        job.set_model_score(result)
                         job.update_status(JobStatus.SCORED)
                         if result.recommended_lane:
                             job.market_lane = result.recommended_lane
@@ -222,7 +222,7 @@ def process_linkedin_capture(capture: LinkedInCapture, user_id: str) -> dict:
                 if capture.auto_score and len(raw_jd) > 200:
                     try:
                         result = scoring.score_job(job, user_id)
-                        job.score = result
+                        job.set_model_score(result)
                         job.update_status(JobStatus.SCORED)
                         if result.recommended_lane:
                             job.market_lane = result.recommended_lane
