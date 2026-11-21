@@ -82,6 +82,8 @@ def test_drawer_is_wired_into_the_page():
     assert "(min-width:1100px)" in HTML and "body.help-open .main{margin-right:380px;" in HTML   # pushes content on wide screens
     assert "localStorage" in HTML and "try{if(v===undefined)return localStorage" in HTML          # storage guarded
     assert "prefers-reduced-motion" in HTML
+    nav = re.search(r"\.nav-item-help\{([^}]*)\}", HTML).group(1)
+    assert "color:var(--accent)" in nav and "color-mix" in nav            # Help is tinted with the accent so it is easy to spot
     assert "d.style.transition='none';helpOpen(null,true)" in HTML       # restoring 'open' does not animate
     assert "max-width:92vw" in HTML and "overflow-x:auto}" in HTML      # phone keeps a tappable strip of page; wide tables scroll
 
