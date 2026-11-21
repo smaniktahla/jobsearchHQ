@@ -38,7 +38,15 @@ KNOWN_SECTIONS = {
     "EARLIER EXPERIENCE", "TECHNICAL SKILLS", "CERTIFICATIONS",
     "EDUCATION", "CERTIFICATIONS & EDUCATION", "SELECTED INNOVATION",
     "SELECTED SYSTEMS & INNOVATION", "PROJECT HIGHLIGHTS", "KEY SKILLS",
+    "PROFESSIONAL SUMMARY", "EXPERIENCE", "SKILLS", "CORE COMPETENCIES", "PROJECTS",
+    "SELECTED PROJECTS", "KEY PROJECTS", "NOTABLE ENGAGEMENTS", "SELECTED ENGAGEMENTS",
+    "RELEVANT ENGAGEMENTS", "CONSULTING ENGAGEMENTS", "RELEVANT CONSULTING ENGAGEMENTS",
+    "RELEVANT CONSULTING AND ADVISORY ENGAGEMENTS", "PUBLICATIONS", "AWARDS",
+    "VOLUNTEER EXPERIENCE", "LANGUAGES",
 }
+
+# "Project 1: Crown Jewels Assessment" opens a project entry whose "Client:/Role:/..." lines are fields
+PROJECT_RE = re.compile(r"^(?:Project|Engagement|Case Study)\s+\d+\s*[:.\-–—]\s*(\S.*)$", re.I)
 
 SAMPLE_RESUME = """JANE SAMPLE
 jane@example.com · (555) 555-0100 · Washington, DC · linkedin.com/in/janesample
@@ -332,6 +340,7 @@ def parse_blocks(text: str) -> list[tuple]:
     i = 0
     in_header = True
     in_job = False
+    in_project = False  # inside a "Project N: ..." entry
     bullet_base = None  # indent of the first bullet in the current run
 
     def next_nonempty(k):
@@ -392,8 +401,14 @@ def parse_blocks(text: str) -> list[tuple]:
         header = _job_header(lines, i)
         if header:
             title, org, dates, used = header
-            blocks.append(("job", title, org, dates))
+            location = ""
+            nxt = lines[i + used].strip() if i + used < len(lines) else ""
+            if nxt and nxt[0] not in "•-*" and _is_location(nxt):
+                location = nxt
+                used += 1
+            blocks.append(("job", title, org, dates, location))
             in_job = True
+            in_project = False
             i += used
             continue
 
@@ -404,6 +419,7 @@ def parse_blocks(text: str) -> list[tuple]:
         if is_section:
             blocks.append(("section", line.rstrip(":")))
             in_job = False
+            in_project = False
             i += 1
             continue
 
@@ -433,11 +449,33 @@ def parse_blocks(text: str) -> list[tuple]:
             i += 2
             continue
 
-        # "Category: description" (skills, competencies) -> bullet with a bold label
+        project = PROJECT_RE.match(line)
+        if project:
+            blocks.append(("project", line))
+            in_project = True
+            in_job = False
+            i += 1
+            continue
+
         head = line.split(":", 1)[0]
-        if ":" in line and len(head) < 45 and len(head.split()) <= 6 and not re.search(r"[.!?]", head):
+        label_like = ":" in line and len(head) < 45 and len(head.split()) <= 6 and not re.search(r"[.!?]", head)
+        if in_project and label_like:
+            # "Client: ...", "Role: ...", "Key Accomplishments:" -> a labelled line, not a bullet
+            label, value = line.split(":", 1)
+            blocks.append(("field", label.strip(), value.strip()))
+            i += 1
+            continue
+
+        # "Category: description" (skills, competencies) -> bullet with a bold label
+        if label_like and line.split(":", 1)[1].strip():
             label, value = line.split(":", 1)
             blocks.append(("skill", label, value.strip()))
+            i += 1
+            continue
+
+        # "Some of the notable engagements include:" -> a bold lead-in, not a bullet
+        if line.endswith(":") and len(line) < 100 and not in_job:
+            blocks.append(("label", line))
             i += 1
             continue
 
@@ -597,6 +635,13 @@ class _Builder:
             self._run(self._new("bullet", bulleted=False), block[1])
         elif kind == "label":
             self._run(self._new("bullet", bulleted=False), block[1], bold=True)
+        elif kind == "project":
+            self._run(self._new("org", right_tab=False), block[1], bold=True)
+        elif kind == "field":
+            p = self._new("bullet", bulleted=False)
+            self._run(p, block[1] + (": " if block[2] else ":"), bold=True)
+            if block[2]:
+                self._run(p, block[2], bold=False)
         elif kind == "tagline":
             self._run(self._new("title"), block[1], italic=True)
         elif kind in ("bullet", "sub"):
@@ -651,6 +696,8 @@ def render(tailored_text: str, user_id: str, out_path: Path) -> str:
         if kind == "section" and prev is not None:
             b.spacer()
         elif kind == "job" and prev in ("bullet", "sub", "skill", "job", "body"):
+            b.spacer()
+        elif kind == "project" and prev not in (None, "section"):
             b.spacer()
         b.add(block)
         prev = kind
