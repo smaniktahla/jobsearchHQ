@@ -140,6 +140,20 @@ def run_search(req: JobSearchRequest, user_id: str, cancel: threading.Event | No
     return result
 
 
+def _board_issues(df) -> list[dict]:
+    """Per-board failures/warnings python-jobspy >=1.4 records on the result's attrs, so a
+    blocked or broken board is reported instead of looking like 'no jobs'."""
+    out: list[dict] = []
+    attrs = getattr(df, "attrs", None) or {}
+    for site, msg in (attrs.get("errors") or {}).items():
+        out.append({"error": f"{site}: {msg}"})
+    for site, msgs in (attrs.get("warnings") or {}).items():
+        msgs = [msgs] if isinstance(msgs, str) else list(msgs or [])
+        if msgs:
+            out.append({"error": f"{site}: {len(msgs)} warning(s), e.g. {msgs[0]}"})
+    return out
+
+
 def _run_board_search(req: JobSearchRequest, user_id: str, cancel: threading.Event | None = None) -> JobSearchResult:
     """The JobSpy board half of run_search (req.sites are boards only)."""
 
@@ -154,7 +168,9 @@ def _run_board_search(req: JobSearchRequest, user_id: str, cancel: threading.Eve
         "is_remote": remote_only,
         "distance": req.distance,
         "country_indeed": req.country_indeed,
-        "linkedin_fetch_description": req.linkedin_fetch_description,
+        # python-jobspy >=1.2: fetch_description replaces linkedin_fetch_description and also
+        # governs Glassdoor/ZipRecruiter descriptions. Field name kept for stored configs.
+        "fetch_description": req.linkedin_fetch_description,
         "description_format": "markdown",
     }
 
@@ -176,9 +192,10 @@ def _run_board_search(req: JobSearchRequest, user_id: str, cancel: threading.Eve
     if cancel is not None and cancel.is_set():
         return JobSearchResult(cancelled=True)
 
+    issues = _board_issues(df)
     if df is None or df.empty:
         logger.info("JobSpy returned 0 results")
-        return JobSearchResult(total_scraped=0)
+        return JobSearchResult(total_scraped=0, errors=issues)
 
     # Log per-site breakdown
     if "site" in df.columns:
@@ -186,7 +203,7 @@ def _run_board_search(req: JobSearchRequest, user_id: str, cancel: threading.Eve
         logger.info(f"JobSpy results by site: {site_counts}")
     logger.info(f"JobSpy total results: {len(df)}")
 
-    result = JobSearchResult(total_scraped=len(df))
+    result = JobSearchResult(total_scraped=len(df), errors=issues)
     dedup_index = storage.load_dedup_index(user_id) if req.skip_existing else []
 
     for _, row in df.iterrows():
