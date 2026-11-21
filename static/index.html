@@ -708,7 +708,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         </div>
         <div class="form-group">
           <label>Model override <span style="color:var(--text-dim);font-weight:normal">(optional — pins a specific model version)</span></label>
-          <input type="text" id="cfg-fast-model" placeholder="leave blank for provider default">
+          <input type="text" id="cfg-fast-model" list="ai-model-options-fast" placeholder="leave blank for automatic (newest suitable model)" onfocus="loadSettingsModels('fast')"><datalist id="ai-model-options-fast"></datalist>
         </div>
         <div style="margin-top:auto;padding-top:16px;display:flex;align-items:center;gap:8px">
           <button class="btn btn-primary btn-sm" onclick="testAIProvider('fast')">Test Fast Provider</button>
@@ -753,7 +753,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
         </div>
         <div class="form-group">
           <label>Model override <span style="color:var(--text-dim);font-weight:normal">(optional — pins a specific model version)</span></label>
-          <input type="text" id="cfg-strong-model" placeholder="leave blank for provider default">
+          <input type="text" id="cfg-strong-model" list="ai-model-options-strong" placeholder="leave blank for automatic (newest suitable model)" onfocus="loadSettingsModels('strong')"><datalist id="ai-model-options-strong"></datalist>
         </div>
         <div style="margin-top:auto;padding-top:16px;display:flex;align-items:center;gap:8px">
           <button class="btn btn-primary btn-sm" onclick="testAIProvider('strong')">Test Strong Provider</button>
@@ -1382,7 +1382,7 @@ async function scoreCurrentJob(){
     const cfg=await api('/api/config');
     const fp=cfg.fast_provider||'anthropic';
     const fmOverride=cfg.fast_model||'';
-    const defaults={anthropic:'haiku',gemini:'gemini-2.0-flash',openai:'gpt-4o-mini',ollama:cfg.ollama_model||'ollama'};
+    const defaults={anthropic:'haiku',gemini:'gemini (latest Flash-Lite)',openai:'gpt-4o-mini',ollama:cfg.ollama_model||'ollama'};
     modelLabel=fmOverride||(fp==='anthropic'?'claude-haiku':defaults[fp]||fp);
   }catch(e){}
   showLoading('Scoring with '+modelLabel+'...');
@@ -1841,8 +1841,8 @@ async function loadSettings(){
   await renderResumeStatus();
   refreshSchedulerStatus()
 }
-const PROVIDER_FAST_DEFAULTS={anthropic:'claude-haiku-4-5-20251001',gemini:'gemini-2.0-flash',openai:'gpt-4o-mini',ollama:'your ollama model'};
-const PROVIDER_STRONG_DEFAULTS={anthropic:'claude-sonnet-4-5',gemini:'gemini-2.5-flash',openai:'gpt-4o',ollama:'your ollama model'};
+const PROVIDER_FAST_DEFAULTS={anthropic:'claude-haiku-4-5-20251001',gemini:'auto — newest Flash-Lite your key offers',openai:'gpt-4o-mini',ollama:'your ollama model'};
+const PROVIDER_STRONG_DEFAULTS={anthropic:'claude-sonnet-4-5',gemini:'auto — newest Flash your key offers',openai:'gpt-4o',ollama:'your ollama model'};
 const PROVIDER_GUIDE={
   anthropic:{name:'Claude (Anthropic)',link:'https://console.anthropic.com/settings/keys',linkText:'console.anthropic.com → API Keys',
     short:'Get a key at console.anthropic.com → Settings → API Keys (starts with sk-ant-). Needs prepaid credit; a Claude Pro/Max chat plan does not include API access.',
@@ -2028,7 +2028,34 @@ async function importConfig(file){
   setTimeout(()=>{statusEl.textContent=''},5000);
 }
 async function sendTestEmail(){const s=document.getElementById('test-email-status');s.textContent='Sending...';s.style.color='var(--text-dim)';try{await saveConfig({silent:true});const r=await api('/api/test-email',{method:'POST'});s.textContent='✓ Test email sent!';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
-async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');s.textContent='Testing...';s.style.color='var(--text-dim)';try{await saveConfig({silent:true});const r=await api('/api/config/test-ai-provider?tier='+tier,{method:'POST'});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
+// Settings: fill the model-override autocomplete from the provider's live model list
+const _smCache={};
+async function loadSettingsModels(tier){
+  const prov=document.getElementById('cfg-'+tier+'-provider').value;if(prov==='ollama')return;
+  const pre=tier==='strong'?'strong-':'';
+  const kEl=document.getElementById('cfg-'+pre+prov+'-key');const key=kEl?kEl.value:'';
+  const ck=prov+'|'+key.slice(-6);if(_smCache[ck]==='busy')return;
+  const dl=document.getElementById('ai-model-options-'+tier);
+  if(_smCache[ck]&&_smCache[ck]!=='busy'){dl.innerHTML=_smCache[ck];return}
+  _smCache[ck]='busy';
+  try{const r=await api('/api/ai/models',{method:'POST',body:{provider:prov,api_key:key}});
+    const h=r.models.map(m=>`<option value="${escAttr2(m.id)}">${escAttr2(m.label||m.id)}</option>`).join('');
+    _smCache[ck]=h;dl.innerHTML=h;
+    const hint=document.getElementById(tier+'-model-hint');
+    if(hint&&r.recommended&&r.recommended[tier])hint.textContent='Automatic currently uses: '+r.recommended[tier];
+  }catch(e){delete _smCache[ck]}
+}
+// AI test with a live timer + client-side timeout. Free-tier models can be slow or
+// overloaded; the server tries fallbacks, so allow up to 120s before giving up.
+const AI_TEST_TIMEOUT=120;
+async function runAITest(el,fn){
+  const t0=Date.now();el.style.color='var(--text-dim)';
+  const tick=()=>{el.textContent='Testing… '+Math.round((Date.now()-t0)/1000)+'s (please allow up to '+AI_TEST_TIMEOUT+' seconds — some AI models are slow to respond)'};
+  tick();const iv=setInterval(tick,1000);let to;
+  try{return await Promise.race([fn(),new Promise((_,rej)=>{to=setTimeout(()=>rej(new Error('No response after '+AI_TEST_TIMEOUT+' seconds. The AI provider may be busy — try again in a minute, or pick a different model/provider.')),AI_TEST_TIMEOUT*1000)})])}
+  finally{clearInterval(iv);clearTimeout(to)}
+}
+async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');try{const r=await runAITest(s,async()=>{await saveConfig({silent:true});return api('/api/config/test-ai-provider?tier='+tier,{method:'POST'})});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
 async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v,{method:'PUT',body:{content:c}});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 async function uploadResumeDocx(file){
   if(!file) return;
@@ -2546,25 +2573,49 @@ function wizRender(){
     b.innerHTML=`<p>Here's where things stand:</p><ul style="list-style:none;margin:8px 0;padding:0">${row(!!d.name,'Profile'+(d.name?'':' (add your name in Settings → Profile)'))}${row(d.resumeLoaded,'Resume'+(d.resumeLoaded?'':' (upload one in Settings → Resumes before generating documents)'))}${row(!!_wiz.provider&&d.aiSaved,'AI provider'+((_wiz.provider&&d.aiSaved)?(d.aiTested?' (tested)':' (not tested yet)'):' (set one in Settings → AI)'))}${row(!!_wlLines(d.titles).length,'Job search preferences'+(_wlLines(d.titles).length?'':' (add titles in Settings → Job Search & Automation)'))}</ul><p>Next, try <strong>Search Boards</strong> to pull in your first jobs, then <strong>Score</strong> them from the Tracker.</p>`;
   }
 }
-function wizPick(k){_wiz.provider=k;_wiz.data.aiTested=false;document.querySelectorAll('#wiz .wiz-opt').forEach((e,i)=>e.classList.toggle('sel',['anthropic','gemini','openai','ollama'][i]===k));wizAIRender()}
+function wizPick(k){if(_wiz.provider!==k)_wiz.model='';_wiz.provider=k;_wiz.data.aiTested=false;document.querySelectorAll('#wiz .wiz-opt').forEach((e,i)=>e.classList.toggle('sel',['anthropic','gemini','openai','ollama'][i]===k));wizAIRender()}
 function wizAIRender(){
   const k=_wiz.provider,el=document.getElementById('wz-ai'),d=_wiz.data;if(!el)return;
   if(!k){el.innerHTML='';return}
   const g=PROVIDER_GUIDE[k];
   let f='';
   if(k==='ollama')f=wizField('wz-ourl','Server URL',d.ollama_url,'http://localhost:11434')+wizField('wz-omodel','Model name',d.ollama_model,'e.g. llama3.1');
-  else f=wizField('wz-key','API key',_wiz.key||'',k==='anthropic'?'sk-ant-…':k==='gemini'?'AIza…':'sk-…','password');
+  else f=wizField('wz-key','API key',_wiz.key||'',k==='anthropic'?'sk-ant-…':k==='gemini'?'AIza…':'sk-…','password')+
+    `<div class="form-group"><label>Model <span class="text-dim">(optional — Auto picks a good, current one for you)</span></label><select id="wz-model">${wizModelOptions()}</select> <button class="btn btn-sm" type="button" onclick="wizLoadModels()">Load available models</button> <span id="wz-modelmsg" class="text-sm"></span></div>`;
   el.innerHTML=`<div style="margin-bottom:8px"><strong>${g.name}</strong><div class="wiz-hint" style="font-size:12px">${g.best}</div><ol style="margin:6px 0 6px 20px">${g.steps.map(x=>`<li>${x}</li>`).join('')}</ol>${g.note?`<div class="pg-note">${g.note}</div>`:''}</div>${f}<button class="btn btn-primary btn-sm" onclick="wizTestAI()">Save &amp; test</button> <span id="wz-aitest" class="text-sm"></span>`;
+  const ke=document.getElementById('wz-key');if(ke)ke.onchange=()=>{if(ke.value.trim().length>15)wizLoadModels(true)};
+}
+function wizModelOptions(){
+  const ms=(_wiz.models&&_wiz.models[_wiz.provider])||null,sel=_wiz.model||'';
+  const rec=ms&&ms.recommended&&(ms.recommended.strong||ms.recommended.fast);
+  let o=`<option value="">Auto (recommended${rec?': '+escAttr2(rec):''})</option>`;
+  if(ms)o+=ms.models.map(m=>`<option value="${escAttr2(m.id)}"${m.id===sel?' selected':''}>${escAttr2(m.label&&m.label!==m.id?m.label+' — '+m.id:m.id)}</option>`).join('');
+  else if(sel)o+=`<option value="${escAttr2(sel)}" selected>${escAttr2(sel)}</option>`;
+  return o;
+}
+async function wizLoadModels(quiet){
+  const k=_wiz.provider,msg=document.getElementById('wz-modelmsg'),key=(document.getElementById('wz-key')||{}).value||'';
+  if(!k||k==='ollama')return;
+  if(!key.trim()){if(!quiet&&msg){msg.textContent='Enter your API key first.';msg.style.color='var(--red)'}return}
+  msg.textContent='Loading…';msg.style.color='var(--text-dim)';
+  try{
+    const r=await api('/api/ai/models',{method:'POST',body:{provider:k,api_key:key}});
+    _wiz.models=_wiz.models||{};_wiz.models[k]=r;
+    const sel=document.getElementById('wz-model');_wiz.model=sel?sel.value:'';
+    if(sel)sel.innerHTML=wizModelOptions();
+    msg.textContent=r.models.length+' models found ✓';msg.style.color='var(--green)';
+  }catch(e){msg.textContent=e.message;msg.style.color='var(--red)'}
 }
 async function wizSaveAI(){
   const k=_wiz.provider;if(!k)return false;
-  const body={provider:k,api_key:(document.getElementById('wz-key')||{}).value||'',ollama_url:(document.getElementById('wz-ourl')||{}).value||'',ollama_model:(document.getElementById('wz-omodel')||{}).value||''};
+  const body={provider:k,api_key:(document.getElementById('wz-key')||{}).value||'',ollama_url:(document.getElementById('wz-ourl')||{}).value||'',ollama_model:(document.getElementById('wz-omodel')||{}).value||'',model:(document.getElementById('wz-model')||{}).value||''};
+  _wiz.model=body.model;
   if(k!=='ollama')_wiz.key=body.api_key;else{_wiz.data.ollama_url=body.ollama_url;_wiz.data.ollama_model=body.ollama_model}
   await api('/api/onboarding/ai',{method:'PUT',body});_wiz.data.aiSaved=true;return true;
 }
 async function wizTestAI(){
-  const t=document.getElementById('wz-aitest');t.textContent='Testing…';t.style.color='var(--text-dim)';
-  try{await wizSaveAI();const r=await api('/api/config/test-ai-provider?tier=strong',{method:'POST'});_wiz.data.aiTested=true;t.textContent='Working ✓ ('+r.model+')';t.style.color='var(--green)'}
+  const t=document.getElementById('wz-aitest');
+  try{const r=await runAITest(t,async()=>{await wizSaveAI();return api('/api/config/test-ai-provider?tier=strong',{method:'POST'})});_wiz.data.aiTested=true;t.textContent='Working ✓ ('+r.model+')';t.style.color='var(--green)'}
   catch(e){t.textContent=e.message;t.style.color='var(--red)'}
 }
 async function wizGo(dir){

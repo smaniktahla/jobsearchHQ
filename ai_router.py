@@ -19,6 +19,11 @@ is not available on other providers.
 """
 
 import contextvars
+import hashlib
+import json
+import time
+import urllib.error
+import urllib.request
 import logging
 import os
 import re
@@ -40,9 +45,12 @@ PROVIDER_DEFAULTS = {
         "fast":   "claude-haiku-4-5-20251001",
         "strong": "claude-sonnet-4-5",
     },
+    # Gemini defaults are only the offline fallback: normally the newest stable
+    # model is discovered from the API (see _discover_gemini_models). Pin a model
+    # in Settings -> AI to override.
     "gemini": {
-        "fast":   "gemini-2.0-flash",  # 15 RPM, 1500 RPD free tier
-        "strong": "gemini-2.5-flash",  # 10 RPM, 500 RPD free tier
+        "fast":   "gemini-flash-lite-latest",  # Google alias -> newest Flash-Lite
+        "strong": "gemini-flash-latest",       # Google alias -> newest Flash
     },
     "openai": {
         "fast":   "gpt-4o-mini",
@@ -111,13 +119,176 @@ def validate_provider(tier: str, config) -> str:
     return provider
 
 
+_GEMINI_CACHE_TTL = 6 * 3600
+_GEMINI_BAD_TTL = 600            # seconds a failing model is skipped
+_gemini_bad: dict = {}           # model name -> time of last failure
+_gemini_model_cache: dict = {}   # sha1(api_key) -> (fetched_at, {"fast": name, "strong": name})
+# Stable text models only: gemini-<ver>-flash / gemini-<ver>-flash-lite. The
+# anchored pattern excludes -preview, -tts, -image, -live, -audio, omni, etc.
+_GEMINI_FLASH_RE = re.compile(r"^models/(gemini-(\d+(?:\.\d+)?)-flash(-lite)?)$")
+
+
+def _discover_gemini_models(api_key: str) -> dict:
+    """Ask the API which models this key can use; return the newest stable
+    Flash (strong tier) and Flash-Lite (fast tier). Cached per key for 6h.
+    Returns {} if discovery fails, so callers fall back to the *-latest aliases."""
+    ck = hashlib.sha1(api_key.encode()).hexdigest()
+    hit = _gemini_model_cache.get(ck)
+    if hit and time.time() - hit[0] < _GEMINI_CACHE_TTL:
+        return hit[1]
+    best: dict = {"fast": [], "strong": []}
+    try:
+        token = ""
+        for _ in range(5):  # page through the listing
+            url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200"
+            if token:
+                url += f"&pageToken={token}"
+            req = urllib.request.Request(url, headers={"x-goog-api-key": api_key})
+            data = json.load(urllib.request.urlopen(req, timeout=10))
+            for m in data.get("models", []):
+                if "generateContent" not in m.get("supportedGenerationMethods", []):
+                    continue
+                mt = _GEMINI_FLASH_RE.match(m.get("name", ""))
+                if not mt:
+                    continue
+                ver = tuple(int(x) for x in mt.group(2).split("."))
+                tier = "fast" if mt.group(3) else "strong"
+                best[tier].append((ver, mt.group(1)))
+            token = data.get("nextPageToken", "")
+            if not token:
+                break
+    except Exception as e:
+        logger.warning(f"[ai_router] Gemini model discovery failed ({type(e).__name__}); using -latest aliases")
+        # Retry in 5 min, not on every call
+        _gemini_model_cache[ck] = (time.time() - _GEMINI_CACHE_TTL + 300, {})
+        return {}
+    found = {t: [n for _, n in sorted(set(v), reverse=True)] for t, v in best.items()}
+    _gemini_model_cache[ck] = (time.time(), found)
+    logger.info(f"[ai_router] Gemini models discovered: {found}")
+    return found
+
+
 def _resolve_model(provider: str, tier: str, config) -> str:
-    """User override → provider default."""
+    """User override -> (Gemini: newest model the key offers) -> provider default."""
     field = f"{tier}_model"
     user_model = getattr(config, field, "") or ""
     if user_model.strip():
         return user_model.strip()
+    if provider == "gemini":
+        try:
+            found = _discover_gemini_models(_resolve_key("gemini", config))
+        except ProviderConfigError:
+            found = {}
+        if found.get(tier):
+            return found[tier][0]
     return PROVIDER_DEFAULTS.get(provider, {}).get(tier, "")
+
+
+def _gemini_candidates(tier: str, config) -> list:
+    """Models to try for a Gemini call, best first. A model pinned in Settings is
+    used alone (never silently swapped). Otherwise: the newest stable models the
+    key offers (top 3), then the Google -latest alias as a last resort."""
+    pinned = (getattr(config, f"{tier}_model", "") or "").strip()
+    if pinned:
+        return [pinned]
+    try:
+        found = _discover_gemini_models(_resolve_key("gemini", config)).get(tier, [])
+    except ProviderConfigError:
+        found = []
+    out = list(found[:5])
+    fb = PROVIDER_DEFAULTS["gemini"][tier]
+    if fb not in out:
+        out.append(fb)
+    return out
+
+
+def _gemini_chat_with_fallback(system, user_msg, tier, config, api_key, max_tokens):
+    """Try each candidate with a bounded timeout; move on if a model is slow,
+    unavailable, retired, rate-limited or returns no text."""
+    cands = _gemini_candidates(tier, config)
+    # Skip models that failed recently (new models are often overloaded on the
+    # free tier) so later calls don't pay the timeout again; if every candidate
+    # is cooling down, try them all anyway.
+    now = time.time()
+    live = [m for m in cands if now - _gemini_bad.get(m, 0) > _GEMINI_BAD_TTL]
+    if len(cands) > 1 and live:
+        cands = live
+    timeout = 12 if max_tokens <= 1000 else 120   # small calls should answer fast
+    last = None
+    for i, model in enumerate(cands):
+        try:
+            out = _gemini_chat(system, user_msg, model, api_key, max_tokens, timeout=timeout)
+            _last_model_used[tier] = f"gemini/{model}"
+            return out
+        except Exception as e:
+            last = e
+            if len(cands) > 1:
+                _gemini_bad[model] = time.time()
+            logger.warning(f"[ai_router] gemini/{model} failed ({type(e).__name__}: {str(e)[:120]}); "
+                           + ("trying next" if i + 1 < len(cands) else "no more candidates"))
+    raise last
+
+
+# ── Model listing (for the model pickers in the wizard / Settings) ────────────
+
+_GEMINI_SKIP = re.compile(r"tts|image|embed|aqa|imagen|veo|live|audio|robotics|computer-use|learnlm|omni|lyria", re.I)
+_OPENAI_SKIP = re.compile(r"audio|realtime|image|tts|transcribe|embed|moderation|search|whisper|dall|sora|instruct|davinci|babbage", re.I)
+
+
+def _http_json(url: str, headers: dict, timeout: int = 10) -> dict:
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        return json.load(urllib.request.urlopen(req, timeout=timeout))
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 401, 403):
+            raise ProviderConfigError("The provider rejected this API key. Double-check it and try again.") from None
+        raise ProviderConfigError(f"The provider returned an error ({e.code}). Try again in a minute.") from None
+    except Exception as e:
+        raise ProviderConfigError(f"Could not reach the provider ({type(e).__name__}).") from None
+
+
+def list_models(provider: str, api_key: str = "", base_url: str = "") -> dict:
+    """Models a key can use, for pickers. Returns
+    {"models": [{"id","label"}], "recommended": {"fast": id, "strong": id}}.
+    Raises ProviderConfigError with a user-readable message."""
+    models, rec = [], {}
+    if provider == "gemini":
+        names, token = [], ""
+        for _ in range(5):
+            url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (f"&pageToken={token}" if token else "")
+            data = _http_json(url, {"x-goog-api-key": api_key})
+            for m in data.get("models", []):
+                nm = m.get("name", "").replace("models/", "")
+                if "generateContent" in m.get("supportedGenerationMethods", []) and nm.startswith("gemini") \
+                        and not _GEMINI_SKIP.search(nm):
+                    names.append((nm, m.get("displayName") or nm))
+            token = data.get("nextPageToken", "")
+            if not token:
+                break
+        models = [{"id": n, "label": l} for n, l in sorted(set(names), reverse=True)]
+        found = _discover_gemini_models(api_key)
+        rec = {t: (found.get(t) or [""])[0] for t in ("fast", "strong")}
+    elif provider == "anthropic":
+        data = _http_json("https://api.anthropic.com/v1/models?limit=100",
+                          {"x-api-key": api_key, "anthropic-version": "2023-06-01"})
+        models = [{"id": m["id"], "label": m.get("display_name") or m["id"]} for m in data.get("data", [])]
+        rec = dict(PROVIDER_DEFAULTS["anthropic"])
+    elif provider == "openai":
+        base = (base_url or "https://api.openai.com/v1").rstrip("/")
+        data = _http_json(base + "/models", {"Authorization": f"Bearer {api_key}"})
+        ids = sorted({m["id"] for m in data.get("data", [])
+                      if re.match(r"^(gpt|o\d|chatgpt)", m["id"]) and not _OPENAI_SKIP.search(m["id"])}, reverse=True)
+        models = [{"id": i, "label": i} for i in ids]
+        rec = dict(PROVIDER_DEFAULTS["openai"])
+    elif provider == "ollama":
+        base = (base_url or "").rstrip("/")
+        if not base:
+            raise ProviderConfigError("Enter the server URL first.")
+        data = _http_json(base + "/api/tags", {})
+        models = [{"id": m["name"], "label": m["name"]} for m in data.get("models", [])]
+    else:
+        raise ProviderConfigError("Unknown provider.")
+    return {"models": models, "recommended": rec}
 
 
 # ── Provider implementations ───────────────────────────────────────────────────
@@ -134,7 +305,7 @@ def _anthropic_chat(system: str, user_msg: str, model: str, api_key: str, max_to
     return msg.content[0].text.strip()
 
 
-def _gemini_chat(system: str, user_msg: str, model: str, api_key: str, max_tokens: int) -> str:
+def _gemini_chat(system: str, user_msg: str, model: str, api_key: str, max_tokens: int, timeout: int = 120) -> str:
     import google.generativeai as genai
     genai.configure(api_key=api_key)
     full_prompt = f"{system}\n\n{user_msg}" if system else user_msg
@@ -142,8 +313,14 @@ def _gemini_chat(system: str, user_msg: str, model: str, api_key: str, max_token
     response = m.generate_content(
         full_prompt,
         generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens),
+        request_options={"timeout": timeout, "retry": None},
     )
-    return response.text.strip()
+    try:
+        return response.text.strip()
+    except ValueError:
+        raise ValueError(f"{model} returned no text (finish_reason="
+                         f"{response.candidates[0].finish_reason if response.candidates else 'none'}); "
+                         f"likely the token limit was consumed by model reasoning")
 
 
 def _openai_chat(system: str, user_msg: str, model: str, api_key: str, max_tokens: int, base_url: str = "") -> str:
@@ -265,7 +442,7 @@ def chat(
     if provider == "anthropic":
         return _anthropic_chat(system, user_msg, model, api_key, max_tokens)
     elif provider == "gemini":
-        return _gemini_chat(system, user_msg, model, api_key, max_tokens)
+        return _gemini_chat_with_fallback(system, user_msg, tier, config, api_key, max_tokens)
     elif provider == "openai":
         return _openai_chat(system, user_msg, model, api_key, max_tokens,
                             base_url=(getattr(config, "openai_base_url", "") or "").strip())
