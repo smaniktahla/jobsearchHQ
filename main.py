@@ -2121,7 +2121,7 @@ def test_ai_provider(tier: str, user: User = Depends(get_current_user)):
                 user_msg="Reply with exactly one word: OK",
                 tier="strong" if tier == "batch" else tier,
                 config=config,
-                max_tokens=10,
+                max_tokens=1000,   # thinking models spend part of the cap on reasoning
             )
         model = ai_router.get_last_model("strong" if tier == "batch" else tier)
         return {"success": True, "model": model, "reply": reply.strip()[:200]}
@@ -2268,6 +2268,7 @@ class OnboardingAI(BaseModel):
     ollama_url: str = ""
     ollama_model: str = ""
     openai_base_url: str = ""
+    model: str = ""                    # optional pinned model (blank = auto/recommended)
 
 
 class OnboardingPreferences(BaseModel):
@@ -2291,6 +2292,26 @@ def _clean_list(items: list[str]) -> list[str]:
     return out
 
 
+class ModelListRequest(BaseModel):
+    provider: str
+    api_key: str = ""          # key being typed (unsaved); blank = use the saved/env key
+    base_url: str = ""         # openai-compatible base URL or ollama URL
+
+
+@app.post("/api/ai/models")
+def ai_models(data: ModelListRequest, user: User = Depends(get_current_user)):
+    """Models available to this key, for the wizard/Settings pickers."""
+    config = storage.load_config(user.id)
+    base = data.base_url.strip() or (config.ollama_url if data.provider == "ollama" else config.openai_base_url)
+    key = data.api_key.strip()
+    try:
+        if data.provider != "ollama" and not key:
+            key = ai_router._resolve_key(data.provider, config)
+        return ai_router.list_models(data.provider, key, (base or "").strip())
+    except ai_router.ProviderConfigError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.put("/api/onboarding/ai")
 def onboarding_ai(data: OnboardingAI, user: User = Depends(get_current_user)):
     if data.provider not in ("anthropic", "gemini", "openai", "ollama"):
@@ -2305,7 +2326,7 @@ def onboarding_ai(data: OnboardingAI, user: User = Depends(get_current_user)):
         config.ollama_model = data.ollama_model.strip()
     if data.provider == "openai":
         config.openai_base_url = data.openai_base_url.strip()
-    config.fast_model = config.strong_model = ""   # provider defaults
+    config.fast_model = config.strong_model = ("" if data.provider == "ollama" else data.model.strip())  # blank = auto
     storage.save_config(user.id, config)
     return {"ok": True}
 
