@@ -122,6 +122,12 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 .fb-card{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0;background:var(--surface2)}
 .fb-meta{font-size:12px;color:var(--text-dim);margin-bottom:4px}
 .fb-reply{border-left:3px solid var(--accent);padding-left:8px;margin:8px 0;white-space:pre-wrap}
+.fb-shot{margin:12px 0}
+.fb-shot-hint{font-size:13px;color:var(--text-dim);margin:6px 0}
+.fb-shot-canvas{display:block;max-width:100%;height:auto;border:1px solid var(--border);border-radius:6px;cursor:crosshair;touch-action:none;background:#fff}
+.fb-shot-editor[hidden]{display:none}
+.fb-consent{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:8px 0}
+.fb-consent input{width:auto;flex:none;margin:3px 0 0}
 .help-backdrop{display:none}
 @media(min-width:1100px){body.help-open .main{margin-right:380px;min-width:0;overflow-x:auto}}   /* wide tables scroll inside the page instead of hiding under the drawer */
 @media(max-width:1099px){.help-backdrop.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:75}}
@@ -2899,21 +2905,96 @@ async function fbCheck(){
 }
 function fbShow(title,node){document.getElementById('help-title').textContent=title;const b=document.getElementById('help-body');b.replaceChildren(node);b.scrollTop=0}
 function fbBack(){return _fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Back to help',onclick:()=>helpLoad(helpTopicFor())})}
+// ── Screenshot (optional): capture this page, paste an image, or choose a file; cover private parts; then send ──
+// What the user sees in the preview is exactly what is sent: hidden areas are painted black into the pixels.
+const FB_SHOT_MAX_W=1600,FB_SHOT_MAX_BYTES=4500000,FB_SHOT_HARD_BYTES=4900000;
+let _fbCapture=null;
+function fbLoadCapture(){      // vendored (static/vendor), loaded only when someone asks to capture the page
+  if(window.html2canvas)return Promise.resolve();
+  if(_fbCapture)return _fbCapture;
+  _fbCapture=new Promise((res,rej)=>{const s=document.createElement('script');s.src='/static/vendor/html2canvas-pro.min.js?v=2.6.3';s.onload=res;s.onerror=()=>{_fbCapture=null;rej(new Error('load'))};document.head.append(s)});
+  return _fbCapture;
+}
+function _fbToBlob(c,type,q){return new Promise(res=>c.toBlob(res,type,q))}
+function fbShotWidget(){
+  let orig=null;const rects=[];let drag=null;
+  const view=_fbEl('canvas',{className:'fb-shot-canvas'});
+  view.setAttribute('aria-label','Your screenshot. Drag over anything private to cover it.');
+  const msg=_fbEl('div',{className:'fb-err',role:'alert'});
+  const consent=_fbEl('input',{type:'checkbox'});
+  const consentRow=_fbEl('label',{className:'fb-consent'},consent,document.createTextNode('I am happy to include this screenshot. It may show personal information. It is kept so the problem can be fixed, and only the people running JSHQ can see it.'));
+  const undo=_fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Undo last cover'});
+  const remove=_fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Remove screenshot'});
+  const editor=_fbEl('div',{className:'fb-shot-editor',hidden:true},
+    _fbEl('p',{className:'fb-shot-hint',textContent:'Drag over anything private, such as names, email addresses or phone numbers, to cover it with a black box. What you see here is exactly what is sent.'}),
+    view,_fbEl('div',{className:'fb-actions'},undo,remove),consentRow);
+  const file=_fbEl('input',{type:'file',accept:'image/png,image/jpeg',hidden:true});
+  const capBtn=_fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Capture this page'});
+  const chooseBtn=_fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Choose a file'});
+  const node=_fbEl('div',{className:'fb-shot'},_fbEl('div',{className:'help-fb-title',textContent:'Screenshot (optional)'}),
+    _fbEl('p',{className:'fb-shot-hint',textContent:'A picture of this page helps us see what you see. You can also paste an image (Ctrl+V) or choose a file.'}),
+    _fbEl('div',{className:'fb-actions'},capBtn,chooseBtn),file,msg,editor);
+  function redraw(){
+    if(!orig)return;
+    view.width=orig.width;view.height=orig.height;const g=view.getContext('2d');g.drawImage(orig,0,0);
+    g.fillStyle='#000';rects.forEach(r=>g.fillRect(r.x,r.y,r.w,r.h));
+    if(drag){g.save();g.strokeStyle='#e11d48';g.lineWidth=Math.max(2,orig.width/400);g.setLineDash([8,6]);g.strokeRect(Math.min(drag.x0,drag.x1),Math.min(drag.y0,drag.y1),Math.abs(drag.x1-drag.x0),Math.abs(drag.y1-drag.y0));g.restore()}
+  }
+  function setImage(src,w,h){
+    const k=Math.min(1,FB_SHOT_MAX_W/w);orig=document.createElement('canvas');orig.width=Math.max(1,Math.round(w*k));orig.height=Math.max(1,Math.round(h*k));
+    orig.getContext('2d').drawImage(src,0,0,orig.width,orig.height);rects.length=0;drag=null;consent.checked=false;msg.textContent='';editor.hidden=false;redraw();
+  }
+  function pt(e){const r=view.getBoundingClientRect();return[(e.clientX-r.left)*view.width/r.width,(e.clientY-r.top)*view.height/r.height]}
+  view.onpointerdown=e=>{e.preventDefault();view.setPointerCapture(e.pointerId);const[x,y]=pt(e);drag={x0:x,y0:y,x1:x,y1:y};redraw()};
+  view.onpointermove=e=>{if(!drag)return;[drag.x1,drag.y1]=pt(e);redraw()};
+  view.onpointerup=e=>{if(!drag)return;const d=drag;drag=null;const w=Math.abs(d.x1-d.x0),h=Math.abs(d.y1-d.y0);if(w>4&&h>4)rects.push({x:Math.min(d.x0,d.x1),y:Math.min(d.y0,d.y1),w,h});redraw()};
+  view.onpointercancel=()=>{drag=null;redraw()};
+  undo.onclick=()=>{rects.pop();redraw()};
+  remove.onclick=()=>{orig=null;rects.length=0;consent.checked=false;editor.hidden=true;msg.textContent='';file.value=''};
+  async function fromBlob(b){
+    msg.textContent='';
+    if(!b||!/^image\/(png|jpeg)$/.test(b.type)||b.size>20*1024*1024){msg.textContent="That doesn't look like a PNG or JPEG image (20 MB at most).";return}
+    try{const bm=await createImageBitmap(b);setImage(bm,bm.width,bm.height);if(bm.close)bm.close()}catch(e){msg.textContent="We couldn't read that image. Please try another one."}
+  }
+  chooseBtn.onclick=()=>file.click();file.onchange=()=>fromBlob(file.files[0]);
+  capBtn.onclick=async()=>{
+    msg.textContent='';capBtn.disabled=true;capBtn.textContent='Capturing…';
+    try{
+      await fbLoadCapture();
+      const c=await window.html2canvas(document.body,{ignoreElements:el=>el.id==='help-drawer'||el.id==='help-backdrop',logging:false,scale:1,
+        backgroundColor:getComputedStyle(document.body).backgroundColor,x:window.scrollX,y:window.scrollY,width:innerWidth,height:innerHeight,windowWidth:innerWidth,windowHeight:innerHeight});
+      setImage(c,c.width,c.height);
+    }catch(e){msg.textContent="We couldn't capture the page. You can paste an image or choose a file instead."}
+    capBtn.disabled=false;capBtn.textContent='Capture this page';
+  };
+  function onPaste(e){const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));if(!it)return;e.preventDefault();fromBlob(it.getAsFile())}
+  function compose(scale){const k=scale||1,c=document.createElement('canvas');c.width=Math.round(orig.width*k);c.height=Math.round(orig.height*k);const g=c.getContext('2d');
+    g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.scale(k,k);g.drawImage(orig,0,0);g.fillStyle='#000';rects.forEach(r=>g.fillRect(r.x,r.y,r.w,r.h));return c}
+  async function blob(){      // PNG, or JPEG / smaller if the PNG is too big to send
+    let b=await _fbToBlob(compose(1),'image/png');if(b.size<=FB_SHOT_MAX_BYTES)return{blob:b,name:'screenshot.png'};
+    b=await _fbToBlob(compose(1),'image/jpeg',0.85);if(b.size<=FB_SHOT_HARD_BYTES)return{blob:b,name:'screenshot.jpg'};
+    return{blob:await _fbToBlob(compose(0.7),'image/jpeg',0.8),name:'screenshot.jpg'};
+  }
+  return{node,has:()=>!!orig,consented:()=>consent.checked,blob,onPaste};
+}
 function fbOpen(type){
   const t=FB_TYPES[type];_helpTopic='feedback:'+type;_fbFrom=helpTopicFor();
   const ta=_fbEl('textarea',{rows:8,maxLength:5000,placeholder:t.ph,value:_fbDraft[type]||'',className:'fb-text'});
   ta.setAttribute('aria-label',t.label);ta.oninput=()=>{_fbDraft[type]=ta.value};
   const err=_fbEl('div',{className:'fb-err',role:'alert'});
+  const shot=fbShotWidget();
   const send=_fbEl('button',{type:'submit',className:'btn btn-primary btn-sm',textContent:'Send'});
   const sent=_fbEl('details',{className:'fb-sent'},_fbEl('summary',{textContent:'What gets sent?'}),
-    _fbEl('p',{textContent:'Your message, the name of the page you were on ('+(HELP_TOPICS[_fbFrom]||'this page')+'), your browser and screen size, and a short list of recent error messages if there were any. Never your password or your resume.'}));
-  const f=_fbEl('form',{className:'fb-form',noValidate:true},_fbEl('p',{className:'help-lead',textContent:t.label}),ta,sent,err,
+    _fbEl('p',{textContent:'Your message, the name of the page you were on ('+(HELP_TOPICS[_fbFrom]||'this page')+'), your browser and screen size, and a short list of recent error messages if there were any. Never your password or your resume. A screenshot is only included if you add one, and you can cover private parts of it first.'}));
+  const f=_fbEl('form',{className:'fb-form',noValidate:true},_fbEl('p',{className:'help-lead',textContent:t.label}),ta,shot.node,sent,err,
     _fbEl('div',{className:'fb-actions'},send,_fbEl('button',{type:'button',className:'btn btn-ghost btn-sm',textContent:'Back',onclick:()=>helpLoad(helpTopicFor())})));
   f.onsubmit=async ev=>{
     ev.preventDefault();const text=ta.value.trim();err.textContent='';
     if(!text){err.textContent='Please tell us a little about it first.';ta.focus();return}
+    if(shot.has()&&!shot.consented()){err.textContent='Please tick the box to include the screenshot, or remove it.';return}
     send.disabled=true;send.textContent='Sending…';
     const fd=new FormData();fd.append('type',type);fd.append('message',text);fd.append('context',JSON.stringify(fbContext()));
+    if(shot.has()){const s=await shot.blob();fd.append('consent','true');fd.append('screenshot',s.blob,s.name)}
     try{
       const r=await fetch('/api/feedback',{method:'POST',body:fd});
       if(r.status===401){location.href='/auth/login';return}
@@ -2922,6 +3003,7 @@ function fbOpen(type){
       delete _fbDraft[type];fbThanks(j.id);
     }catch(e){err.textContent=FB_DOWN;send.disabled=false;send.textContent='Send'}
   };
+  f.addEventListener('paste',shot.onPaste);
   fbShow(t.title,f);ta.focus();
 }
 function fbThanks(id){
