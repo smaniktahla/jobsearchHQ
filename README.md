@@ -14,7 +14,7 @@ Job Search HQ (JSHQ) is a self-hosted workspace for finding jobs, evaluating fit
 - **Score and prioritize.** Score jobs against your work history, role scope, compensation targets, and interest. Review the score breakdown on the job page or batch score the tracker.
 - **Research companies and manage contacts.** Find relevant contacts from a job page. The optional Network directory lets you preview a LinkedIn connections CSV import, search contacts, add notes, resolve possible duplicates, and export or delete imported data. The directory is off by default.
 - **Prepare application documents.** Generate a tailored résumé and up to three cover-letter variants as Word files. Choose among uploaded résumé variants, apply your own Word template, and use optional writing samples to guide tone and style.
-- **Track applications and follow-ups.** Filter the tracker by lane, posting status, application status, or document readiness. Check whether a job is still open, archive closed postings, and manage reminders when an application is marked applied. Optional Gmail integration sends application emails and processes supported confirmation and rejection messages.
+- **Track applications and follow-ups.** Filter the tracker by résumé lane, posting status, application status, or document readiness. Check whether a job is still open, archive closed postings, and manage reminders when an application is marked applied. Optional Gmail integration sends application emails and processes supported confirmation and rejection messages.
 - **Automate repeat work.** Schedule board and company-site searches, score new jobs, and configure thresholds for document generation, research, and approval. The tracker shows which documents are available and which jobs are ready to apply.
 - **Set up your account.** The first-login wizard covers profile, résumé, AI provider, and job preferences. Reopen it from **Settings → Account**. In **Settings → Profile**, you can record language proficiency and choose Light, Dark, or Match device.
 
@@ -39,7 +39,7 @@ Screenshots use fictional jobs and contacts from the demo tenant.
 
 <p align="center">
   <img src="docs/screenshot_tracker.png" alt="Tracker" width="800"><br>
-  <em>Tracker — filter by lane, posting status, and document readiness, and see application follow-ups</em>
+  <em>Tracker — filter by résumé lane, posting status, and document readiness, and see application follow-ups</em>
 </p>
 
 ## Quick start
@@ -83,7 +83,7 @@ JSHQ prepares the application package and exposes its ready-to-apply queue. JobP
 | Pay Alignment | 0–2 | Comp range vs your targets |
 | Gut Interest | 0–1 | Your manual assessment |
 
-The scorer recommends a market lane based on the job type and fit. Market lanes include W2 Sniper, Contract, Contract-to-hire, and Ignore. The résumé variant is a separate recommendation that you can override on the job detail page.
+The scorer also picks a résumé lane (director, base, or contract) for each job: which of your uploaded résumés fits the role best. You can override it on the job detail page and filter the tracker by résumé lane.
 
 ## Company research
 
