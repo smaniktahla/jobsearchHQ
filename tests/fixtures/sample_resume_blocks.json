@@ -1,0 +1,72 @@
+[
+ [
+  "name",
+  "JANE SAMPLE"
+ ],
+ [
+  "contact",
+  "jane@example.com · (555) 555-0100 · Washington, DC · linkedin.com/in/janesample"
+ ],
+ [
+  "section",
+  "SUMMARY"
+ ],
+ [
+  "body",
+  "Data and analytics leader with 12 years of experience building BI teams."
+ ],
+ [
+  "section",
+  "PROFESSIONAL EXPERIENCE"
+ ],
+ [
+  "job",
+  "Director of Analytics",
+  "Example Corp",
+  "Jan 2020 – Present"
+ ],
+ [
+  "bullet",
+  "Led a 15-person analytics organization supporting $2B in annual revenue."
+ ],
+ [
+  "sub",
+  "Cut reporting turnaround from 5 days to 1 day."
+ ],
+ [
+  "bullet",
+  "Built the enterprise data platform on Snowflake and dbt."
+ ],
+ [
+  "job",
+  "Senior Manager, Business Intelligence",
+  "Sample Industries",
+  "Mar 2015 – Dec 2019"
+ ],
+ [
+  "bullet",
+  "Delivered self-service dashboards adopted by 400+ users."
+ ],
+ [
+  "section",
+  "TECHNICAL SKILLS"
+ ],
+ [
+  "skill",
+  "Languages",
+  "SQL; Python; R"
+ ],
+ [
+  "skill",
+  "Platforms",
+  "Snowflake; Tableau; Power BI"
+ ],
+ [
+  "section",
+  "EDUCATION"
+ ],
+ [
+  "body",
+  "M.S., Information Systems · Example University · 2012"
+ ]
+]

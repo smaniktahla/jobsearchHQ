@@ -1,0 +1,70 @@
+Jordan Example, CISSP, PMP
+
+Founder and Managing Director of Example Advisory LLC, Jordan Example is a seasoned security leader and trusted advisor with over 20 years of experience bringing teams together to solve complex technical and strategic challenges. Jordan serves as an executive advisor to C-suite leaders and senior stakeholders, articulating complex cyber security concepts into actionable business strategies that drive enterprise risk reduction, regulatory compliance, and security transformation.
+
+Some of Jordan's notable engagements include:
+
+- Served as a trusted C-suite advisor to the Office of the CIO of a Fortune 500 retail enterprise, providing strategic guidance on data segregation and delivering workshops that aligned business functions with technical security requirements.
+- Led the vendor evaluation, technical analysis, and selection process for an enterprise GRC solution for a Fortune 200 financial institution, managing demonstrations, RFP evaluation frameworks, and cross-functional alignment.
+- Served as security advisor and subject matter expert leading a global crown jewels risk assessment for an international financial organization, engaging over 100 executive and functional stakeholders.
+- Led an integrated privacy and security risk assessment for one of the largest clinical diagnostic laboratories in the United States, delivering findings that resulted in C-level realignments across executive leadership.
+- Developed a comprehensive compliance framework for a multi-billion dollar aerospace and defense contractor within two months of project kick-off, protecting contracts valued at hundreds of millions of dollars.
+
+Relevant Consulting and Advisory Engagements
+
+Project 1: Crown Jewels Assessment
+Client: International Financial Organization
+Role: Security Advisor and SME
+Duration: 12 Months
+Description: Assessed the organization's most critical data assets and core business processes across dozens of functional departments. Interviewed over 100 stakeholders to identify, validate, and document crown jewel data, and developed over 90 process maps for critical business processes.
+Outcome: Delivered comprehensive work products and detailed deliverables for each functional department, providing executive leadership with a clear understanding of enterprise crown jewels and establishing a roadmap to strengthen overall security posture.
+
+Project 2: Control Framework Assessments
+Client: Multiple multi-national organizations in the electronics and human resources industries
+Role: Security Advisor and SME
+Duration: 10 Months
+Description: Conducted comprehensive technical risk and control gap assessments based on a widely used critical controls framework. Served as technical subject matter expert, interviewing dozens of cross-departmental stakeholders and evaluating security policies, operational procedures, and architecture.
+Outcome: Enabled the effective adoption and implementation of the framework across client environments, measurably reducing enterprise cyber risk to personally identifiable information and sensitive corporate data.
+
+Project 3: Compliance Assessment and Framework Development
+Client: Multi-Billion Dollar Aerospace and Defense Contractor
+Role: Security Advisor/SME
+
+Description: Led technical assessment for in-scope enterprise systems to achieve regulatory compliance. Facilitated controlled information definition workshops to establish system boundaries, engaging over 50 technical and business stakeholders across the enterprise.
+Duration: 15 Months
+Outcome: Developed a reusable compliance framework complete with technical tools and execution accelerators that reduced assessment time for subsequent engagements.
+
+Project 4: Program Management Office for a Regulatory Compliance Outsourcing Initiative
+Role: Program Manager
+Duration: 9 Months
+Description: Directed the design, development, and launch of a new firm-wide regulatory compliance solution targeted at highly regulated clients in the life sciences, healthcare, and financial services sectors.
+Key Accomplishments:
+- Managed daily PMO operations leading cross-functional teams in the United States and India.
+- Directed key components of the market offering, including talent recruitment, sales strategy alignment, and service delivery architecture.
+- Authored high-impact marketing and pre-sales collateral, including solution sheets and executive presentation decks.
+Outcome: Successfully launched a new firm-wide compliance and security outsourcing service offering that expanded market presence within target regulated enterprise sectors.
+
+PROFESSIONAL EXPERIENCE
+
+Principal Consultant
+Example Advisory LLC
+Jan 2015 – Present
+Washington, DC
+- Provide independent security advisory services to federal civilian agencies, military organizations, and Fortune 500 companies.
+- Lead assessments, build programs, and advise executives on risk, governance, and compliance.
+
+Security Manager
+Contoso Systems Corp.
+Mar 2008 – Dec 2014
+- Directed a 9-person team delivering information assurance and security engineering.
+- Built an information assurance service capability from inception.
+
+EDUCATION
+
+M.S., Information Systems Management, Example State University
+B.A., Economics, Sample College
+
+CERTIFICATIONS
+
+Certified Information Systems Security Professional (CISSP)
+Project Management Professional (PMP)

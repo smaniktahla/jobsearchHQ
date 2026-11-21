@@ -468,7 +468,14 @@ REQUIRED STRUCTURE AND OUTPUT FORMAT
 6. If the job description asks for something the candidate has done but the base resume does not mention, pull it from the full background.
 7. Address keyword gaps honestly: if the candidate has adjacent experience, surface it; if they genuinely lack something, do not claim it.
 
-Output only the complete tailored resume as clean text with clear section headers. No markdown formatting and no commentary."""
+Output only the complete tailored resume as clean text with clear section headers. No markdown formatting and no commentary.
+
+Layout contract (the text is turned into a Word file by a parser that reads these shapes, so follow them exactly):
+- Line 1 is the candidate's name. Section headings are ALL CAPS on their own line (for example PROFESSIONAL EXPERIENCE).
+- Each job is three lines then bullets: job title, employer, dates ("Jan 2015 - Present"), then an optional location line, then bullets starting with "- ".
+- Skill and competency lines are "Category: items" on one line.
+- Project or engagement entries start with "Project N: Name" and are followed by one "Label: value" line each (Client, Role, Duration, Description, Outcome), always in that order and never with blank lines between them; any bullets go under a "Key Accomplishments:" line.
+- Put a blank line between entries and sections. Every bullet starts with "- ". Never use tables, columns or markdown."""
 
 
 def generate_tailored_resume(job: Job, user_id: str = None) -> str:
