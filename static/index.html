@@ -88,8 +88,9 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
 .toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
 
 /* ── Contextual help drawer ───────────────────────────────────────── */
-.nav-item-help{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text-dim);cursor:pointer;font-size:14px;transition:all .15s;border:0;background:none;width:100%;text-align:left;font-family:inherit}
-.nav-item-help:hover,.nav-item-help.active{color:var(--text);background:var(--surface2)}
+/* Help stands out a little: the app's accent blue with a soft tint (not a loud colour) */
+.nav-item-help{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--accent);cursor:pointer;font-size:14px;font-weight:600;transition:all .15s;border:0;background:rgba(79,143,247,.10);background:color-mix(in srgb,var(--accent) 10%,transparent);width:100%;text-align:left;font-family:inherit}
+.nav-item-help:hover,.nav-item-help.active{color:var(--accent);background:rgba(79,143,247,.20);background:color-mix(in srgb,var(--accent) 20%,transparent)}
 .nav-item-help svg{width:18px;height:18px;flex-shrink:0}
 .help-drawer{position:fixed;top:0;right:0;bottom:0;width:380px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.18);transform:translateX(100%);visibility:hidden;transition:transform .2s ease,visibility 0s linear .2s;z-index:80;display:flex;flex-direction:column;outline:none}
 .help-drawer.open{transform:none;visibility:visible;transition:transform .2s ease}
