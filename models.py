@@ -125,6 +125,10 @@ class Contact(BaseModel):
     linkedin_url: str = ""
     notes: str = ""
     confidence: str = "medium"  # high | medium | low
+    # Where this person came from: "web" (company research) and/or a people search source (see people_search.py).
+    sources: list[str] = []
+    provider_ids: dict[str, str] = {}   # source -> that source's person id (Apollo Reveal needs it)
+    masked: bool = False                # name partly hidden until revealed (Apollo search results)
 
 
 class CompanyResearch(BaseModel):
@@ -515,6 +519,20 @@ class AppConfig(BaseModel):
     auto_research_enabled: bool = False
     auto_research_threshold: int = 9
     auto_research_daily_cap: int = 25
+    # --- People search (Settings → People Search; see people_search.py) ---
+    # Ordered sources this account searches during company research: "pdl", "hunter", "apollo".
+    # Each needs this account's own key; there is no shared server key. Empty = off.
+    people_search_providers: list[str] = []
+    people_search_mode: str = "first"          # "first": stop at the first source that finds people; "all"
+    people_search_max_results: int = 8
+    people_search_in_auto_research: bool = False   # automatic research spends credits only when this is on
+    people_search_cache_days: int = 30
+    # Who to look for. People search always starts from each job's own title; these add to it per account.
+    people_search_titles: list[str] = []        # extra titles to look for at every company, e.g. "hiring manager"
+    people_search_include_recruiters: bool = True
+    pdl_api_key: str = ""
+    hunter_api_key: str = ""
+    apollo_api_key: str = ""
     # --- AI Provider ---
     # fast_provider: scoring, metadata, research (cheap/free tasks)
     # strong_provider: resumes, cover letters, LinkedIn messages (quality tasks)

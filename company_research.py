@@ -7,6 +7,7 @@ Flow:
 3. Direct site scrape → bonus enrichment if accessible (plain HTML sites only)
 4. Google email search → per-contact Claude web search for actual email address (parallel)
 5. Build LinkedIn search URLs + Google email search URLs for each contact
+6. People search (per-account sources: People Data Labs, Hunter, Apollo; see people_search.py)
 """
 
 import json
@@ -17,6 +18,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import ai_router
+import people_search
 import requests
 from bs4 import BeautifulSoup
 
@@ -94,7 +96,23 @@ def _clean_domain(text: str) -> str | None:
 
 # ── Step 2: Web search for contacts (primary) ─────────────────────────────────
 
-def _search_contacts(company: str, job_title: str, domain: str | None) -> dict:
+def _who_to_find(job_title: str, config=None) -> str:
+    """Who matters for this job, in words, from the job's own title and the account's People Search settings.
+    No kind of job is assumed: every account searches for different roles."""
+    tg = people_search.targets_for(config, job_title)
+    parts = ["the CEO/President"]
+    if tg.function:
+        parts.append(f"leaders of the {tg.function} team or department this role would join (likely hiring managers)")
+    else:
+        parts.append("leaders of the team or department this role would join (likely hiring managers)")
+    if tg.extra:
+        parts.append("anyone titled " + ", ".join(f'"{x}"' for x in tg.extra))
+    if tg.recruiters:
+        parts.append("HR, people and talent acquisition leaders")
+    return ", ".join(parts)
+
+
+def _search_contacts(company: str, job_title: str, domain: str | None, who: str = "") -> dict:
     """
     Use Claude web search to find leadership contacts.
     This is the PRIMARY contact discovery method — works regardless of site tech.
@@ -104,14 +122,12 @@ def _search_contacts(company: str, job_title: str, domain: str | None) -> dict:
 
     prompt = (
         f'Search for the leadership team and key executives at "{company}"{domain_hint}. '
-        f'Find names and titles of people relevant to hiring a {job_title or "Director of Data Analytics"}: '
-        f'CEO/President, Chief Data Officer, VP Analytics, VP Data, Head of Data, '
-        f'Chief People Officer, VP HR, Head of Talent Acquisition, CHRO, '
-        f'and any data/analytics/BI leadership. '
+        f'Find names and titles of people relevant to hiring for the role "{job_title or "this role"}": '
+        f'{who or _who_to_find(job_title)}. '
         f'Return ONLY valid JSON with no markdown: '
         f'{{"company_summary": "2-3 sentences about the company", '
         f'"contacts": [{{"name": "Full Name", "title": "Exact Title", '
-        f'"notes": "1 sentence why relevant to data analytics director candidate", '
+        f'"notes": "1 sentence why relevant to a candidate for this role", '
         f'"confidence": "high|medium|low"}}]}}'
     )
 
@@ -194,12 +210,13 @@ def _local_find_domain(company: str) -> str | None:
     return None
 
 
-def _local_search_contacts(company: str, job_title: str, domain: str | None) -> dict:
+def _local_search_contacts(company: str, job_title: str, domain: str | None, who: str = "") -> dict:
     """SearXNG + local LLM leadership extraction. Only names present in the gathered text are kept."""
     queries = [f"{company} leadership team", f"{company} CEO chief executive officer"]
     if domain:
         queries.append(f"{company} {domain} executive team")
-    queries.append(f"{company} chief data officer chief people officer head of talent")
+    fn = people_search.job_function(job_title)
+    queries.append(f"{company} {('head of ' + fn) if fn else 'department heads'} chief people officer head of talent")
     blocks, seen = [], set()
     for q in queries:
         try:
@@ -243,8 +260,8 @@ def _local_search_contacts(company: str, job_title: str, domain: str | None) -> 
         "You extract people from search results. Use ONLY names and titles that appear in the text provided. "
         "Never invent or guess a person. Reply with JSON only.",
         f'Company: "{company}"{" (" + domain + ")" if domain else ""}\n\n{context}\n\n'
-        f'List current leadership and key people at this company who matter to a {job_title or "Director of Data Analytics"} '
-        f'candidate (CEO/President, data/analytics leaders, HR/talent leaders). Max 6, most relevant first. Reply as '
+        f'List current leadership and key people at this company who matter to a candidate for the role '
+        f'"{job_title or "this role"}" ({who or _who_to_find(job_title)}). Max 6, most relevant first. Reply as '
         f'{{"company_summary": "1-2 sentences, only facts in the text", "contacts": [{{"name": "Full Name", '
         f'"title": "Title as written", "notes": "why relevant, 1 sentence", "confidence": "high|medium|low"}}]}}',
         max_tokens=1500,
@@ -391,11 +408,19 @@ def _enrich_contacts_with_emails(contacts: list[dict], company: str) -> list[dic
 
 # ── Main entry point ───────────────────────────────────────────────────────────
 
-def research_company(company: str, job_title: str = "", user_id: str = "") -> dict:
+def research_company(company: str, job_title: str = "", user_id: str = "",
+                     people_search_enabled: bool = True, config=None) -> dict:
     """
     Research a company to find key contacts.
     Primary: Claude web search. Bonus: direct site scrape + Google email search.
+    Then the account's people search sources, when it has any and people_search_enabled is True.
+    If web search fails completely but people search is set up, the people search result is still returned.
     """
+    if config is None and user_id:
+        import storage
+        config = storage.load_config(user_id)
+    use_people = bool(people_search_enabled and config is not None and people_search.configured_providers(config))
+    who = _who_to_find(job_title, config)
     logger.info(f"=== Researching: {company} ===")
     result = {
         "company_name": company,
@@ -432,20 +457,33 @@ def research_company(company: str, job_title: str = "", user_id: str = "") -> di
         fallback_used = True
         return value
 
-    # Step 1: Find domain
-    domain = _with_fallback("domain", lambda: _find_domain(company), lambda: _local_find_domain(company))
-    tag = " [SearXNG+local LLM]" if fallback_used else ""
-    result["searches_run"].append(
-        f"Domain search{tag}: {'found ' + domain if domain else 'not found'}"
-    )
-    logger.info(f"Domain: {domain}")
+    domain = None
+    try:
+        # Step 1: Find domain
+        domain = _with_fallback("domain", lambda: _find_domain(company), lambda: _local_find_domain(company))
+        tag = " [SearXNG+local LLM]" if fallback_used else ""
+        result["searches_run"].append(
+            f"Domain search{tag}: {'found ' + domain if domain else 'not found'}"
+        )
+        logger.info(f"Domain: {domain}")
 
-    # Step 2: Web search for contacts (primary — always runs)
-    extracted = _with_fallback(
-        "contacts",
-        lambda: _search_contacts(company, job_title, domain),
-        lambda: _local_search_contacts(company, job_title, domain),
-    )
+        # Step 2: Web search for contacts (primary — always runs)
+        extracted = _with_fallback(
+            "contacts",
+            lambda: _search_contacts(company, job_title, domain, who),
+            lambda: _local_search_contacts(company, job_title, domain, who),
+        )
+    except ResearchError as e:
+        if not use_people:
+            raise
+        # Web search is down, but the account has people search: return that rather than nothing.
+        result["searches_run"].append(f"Web research failed ({e}); people search only")
+        found, notes = people_search.search_people(config, company, domain, job_title, user_id=user_id)
+        if not found and any("failed" in n for n in notes):
+            raise ResearchError(f"{e}; people search also failed: {'; '.join(notes)}") from e
+        result["searches_run"].extend(notes)
+        result["contacts"] = found
+        return result
     result["company_summary"] = extracted.get("company_summary", "")
     raw_contacts = extracted.get("contacts", [])
     result["searches_run"].append(
@@ -496,6 +534,15 @@ def research_company(company: str, job_title: str = "", user_id: str = "") -> di
             f"Google email search: {found_emails}/{len(contacts)} emails found"
         )
         logger.info(f"Email search: {found_emails}/{len(contacts)} found")
+
+    for c in contacts:
+        c["sources"] = ["web"]
+
+    # Step 6: People search (this account's own sources and keys)
+    if use_people:
+        found, notes = people_search.search_people(config, company, domain, job_title, user_id=user_id)
+        result["searches_run"].extend(notes)
+        contacts = people_search.merge_contacts(contacts, found)
 
     result["contacts"] = contacts
     logger.info(

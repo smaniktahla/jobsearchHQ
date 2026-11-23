@@ -81,7 +81,12 @@ def cancel(user_id: str) -> bool:
 
 def research_job(user_id: str, job) -> int:
     """Research one job's company and save the result. Raises on a backend failure (nothing is saved)."""
-    result = company_research.research_company(company=job.company, job_title=job.title, user_id=user_id)
+    config = storage.load_config(user_id)
+    # Automatic research spends people-search credits only when the account opted in.
+    result = company_research.research_company(
+        company=job.company, job_title=job.title, user_id=user_id,
+        people_search_enabled=config.people_search_in_auto_research, config=config,
+    )
     job.research = CompanyResearch(
         contacts=[Contact(**c) for c in result.get("contacts", [])],
         company_summary=result.get("company_summary", ""),
