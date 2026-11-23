@@ -459,6 +459,7 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
       <a href="#settings/resumes" data-sx="resumes" onclick="showSettingsPage('resumes');return false">Resumes</a>
       <a href="#settings/automation" data-sx="automation" onclick="showSettingsPage('automation');return false">Job Search &amp; Automation</a>
       <a href="#settings/ai" data-sx="ai" onclick="showSettingsPage('ai');return false">AI</a>
+      <a href="#settings/people" data-sx="people" onclick="showSettingsPage('people');return false">People Search</a>
       <a href="#settings/email" data-sx="email" onclick="showSettingsPage('email');return false">Email &amp; Follow-Up</a>
       <a href="#settings/account" data-sx="account" onclick="showSettingsPage('account');return false">Account</a>
       <a href="#settings/admin" data-sx="admin" id="sx-nav-admin" style="display:none" onclick="showSettingsPage('admin');return false">Admin</a>
@@ -867,6 +868,87 @@ input,textarea,select{background:var(--surface2);border:1px solid var(--border);
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-top:8px">💡 Recommended: Fast=Gemini (free scoring) or Local Ollama/Hermes (zero cost), Strong=Anthropic (quality resumes). Web search for company research always uses Anthropic.</div>
   </div>
+  <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
+  </section>
+  <section class="sx-page" id="sx-people" style="display:none">
+    <div class="sx-head"><h2>People Search</h2><p>Extra sources Research Company uses to find hiring managers and recruiters. Keys and credits belong to this account only.</p></div>
+    <style>
+      .ps-row{border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:10px}
+      .ps-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+      .src-badge{font-size:10px;padding:1px 6px;border-radius:8px;border:1px solid var(--border);color:var(--text-dim);margin-left:6px;text-transform:none;white-space:nowrap}
+    </style>
+    <div class="card mb-16">
+      <div class="card-header">Sources</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">Tick the sources to use and paste your own key for each. Lower order numbers are searched first. Test Key checks a key without using credits (it saves first).</div>
+      <div class="ps-row" data-ps="pdl">
+        <div class="ps-head">
+          <label style="display:inline-flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="cfg-ps-use-pdl" style="width:auto"> <strong>People Data Labs</strong></label>
+          <label style="margin:0;font-size:12px;color:var(--text-dim)">Order <input type="number" id="cfg-ps-order-pdl" min="1" max="3" style="width:56px"></label>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin:4px 0 6px">Finds people at the company by job title. Free plan: 100 people a month; each person returned uses one.</div>
+        <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
+          <input type="password" id="cfg-pdl-key" placeholder="PDL key from dashboard.peopledatalabs.com" style="flex:1;min-width:220px" autocomplete="off">
+          <button class="btn btn-ghost btn-sm" onclick="testPeopleSearch('pdl')">Test Key</button>
+        </div>
+        <div id="test-ps-pdl-status" class="text-sm" style="margin-top:4px"></div>
+      </div>
+      <div class="ps-row" data-ps="hunter">
+        <div class="ps-head">
+          <label style="display:inline-flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="cfg-ps-use-hunter" style="width:auto"> <strong>Hunter</strong></label>
+          <label style="margin:0;font-size:12px;color:var(--text-dim)">Order <input type="number" id="cfg-ps-order-hunter" min="1" max="3" style="width:56px"></label>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin:4px 0 6px">Finds work emails at the company, with names and titles. Free plan: 50 credits a month.</div>
+        <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
+          <input type="password" id="cfg-hunter-key" placeholder="Hunter key from hunter.io/api-keys" style="flex:1;min-width:220px" autocomplete="off">
+          <button class="btn btn-ghost btn-sm" onclick="testPeopleSearch('hunter')">Test Key</button>
+        </div>
+        <div id="test-ps-hunter-status" class="text-sm" style="margin-top:4px"></div>
+      </div>
+      <div class="ps-row" data-ps="apollo">
+        <div class="ps-head">
+          <label style="display:inline-flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="cfg-ps-use-apollo" style="width:auto"> <strong>Apollo</strong></label>
+          <label style="margin:0;font-size:12px;color:var(--text-dim)">Order <input type="number" id="cfg-ps-order-apollo" min="1" max="3" style="width:56px"></label>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin:4px 0 6px">Finds people by job title; names stay partly hidden until you click Reveal (one Apollo credit). Paid Apollo plans only.</div>
+        <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
+          <input type="password" id="cfg-apollo-key" placeholder="Apollo master key from Settings &rarr; Integrations &rarr; API" style="flex:1;min-width:220px" autocomplete="off">
+          <button class="btn btn-ghost btn-sm" onclick="testPeopleSearch('apollo')">Test Key</button>
+        </div>
+        <div id="test-ps-apollo-status" class="text-sm" style="margin-top:4px"></div>
+      </div>
+    </div>
+    <div class="card mb-16">
+      <div class="card-header">Who to look for</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">Each search starts from the job's own title: for a &ldquo;Director of Nursing&rdquo; job it looks for nursing leaders, for a &ldquo;Senior Software Engineer&rdquo; job it looks for engineering leaders. Add titles here that matter for every job you research.</div>
+      <div class="form-group" style="max-width:520px">
+        <label>Also look for these titles (one per line)</label>
+        <textarea id="cfg-ps-titles" rows="3" placeholder="e.g. hiring manager&#10;chief operating officer&#10;program director"></textarea>
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="cfg-ps-recruiters" style="width:auto"> Include recruiters and talent acquisition
+      </label>
+    </div>
+    <div class="card mb-16">
+      <div class="card-header">Credits</div>
+      <div class="form-group" style="max-width:520px">
+        <label>When more than one source is ticked</label>
+        <select id="cfg-ps-mode">
+          <option value="first">Stop at the first source that finds people (uses fewer credits)</option>
+          <option value="all">Search every ticked source and combine the results</option>
+        </select>
+      </div>
+      <div class="form-group" style="max-width:520px">
+        <label>Most people to add per company <input type="number" id="cfg-ps-max" min="1" max="25" style="width:70px"></label>
+      </div>
+      <div class="form-group" style="max-width:520px">
+        <label>Reuse a company's results for <input type="number" id="cfg-ps-cache-days" min="0" max="365" style="width:70px"> days</label>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Researching another job at the same company within this time uses no credits. 0 searches every time.</div>
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="cfg-ps-auto" style="width:auto"> Also use people search in automatic and bulk company research
+      </label>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;margin-left:28px">Off: only the Research Company button on a job uses these sources, so credits are spent when you ask.</div>
+    </div>
   <div class="sx-savebar"><button class="btn btn-primary" onclick="saveConfig()">Save Settings</button></div>
   </section>
   <section class="sx-page" id="sx-email" style="display:none">
@@ -1589,12 +1671,15 @@ function renderResearch(research){
     }
     return;
   }
+  const psNotes=(research.searches_run||[]).filter(n=>n.startsWith('People search'));
+  if(psNotes.length)el.innerHTML+='<div class="text-sm mb-8" style="color:var(--text-dim)">'+psNotes.map(n=>esc(n)).join(' · ')+'</div>';
   research.contacts.forEach((c,idx)=>{
     const confidenceColor=c.confidence==='high'?'var(--green)':c.confidence==='medium'?'var(--yellow)':'var(--text-dim)';
     let html=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">`;
-    html+=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><strong style="font-size:13px">${esc(c.name)}</strong><br><span class="text-sm" style="color:var(--text-dim)">${esc(c.title)}</span></div><span style="font-size:10px;color:${confidenceColor};text-transform:uppercase;flex-shrink:0;margin-left:8px">${esc(c.confidence)}</span></div>`;
+    html+=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><strong style="font-size:13px">${esc(c.name)}</strong>${(c.sources||[]).map(s=>`<span class="src-badge">${esc(SOURCE_LABELS[s]||s)}</span>`).join('')}<br><span class="text-sm" style="color:var(--text-dim)">${esc(c.title)}</span></div><span style="font-size:10px;color:${confidenceColor};text-transform:uppercase;flex-shrink:0;margin-left:8px">${esc(c.confidence)}</span></div>`;
     if(c.notes)html+=`<div class="text-sm mt-4" style="color:var(--text-dim)">${esc(c.notes)}</div>`;
     html+=`<div class="flex gap-8 mt-8" style="flex-wrap:wrap">`;
+    if(c.masked&&c.provider_ids?.apollo)html+=`<button class="btn btn-ghost btn-sm" id="reveal-btn-${idx}" onclick="revealContact(${idx})" title="Uses one Apollo credit">Reveal (1 Apollo credit)</button>`;
     if(c.email)html+=`<a href="mailto:${esc(c.email)}" class="btn btn-ghost btn-sm">✉ ${esc(c.email)}</a>`;
     if(c.linkedin_url){const liUrl=c.linkedin_url.startsWith('http')?c.linkedin_url:'https://'+c.linkedin_url;html+=`<a href="${esc(liUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">in LinkedIn</a>`;}
     const searchUrl=c.linkedin_search_url||`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(c.name)}`;
@@ -1605,6 +1690,14 @@ function renderResearch(research){
     html+=`</div></div>`;
     el.innerHTML+=html;
   });
+}
+const SOURCE_LABELS={web:'Web',pdl:'People Data Labs',hunter:'Hunter',apollo:'Apollo'};
+async function revealContact(idx){
+  const btn=document.getElementById('reveal-btn-'+idx);
+  if(!btn||!currentJobId)return;
+  btn.disabled=true;btn.textContent='Revealing…';
+  try{const job=await api('/api/jobs/'+currentJobId+'/research/contacts/'+idx+'/reveal',{method:'POST'});renderResearch(job.research)}
+  catch(e){btn.disabled=false;btn.textContent='Reveal failed: '+e.message}
 }
 async function copyContactMessage(contactName,contactTitle,idx){
   const btn=document.getElementById('msg-btn-'+idx);
@@ -1643,7 +1736,7 @@ async function runResearch(){
   if(!currentJobId)return;
   btn.disabled=true;
   btn.textContent='Researching...';
-  status.textContent='Searching Google + extracting contacts via Claude...';
+  status.textContent='Searching the web and your people search sources...';
   status.style.display='block';
   status.style.color='var(--text-dim)';
   try{
@@ -1914,6 +2007,7 @@ async function loadSettings(){
   document.getElementById('cfg-auto-research').checked=!!c.auto_research_enabled;
   document.getElementById('cfg-auto-research-threshold').value=c.auto_research_threshold||9;
   document.getElementById('cfg-auto-research-cap').value=c.auto_research_daily_cap||25;
+  loadPeopleSearchSettings(c);
   refreshMissingResumes();
   refreshMissingResearch();
   if(c.resume_labels){resumeLabels=c.resume_labels;document.getElementById('cfg-label-director').value=c.resume_labels.director||'';document.getElementById('cfg-label-base').value=c.resume_labels.base||'';document.getElementById('cfg-label-contract').value=c.resume_labels.contract||'';['director','base','contract'].forEach(k=>{const opt=document.getElementById('opt-'+k);if(opt)opt.textContent=resumeLabels[k]||k})}
@@ -2074,6 +2168,7 @@ async function saveConfig(opts){
   auto_research_enabled:document.getElementById('cfg-auto-research').checked,
   auto_research_threshold:+document.getElementById('cfg-auto-research-threshold').value||9,
   auto_research_daily_cap:+document.getElementById('cfg-auto-research-cap').value||25,
+  ...peopleSearchSettings(),
   fast_provider:document.getElementById('cfg-fast-provider').value||'anthropic',
   strong_provider:document.getElementById('cfg-strong-provider').value||'anthropic',
   anthropic_api_key:document.getElementById('cfg-anthropic-key').value||document.getElementById('cfg-strong-anthropic-key').value||'',
@@ -2138,6 +2233,39 @@ async function runAITest(el,fn){
   finally{clearInterval(iv);clearTimeout(to)}
 }
 async function testAIProvider(tier){const s=document.getElementById('test-'+tier+'-provider-status');try{const r=await runAITest(s,async()=>{await saveConfig({silent:true});return api('/api/config/test-ai-provider?tier='+tier,{method:'POST'})});s.textContent='✓ '+r.model+' responded: "'+r.reply+'"';s.style.color='var(--green)'}catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}}
+const PS_SOURCES=['pdl','hunter','apollo'];
+function loadPeopleSearchSettings(c){
+  const on=c.people_search_providers||[];
+  PS_SOURCES.forEach((p,i)=>{
+    document.getElementById('cfg-ps-use-'+p).checked=on.includes(p);
+    document.getElementById('cfg-ps-order-'+p).value=on.includes(p)?on.indexOf(p)+1:on.length+i+1;
+    document.getElementById('cfg-'+p+'-key').value=c[p+'_api_key']||'';
+  });
+  document.getElementById('cfg-ps-mode').value=c.people_search_mode||'first';
+  document.getElementById('cfg-ps-max').value=c.people_search_max_results||8;
+  document.getElementById('cfg-ps-cache-days').value=c.people_search_cache_days??30;
+  document.getElementById('cfg-ps-auto').checked=!!c.people_search_in_auto_research;
+  document.getElementById('cfg-ps-titles').value=(c.people_search_titles||[]).join('\n');
+  document.getElementById('cfg-ps-recruiters').checked=c.people_search_include_recruiters!==false;
+}
+function peopleSearchSettings(){
+  const order=p=>+document.getElementById('cfg-ps-order-'+p).value||9;
+  const out={people_search_providers:PS_SOURCES.filter(p=>document.getElementById('cfg-ps-use-'+p).checked).sort((a,b)=>order(a)-order(b)),
+    people_search_mode:document.getElementById('cfg-ps-mode').value||'first',
+    people_search_max_results:+document.getElementById('cfg-ps-max').value||8,
+    people_search_cache_days:+(document.getElementById('cfg-ps-cache-days').value||0),
+    people_search_in_auto_research:document.getElementById('cfg-ps-auto').checked,
+    people_search_titles:document.getElementById('cfg-ps-titles').value.split('\n').map(t=>t.trim()).filter(Boolean),
+    people_search_include_recruiters:document.getElementById('cfg-ps-recruiters').checked};
+  PS_SOURCES.forEach(p=>out[p+'_api_key']=document.getElementById('cfg-'+p+'-key').value.trim());
+  return out;
+}
+async function testPeopleSearch(p){
+  const s=document.getElementById('test-ps-'+p+'-status');
+  s.textContent='Checking…';s.style.color='var(--text-dim)';
+  try{await saveConfig({silent:true});const r=await api('/api/config/test-people-search?provider='+p,{method:'POST'});s.textContent='✓ '+r.message;s.style.color='var(--green)'}
+  catch(e){s.textContent='✕ '+e.message;s.style.color='var(--red)'}
+}
 async function uploadResume(){const v=document.getElementById('resume-variant').value,c=document.getElementById('resume-text').value;if(!c.trim())return alert('Paste text');await api('/api/resumes/'+v,{method:'PUT',body:{content:c}});document.getElementById('resume-text').value='';alert('Uploaded: '+v);loadSettings()}
 async function uploadResumeDocx(file){
   if(!file) return;
@@ -2795,6 +2923,7 @@ const HELP_TOPICS={
   'settings-resumes':'Resumes',
   'settings-automation':'Job Search & Automation',
   'settings-ai':'AI',
+  'settings-people':'People Search',
   'settings-email':'Email & Follow-Up',
   'settings-account':'Account',
   'settings-admin':'Admin',
@@ -2802,7 +2931,7 @@ const HELP_TOPICS={
   'feedback':'Sending feedback'
 };
 const HELP_GROUPS=[['Pages',['dashboard','add','search','tracker','detail','followups','activity','archive','network']],
-  ['Settings',['settings-profile','settings-resumes','settings-automation','settings-ai','settings-email','settings-account','settings-admin']],
+  ['Settings',['settings-profile','settings-resumes','settings-automation','settings-ai','settings-people','settings-email','settings-account','settings-admin']],
   ['Getting started',['wizard','feedback']]];
 const HELP_WIDE='(min-width:1100px)';
 let _helpOpen=false,_helpTopic=null;const _helpCache={};

@@ -55,6 +55,7 @@ import scoring
 import storage
 import archiving
 import company_research
+import people_search
 import company_site_search
 import ai_router
 import lanes
@@ -2095,6 +2096,34 @@ def research_job_company(job_id: str, user: User = Depends(get_current_user)):
         raise HTTPException(500, f"Research failed: {str(e)}")
 
 
+@app.post("/api/jobs/{job_id}/research/contacts/{index}/reveal")
+def reveal_research_contact(job_id: str, index: int, user: User = Depends(get_current_user)):
+    """Apollo search hides last names and contact details. Spend one of this account's Apollo credits to reveal one person."""
+    job = storage.load_job(user.id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    contacts = job.research.contacts if job.research else []
+    if not 0 <= index < len(contacts):
+        raise HTTPException(404, "Contact not found")
+    c = contacts[index]
+    person_id = (c.provider_ids or {}).get("apollo")
+    if not person_id:
+        raise HTTPException(400, "Only Apollo contacts can be revealed")
+    try:
+        found = people_search.apollo_reveal(storage.load_config(user.id), person_id)
+    except people_search.PeopleSearchError as e:
+        raise HTTPException(400, f"Reveal failed: {e}")
+    c.name = found["name"] or c.name
+    c.title = found["title"] or c.title
+    c.email = found["email"] or c.email
+    c.linkedin_url = found["linkedin_url"] or c.linkedin_url
+    c.masked = False
+    c.confidence = "high" if (c.email or c.linkedin_url) else c.confidence
+    job.updated_at = datetime.now(timezone.utc).isoformat()
+    storage.save_job(user.id, job)
+    return enrich_job(job)
+
+
 class ContactMessageRequest(BaseModel):
     contact_name: str
     contact_title: str
@@ -2179,6 +2208,17 @@ def test_ai_provider(tier: str, user: User = Depends(get_current_user)):
         raise HTTPException(400, str(e))
 
 
+@app.post("/api/config/test-people-search")
+def test_people_search(provider: str, user: User = Depends(get_current_user)):
+    """Check this account's saved key for one people search source. Spends no credits."""
+    if provider not in people_search.PROVIDERS:
+        raise HTTPException(400, "provider must be one of: " + ", ".join(people_search.PROVIDERS))
+    try:
+        return {"success": True, "message": people_search.check_key(storage.load_config(user.id), provider)}
+    except people_search.PeopleSearchError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/config/ai-status")
 def ai_status(user: User = Depends(get_current_user)):
     """Per-tier provider health, so Settings can warn before a resume run fails."""
@@ -2191,6 +2231,26 @@ def ai_status(user: User = Depends(get_current_user)):
         except ai_router.ProviderConfigError as e:
             out[tier] = {"ok": False, "message": str(e)}
     return out
+
+
+def _normalize_people_search(config: AppConfig) -> None:
+    seen = []
+    for p in config.people_search_providers or []:
+        if p in people_search.PROVIDERS and p not in seen:
+            seen.append(p)
+    config.people_search_providers = seen
+    if config.people_search_mode not in ("first", "all"):
+        config.people_search_mode = "first"
+    config.people_search_max_results = max(1, min(int(config.people_search_max_results or 8), 25))
+    config.people_search_cache_days = max(0, min(int(config.people_search_cache_days or 0), 365))
+    titles = []
+    for t in config.people_search_titles or []:
+        t = " ".join(str(t).split())[:80]
+        if t and t.lower() not in (x.lower() for x in titles):
+            titles.append(t)
+    config.people_search_titles = titles[:20]
+    for p in people_search.PROVIDERS:
+        setattr(config, f"{p}_api_key", (getattr(config, f"{p}_api_key") or "").strip())
 
 
 @app.get("/api/config")
@@ -2230,6 +2290,7 @@ def update_config(config: AppConfig, user: User = Depends(get_current_user)):
     config.education       = existing.education
     config.certifications  = existing.certifications
     config.languages       = existing.languages
+    _normalize_people_search(config)
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
     if config.auto_approve_enabled:
@@ -2259,6 +2320,7 @@ def export_config(user: User = Depends(get_current_user)):
 @app.post("/api/config/import")
 def import_config(config: AppConfig, user: User = Depends(get_current_user)):
     """Restore config from a previously exported backup JSON file."""
+    _normalize_people_search(config)
     storage.save_config(user.id, config)
     scheduler.update_schedule(config, user.id)
     return config.model_dump()
