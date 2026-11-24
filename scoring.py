@@ -513,7 +513,7 @@ Overall: {job.score.raw_analysis}"""
 
     user_msg = f"Tailor my resume for this job:\n\nCompany: {job.company}\nTitle: {job.title}\n\nJob Description:\n{job.raw_jd}"
 
-    return ai_router.chat(system, user_msg, "strong", config, max_tokens=4000)
+    return ai_router.chat(system, user_msg, "strong", config, max_tokens=16000)
 
 
 # ── LinkedIn message generation ────────────────────────────────────────────────
