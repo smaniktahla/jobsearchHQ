@@ -328,6 +328,11 @@ def _dated_header(line: str):
     return "", left, m.group(1)
 
 
+def label_like_line(line: str) -> bool:
+    head = line.split(":", 1)[0]
+    return ":" in line and len(head) < 45 and len(head.split()) <= 6 and not re.search(r"[.!?]", head)
+
+
 def _is_location(line: str) -> bool:
     if len(line) > 45 or line.endswith(".") or len(line.split()) > 6 or DATE_TAIL.search(line):
         return False
@@ -384,6 +389,14 @@ def parse_blocks(text: str) -> list[tuple]:
             i += 1
             continue
         bullet_base = None
+
+        if in_project and label_like_line(line) and not PROJECT_RE.match(line):
+            # "Client: ...", "Role: ...", "Key Accomplishments:" -> a labelled line, not a bullet.
+            # Checked before the job-header rules: a word like "Dec" in the next line must not turn it into a job.
+            label, value = line.split(":", 1)
+            blocks.append(("field", label.strip(), value.strip()))
+            i += 1
+            continue
 
         dated = _dated_header(line)
         if dated:
@@ -459,12 +472,6 @@ def parse_blocks(text: str) -> list[tuple]:
 
         head = line.split(":", 1)[0]
         label_like = ":" in line and len(head) < 45 and len(head.split()) <= 6 and not re.search(r"[.!?]", head)
-        if in_project and label_like:
-            # "Client: ...", "Role: ...", "Key Accomplishments:" -> a labelled line, not a bullet
-            label, value = line.split(":", 1)
-            blocks.append(("field", label.strip(), value.strip()))
-            i += 1
-            continue
 
         # "Category: description" (skills, competencies) -> bullet with a bold label
         if label_like and line.split(":", 1)[1].strip():
