@@ -316,11 +316,16 @@ def _gemini_chat(system: str, user_msg: str, model: str, api_key: str, max_token
         request_options={"timeout": timeout, "retry": None},
     )
     try:
-        return response.text.strip()
+        text = response.text.strip()
     except ValueError:
         raise ValueError(f"{model} returned no text (finish_reason="
                          f"{response.candidates[0].finish_reason if response.candidates else 'none'}); "
                          f"likely the token limit was consumed by model reasoning")
+    # A reasoning model can spend the whole budget thinking and return a few lines of half a document.
+    # Treat that as a failure so the next model is tried, instead of saving a truncated resume.
+    if response.candidates and "MAX_TOKENS" in str(response.candidates[0].finish_reason).upper():
+        raise ValueError(f"{model} hit the token limit mid-answer ({len(text)} chars returned)")
+    return text
 
 
 def _openai_chat(system: str, user_msg: str, model: str, api_key: str, max_tokens: int, base_url: str = "") -> str:
