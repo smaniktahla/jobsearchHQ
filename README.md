@@ -107,7 +107,11 @@ Browser endpoints use the signed-in session. Agent endpoints accept an `X-API-Ke
 | Follow-ups | `GET /api/follow-ups`, `POST /api/jobs/{job_id}/mark-followed-up` |
 | Scheduler | `GET /api/scheduler/status`, `POST /api/scheduler/run-now` |
 | Agent queue and profile | `GET /api/agent/ready-queue`, `GET /api/agent/profile` |
-| Agent application handoff | `GET /api/agent/jobs/{job_id}/package`, `POST /api/agent/jobs/{job_id}/application-result` |
+| Agent application handoff | `GET /api/agent/jobs/{job_id}/package`, `GET /api/agent/jobs/{job_id}/eligibility`, `POST /api/agent/jobs/{job_id}/application-result` |
+
+Both application queues sort by effective score, including user overrides. Queue eligibility requires approval, an effective score of at least 5, an open posting, a usable HTTP(S) apply URL, and existing résumé and cover-letter files. Actioned jobs and jobs matching the user's archive by job ID, normalized posting URL, or company and requisition ID are excluded. Queue items expose the selected `apply_url` and any known `posting_identity`. Requisition IDs can be supplied on job creation or update and are also read from labeled job descriptions and recognized URL query parameters.
+
+Executors can recheck eligibility with their agent API key immediately before submitting. The endpoint returns `eligible` and a list of blocker codes in `reasons`. Job responses include `approved_by` and `approved_at` for the most recent recorded approval.
 
 See [`main.py`](main.py) for the route definitions and [`network/api.py`](network/api.py) for the Network directory API.
 

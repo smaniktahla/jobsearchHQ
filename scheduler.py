@@ -462,6 +462,14 @@ def run_daily_pipeline(user_id: str) -> dict:
                 # Generate cover letters
                 try:
                     letters = scoring.generate_cover_letters(job, user_id)
+                    for letter in letters:
+                        letter.docx_path = docx_builder.generate_cover_letter_docx(
+                            content=letter.content, variant=letter.variant, job_id=job.id,
+                            user_id=user_id, company=job.company, title=job.title,
+                            author_name=config.author_name, author_location=config.author_location,
+                            author_phone=config.author_phone,
+                            author_email=config.smtp_user or config.follow_up_email,
+                        )
                     job.cover_letters = letters
                     storage.save_job(user_id, job)
                     logger.info(
