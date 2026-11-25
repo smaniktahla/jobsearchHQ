@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import tempfile
 import threading
 from pathlib import Path
 from models import Job, AppConfig
@@ -62,8 +63,25 @@ def ensure_dirs() -> None:
 # ever seen (active or archived) lives in the dedup index below, so scrapers
 # never re-import something we already passed on.
 
+job_activity_lock = threading.Lock()
+
+
 def save_job(user_id: str, job: Job) -> None:
     ensure_user_dirs(user_id)
+    path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
+    _write_job(user_id, job, path)
+    update_dedup_index(user_id, job, archived=False)
+
+
+def save_job_activity(user_id: str, job: Job) -> None:
+    """Update an existing job in place while holding job_activity_lock."""
+    path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
+    if not path.exists():
+        path = get_archive_dir(user_id) / path.name
+    _write_job(user_id, job, path)
+
+
+def _write_job(user_id: str, job: Job, path: Path) -> None:
     job.user_id = user_id
     data = sanitize_unicode(job.model_dump())
     # Copy the sanitized values back onto the caller's job, as typed objects: model_dump()
@@ -73,9 +91,14 @@ def save_job(user_id: str, job: Job) -> None:
     clean = Job(**data)
     for field in data:
         setattr(job, field, getattr(clean, field))
-    path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
-    path.write_text(json.dumps(data, indent=2))
-    update_dedup_index(user_id, job, archived=False)
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as temp:
+        temp_path = Path(temp.name)
+        try:
+            json.dump(data, temp, indent=2)
+            temp.close()
+            temp_path.replace(path)
+        finally:
+            temp_path.unlink(missing_ok=True)
 
 
 def load_job(user_id: str, job_id: str) -> Job | None:
@@ -170,40 +193,43 @@ def load_archived_jobs(user_id: str) -> list[Job]:
 
 def archive_job(user_id: str, job_id: str) -> bool:
     """Move an active job to jobs_archive/. Keeps its dedup fingerprint."""
-    src = get_user_dir(user_id) / "jobs" / f"{job_id}.json"
-    if not src.exists():
-        return False
-    dst = get_archive_dir(user_id) / f"{job_id}.json"
-    src.rename(dst)
-    try:
-        job = Job(**json.loads(dst.read_text()))
-        update_dedup_index(user_id, job, archived=True)
-    except Exception:
-        pass
-    return True
+    with job_activity_lock:
+        src = get_user_dir(user_id) / "jobs" / f"{job_id}.json"
+        if not src.exists():
+            return False
+        dst = get_archive_dir(user_id) / f"{job_id}.json"
+        src.rename(dst)
+        try:
+            job = Job(**json.loads(dst.read_text()))
+            update_dedup_index(user_id, job, archived=True)
+        except Exception:
+            pass
+        return True
 
 
 def unarchive_job(user_id: str, job_id: str) -> bool:
-    src = get_archive_dir(user_id) / f"{job_id}.json"
-    if not src.exists():
-        return False
-    dst = get_user_dir(user_id) / "jobs" / f"{job_id}.json"
-    src.rename(dst)
-    try:
-        job = Job(**json.loads(dst.read_text()))
-        update_dedup_index(user_id, job, archived=False)
-    except Exception:
-        pass
-    return True
+    with job_activity_lock:
+        src = get_archive_dir(user_id) / f"{job_id}.json"
+        if not src.exists():
+            return False
+        dst = get_user_dir(user_id) / "jobs" / f"{job_id}.json"
+        src.rename(dst)
+        try:
+            job = Job(**json.loads(dst.read_text()))
+            update_dedup_index(user_id, job, archived=False)
+        except Exception:
+            pass
+        return True
 
 
 def delete_job(user_id: str, job_id: str) -> bool:
-    for base in (get_user_dir(user_id) / "jobs", get_archive_dir(user_id)):
-        path = base / f"{job_id}.json"
-        if path.exists():
-            path.unlink()
-            return True
-    return False
+    with job_activity_lock:
+        for base in (get_user_dir(user_id) / "jobs", get_archive_dir(user_id)):
+            path = base / f"{job_id}.json"
+            if path.exists():
+                path.unlink()
+                return True
+        return False
 
 
 # ── Dedup index ─────────────────────────────────────────────────────────────────

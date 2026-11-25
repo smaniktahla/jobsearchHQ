@@ -112,6 +112,35 @@ Browser endpoints use the signed-in session. Agent endpoints accept an `X-API-Ke
 
 See [`main.py`](main.py) for the route definitions and [`network/api.py`](network/api.py) for the Network directory API.
 
+### Agent API keys and scopes
+
+Send the key in the `X-API-Key` header. The existing `agent_api_key` is the
+**management** key and retains access to the existing agent operations. An admin
+session can retrieve it with `GET /api/agent/key`. Agent approvals record
+`approved_by: "agent-management"` and an approval timestamp.
+
+The **executor** key is generated on the first admin-session
+`GET /api/agent/keys/executor` and stored as `executor_api_key` alongside the
+management key in `system_config.json`. Use `POST /api/agent/keys/executor` with
+the admin session to rotate it and invalidate the previous executor key.
+
+| Executor access | Routes |
+| --- | --- |
+| Read queue, jobs and profile | `GET /api/agent/ready-queue`, `GET /api/agent/jobs` (supports `status`, `lane`, `company` and `q`), `GET /api/agent/profile`, `GET /api/agent/writing-samples` |
+| Read job details and documents | `GET /api/agent/jobs/{job_id}/` with `package`, `resume`, `resume/download`, `cover-letter/download`, `log` or `eligibility` |
+| Report activity | `POST /api/agent/jobs/{job_id}/` with `log`, `evidence` or `application-result` |
+
+Evidence reports use `kind` (`closed_posting` or `accessibility_preflight`),
+`verdict`, `url`, a timezone-aware ISO 8601 `observed_at`, and an optional
+`note`. Reports appear in the job's event log. Eligibility reflects the current
+ready-queue criteria. These scopes govern API access.
+
+Missing or unknown API keys receive HTTP 401. An executor request to a
+management-only route receives HTTP 403 and writes a `scope_denied` AgentEvent
+to `agent_scope_audit.jsonl` in the data directory. Management-only routes
+include review, profile updates, intake, research, ATS URL updates, and
+refresh-and-score. Routes that require a browser session still require it.
+
 ### Agent job intake
 
 Send `POST /api/agent/intake` with the `X-API-Key` header and a JSON body containing
