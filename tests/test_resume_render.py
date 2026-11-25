@@ -51,3 +51,8 @@ def test_docx_has_spacing_between_projects_and_bold_labels(tmp_path, monkeypatch
     first = next(p for p in doc.paragraphs if p.text.startswith("Client: International"))
     assert first.runs[0].bold and first.runs[0].text == "Client: "
     assert not first._p.pPr.numPr if first._p.pPr is not None else True   # not a bullet
+
+
+def test_field_lines_stay_fields_even_when_the_next_line_mentions_a_month():
+    text = "Name\n\nPROJECTS\n\nProject 1: X\nClient: Acme\nDescription: Did the work.\nOutcome: Shipped in December and March.\n"
+    assert [b[0] for b in rt.parse_blocks(text)] == ["name", "section", "project", "field", "field", "field"]
