@@ -20,17 +20,19 @@ import hmac
 import json
 import os
 import secrets
+import tempfile
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import quote, urlsplit
-from typing import Optional
+from typing import Literal, Optional
 
 import httpx
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 import local_users
-from models import User
+from models import AgentEvent, AgentEventType, User
 
 DATA_DIR = Path(os.environ.get("JSHQ_DATA_DIR", "/app/data"))
 SYSTEM_CONFIG_PATH = DATA_DIR / "system_config.json"
@@ -114,6 +116,9 @@ def oidc_redirect_uri_for(request: Request, cfg: dict) -> str:
 
 # ── System config ──────────────────────────────────────────────────────────────
 
+_system_config_lock = threading.Lock()
+
+
 def load_system_config() -> dict:
     if SYSTEM_CONFIG_PATH.exists():
         try:
@@ -124,10 +129,28 @@ def load_system_config() -> dict:
 
 
 def save_system_config(config: dict) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    SYSTEM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     if not config.get("session_secret"):
         config["session_secret"] = secrets.token_hex(32)
-    SYSTEM_CONFIG_PATH.write_text(json.dumps(config, indent=2))
+    with tempfile.NamedTemporaryFile(mode="w", dir=SYSTEM_CONFIG_PATH.parent, delete=False) as temp:
+        path = Path(temp.name)
+        try:
+            json.dump(config, temp, indent=2)
+            temp.close()
+            path.replace(SYSTEM_CONFIG_PATH)
+        finally:
+            path.unlink(missing_ok=True)
+
+
+@contextmanager
+def edit_system_config():
+    """Serialize read-modify-write updates in the app process."""
+    with _system_config_lock:
+        config = load_system_config()
+        original = config.copy()
+        yield config
+        if config != original:
+            save_system_config(config)
 
 
 def is_oidc_configured() -> bool:
@@ -170,13 +193,7 @@ def bootstrap_admin(name: str, email: str, password: str, setup_token: str = "")
 
 
 def get_session_secret() -> str:
-    cfg = load_system_config()
-    secret = cfg.get("session_secret")
-    if not secret:
-        secret = secrets.token_hex(32)
-        cfg["session_secret"] = secret
-        save_system_config(cfg)
-    return secret
+    return _get_system_token("session_secret")
 
 
 # ── Admin user helpers ─────────────────────────────────────────────────────────
@@ -188,9 +205,8 @@ def get_admin_user_id() -> Optional[str]:
 
 def set_admin_user_id(user_id: str) -> None:
     """Persist the admin OIDC sub to system_config.json."""
-    cfg = load_system_config()
-    cfg["admin_user_id"] = user_id
-    save_system_config(cfg)
+    with edit_system_config() as cfg:
+        cfg["admin_user_id"] = user_id
 
 
 def is_admin(user_id: str) -> bool:
@@ -201,20 +217,69 @@ def is_admin(user_id: str) -> bool:
 
 # ── Agent API key ──────────────────────────────────────────────────────────────
 
+def _get_system_token(field: str, *, rotate: bool = False) -> str:
+    with edit_system_config() as cfg:
+        token = cfg.get(field)
+        if rotate or not token:
+            token = cfg[field] = secrets.token_hex(32)
+        return token
+
+
 def get_agent_api_key() -> str:
-    """Return the agent API key, generating and persisting one if absent."""
-    cfg = load_system_config()
-    key = cfg.get("agent_api_key")
-    if not key:
-        key = secrets.token_hex(32)
-        cfg["agent_api_key"] = key
-        save_system_config(cfg)
-    return key
+    """Return the management key, creating it if absent."""
+    return _get_system_token("agent_api_key")
+
+
+def get_executor_api_key(*, rotate: bool = False) -> str:
+    """Return the executor key, creating or replacing it on admin request."""
+    return _get_system_token("executor_api_key", rotate=rotate)
 
 
 def verify_agent_api_key(key: str) -> bool:
-    """Constant-time comparison to prevent timing attacks."""
-    return hmac.compare_digest(key, get_agent_api_key())
+    """Verify the legacy management key."""
+    return _matches_key(key.encode(), load_system_config().get("agent_api_key"))
+
+
+def _matches_key(supplied: bytes, stored: str | None) -> bool:
+    return bool(stored) and hmac.compare_digest(supplied, stored.encode())
+
+
+AgentScope = Literal["management", "executor_read", "executor_write"]
+_agent_audit_lock = threading.Lock()
+
+
+def require_agent_scope(request: Request, scope: AgentScope) -> str:
+    """Authorize one route's API-key scope and return the admin user ID."""
+    key = request.headers.get("X-API-Key", "").encode()
+    config = load_system_config()
+    if not key:
+        raise HTTPException(401, "Invalid or missing API key")
+    management = _matches_key(key, config.get("agent_api_key"))
+    executor = _matches_key(key, config.get("executor_api_key"))
+    if not (management or executor):
+        raise HTTPException(401, "Invalid or missing API key")
+    if not management and scope not in ("executor_read", "executor_write"):
+        event = AgentEvent(
+            event_type=AgentEventType.SCOPE_DENIED,
+            success=False,
+            notes=f"Executor key denied {request.method} {request.scope['route'].path} (requires {scope})",
+        )
+        with _agent_audit_lock:
+            with (DATA_DIR / "agent_scope_audit.jsonl").open("a", encoding="utf-8") as audit:
+                audit.write(event.model_dump_json() + "\n")
+        raise HTTPException(403, "API key scope does not permit this operation")
+    admin_id = config.get("admin_user_id")
+    if not admin_id:
+        raise HTTPException(503, "No admin user configured")
+    return admin_id
+
+
+def agent_scope(scope: AgentScope):
+    """Bind a route's scope without exposing it as a request parameter."""
+    def check(request: Request) -> str:
+        return require_agent_scope(request, scope)
+
+    return Depends(check)
 
 
 # ── Digest one-click action tokens ─────────────────────────────────────────────
@@ -223,13 +288,7 @@ def verify_agent_api_key(key: str) -> bool:
 # so a leaked digest link can't be used to forge a session or agent calls.
 
 def get_digest_action_secret() -> str:
-    cfg = load_system_config()
-    secret = cfg.get("digest_action_secret")
-    if not secret:
-        secret = secrets.token_hex(32)
-        cfg["digest_action_secret"] = secret
-        save_system_config(cfg)
-    return secret
+    return _get_system_token("digest_action_secret")
 
 
 def sign_digest_action(user_id: str, job_id: str, action: str, ttl_seconds: int = 14 * 86400) -> str:
@@ -363,6 +422,10 @@ async def get_current_user(request: Request) -> User:
         email=session["email"],
         name=session["name"],
     )
+
+
+def require_admin_session(user: User = Depends(get_current_user)) -> User:
+    return require_admin(user)
 
 
 # ── Route handlers (mounted in main.py) ───────────────────────────────────────

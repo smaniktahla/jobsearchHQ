@@ -118,11 +118,13 @@ def test_generation_prompts_include_samples(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     from fastapi.testclient import TestClient
+    import auth
     import main
     from models import User
     main.app.dependency_overrides[main.get_current_user] = lambda: User(id=UID, email="t@example.com", name="T")
-    monkeypatch.setattr(main, "verify_agent_api_key", lambda k: k == "good")
-    monkeypatch.setattr(main, "get_admin_user_id", lambda: UID)
+    monkeypatch.setattr(auth, "DATA_DIR", storage.DATA_DIR)
+    monkeypatch.setattr(auth, "SYSTEM_CONFIG_PATH", storage.SYSTEM_CONFIG_PATH)
+    auth.save_system_config({"admin_user_id": UID, "agent_api_key": "good"})
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()
 

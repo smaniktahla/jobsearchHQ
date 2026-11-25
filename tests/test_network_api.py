@@ -21,7 +21,9 @@ def client(monkeypatch):
     # Real signed session cookies, synthetic system configuration and users.
     monkeypatch.setattr(auth, 'is_setup_complete', lambda: True)
     monkeypatch.setattr(auth, 'get_session_secret', lambda: 'synthetic-session-secret')
-    monkeypatch.setattr(auth, 'get_agent_api_key', lambda: 'synthetic-agent-key')
+    monkeypatch.setattr(auth, 'DATA_DIR', storage.DATA_DIR)
+    monkeypatch.setattr(auth, 'SYSTEM_CONFIG_PATH', storage.SYSTEM_CONFIG_PATH)
+    auth.save_system_config({'admin_user_id': 'alice', 'agent_api_key': 'synthetic-agent-key'})
     monkeypatch.setattr(main.scheduler, 'update_schedule', lambda *a: None)
     for uid in ('alice', 'bob'):
         storage.save_config(uid, AppConfig(network_enabled=True))
@@ -88,9 +90,8 @@ def test_every_route_session_only_flag_off_agent_rejected(client):
         if not hasattr(route, 'dependant'):
             continue
         calls = route_calls(route.dependant)
-        # Existing agent routes verify their header inside the handler.
         source = inspect.getsource(route.endpoint)
-        if auth.verify_agent_api_key in calls or 'verify_agent_api_key(' in source:
+        if 'agent_scope(' in source or auth.require_agent_scope in calls:
             assert not route.path.startswith('/api/network')
             assert not any(getattr(c, '__module__', '').startswith('network') for c in calls)
             assert 'network' not in source.casefold()

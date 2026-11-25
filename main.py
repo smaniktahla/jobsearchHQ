@@ -19,7 +19,9 @@ from auth import (
     get_current_user,
     get_admin_user_id,
     get_agent_api_key,
-    verify_agent_api_key,
+    agent_scope,
+    get_executor_api_key,
+    require_admin_session,
     invalidate_discovery_cache,
     is_admin,
     is_oidc_configured,
@@ -30,7 +32,7 @@ from auth import (
     sso_login_handler,
     callback_handler,
     logout_handler,
-    save_system_config,
+    edit_system_config,
     sign_digest_action,
     verify_digest_action,
     bootstrap_admin,
@@ -44,7 +46,7 @@ import local_users
 from pydantic import BaseModel
 from models import (
     ReviewStatus, AgentEvent, AgentEventType, AppConfig, ApplicationResult,
-    EmailCompose, EmailRecord, IntakeSource, Job, JobCreate,
+    EmailCompose, EmailRecord, IntakeSource, Job, JobCreate, PostingEvidence,
     JobStatus, JobUpdate, MarketLane, ProfileUpdate, User,
 )
 import docx_builder
@@ -296,18 +298,17 @@ def admin_get_oidc(user: User = Depends(get_current_user)):
 def admin_save_oidc(data: OidcConfig, user: User = Depends(get_current_user)):
     """Enable, change or (with every field blank) remove optional SSO."""
     require_admin(user)
-    cfg = load_system_config()
-    if not any([data.oidc_issuer, data.oidc_client_id, data.oidc_client_secret, data.oidc_redirect_uri]):
-        for k in ("oidc_issuer", "oidc_client_id", "oidc_client_secret", "oidc_redirect_uri"):
-            cfg.pop(k, None)
-    else:
-        cfg["oidc_issuer"] = data.oidc_issuer.strip().rstrip("/")
-        cfg["oidc_client_id"] = data.oidc_client_id.strip()
-        cfg["oidc_redirect_uri"] = data.oidc_redirect_uri.strip()
-        # Keep the stored secret when the masked placeholder is sent back
-        if data.oidc_client_secret and not data.oidc_client_secret.startswith("•"):
-            cfg["oidc_client_secret"] = data.oidc_client_secret.strip()
-    save_system_config(cfg)
+    with edit_system_config() as cfg:
+        if not any([data.oidc_issuer, data.oidc_client_id, data.oidc_client_secret, data.oidc_redirect_uri]):
+            for k in ("oidc_issuer", "oidc_client_id", "oidc_client_secret", "oidc_redirect_uri"):
+                cfg.pop(k, None)
+        else:
+            cfg["oidc_issuer"] = data.oidc_issuer.strip().rstrip("/")
+            cfg["oidc_client_id"] = data.oidc_client_id.strip()
+            cfg["oidc_redirect_uri"] = data.oidc_redirect_uri.strip()
+            # Keep the stored secret when the masked placeholder is sent back
+            if data.oidc_client_secret and not data.oidc_client_secret.startswith("•"):
+                cfg["oidc_client_secret"] = data.oidc_client_secret.strip()
     invalidate_discovery_cache()
     return {"ok": True, "enabled": is_oidc_configured()}
 
@@ -315,17 +316,11 @@ def admin_save_oidc(data: OidcConfig, user: User = Depends(get_current_user)):
 # ── Agent endpoints (API key auth — for job-agent automation) ─────────────────
 
 @app.get("/api/agent/ready-queue")
-def agent_ready_queue(request: Request):
+def agent_ready_queue(admin_id: str = agent_scope("executor_read")):
     """
     Returns ready-to-apply jobs for the admin user.
     Requires X-API-Key header. Key is auto-generated and stored in system_config.json.
     """
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    if not admin_id:
-        raise HTTPException(503, "No admin user configured")
     jobs = storage.load_all_jobs(admin_id)
     queue = [enrich_job(j) for j in jobs if j.ready_to_apply]
     queue.sort(key=lambda j: (j.get("score") or {}).get("total", 0), reverse=True)
@@ -334,11 +329,11 @@ def agent_ready_queue(request: Request):
 
 @app.get("/api/agent/jobs")
 def agent_list_jobs(
-    request: Request,
     status: str | None = None,
     company: str | None = None,
     q: str | None = None,
     lane: str | None = None,
+    admin_id: str = agent_scope("executor_read"),
 ):
     """
     Agent-accessible full job list — X-API-Key auth.
@@ -348,12 +343,6 @@ def agent_list_jobs(
     rejected, or otherwise historical jobs by status, company, or free-text
     query against title/company. Mirrors the filtering on /api/jobs.
     """
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    if not admin_id:
-        raise HTTPException(503, "No admin user configured")
     jobs = storage.load_all_jobs(admin_id)
     if status:
         jobs = [j for j in jobs if j.status == status]
@@ -370,14 +359,8 @@ def agent_list_jobs(
 
 
 @app.get("/api/agent/profile")
-def agent_get_profile(request: Request):
+def agent_get_profile(admin_id: str = agent_scope("executor_read")):
     """Agent-accessible profile endpoint — uses X-API-Key auth."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    if not admin_id:
-        raise HTTPException(503, "No admin user configured")
     config = storage.load_config(admin_id)
     return {
         "name": config.author_name,
@@ -400,14 +383,8 @@ def agent_get_profile(request: Request):
 
 
 @app.put("/api/agent/profile")
-def agent_update_profile(data: ProfileUpdate, request: Request):
+def agent_update_profile(data: ProfileUpdate, admin_id: str = agent_scope("management")):
     """Agent-accessible profile update — uses X-API-Key auth."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    if not admin_id:
-        raise HTTPException(503, "No admin user configured")
     config = storage.load_config(admin_id)
     if data.name: config.author_name = data.name
     if data.email: config.author_email = data.email
@@ -426,32 +403,39 @@ def agent_update_profile(data: ProfileUpdate, request: Request):
     if data.certifications is not None: config.certifications = data.certifications
     if data.languages is not None: config.languages = data.languages
     storage.save_config(admin_id, config)
-    return agent_get_profile(request)
+    return agent_get_profile(admin_id)
 
 
 @app.get("/api/agent/writing-samples")
-def agent_get_writing_samples(request: Request):
+def agent_get_writing_samples(admin_id: str = agent_scope("executor_read")):
     """The user's writing samples (voice/style reference for cover letters and resumes). Empty when the feature is turned off."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    if not admin_id:
-        raise HTTPException(503, "No admin user configured")
     enabled = writing_samples.is_enabled(admin_id)
     samples = [{**m, "text": writing_samples.get_text(admin_id, m["id"]) or ""} for m in writing_samples.list_samples(admin_id)] if enabled else []
     return {"enabled": enabled, "samples": samples, "prompt_text": writing_samples.prompt_text(admin_id)}
 
 
-@app.get("/api/agent/key")
-def get_agent_key(user: User = Depends(get_current_user)):
-    """
-    Returns the current agent API key. Requires OIDC session (admin only).
-    Use this to retrieve the key to configure job-agent.
-    """
-    if not is_admin(user.id):
-        raise HTTPException(403, "Admin only")
+@app.get("/api/agent/key", dependencies=[Depends(require_admin_session)])
+def get_agent_key():
+    """Return the management API key to an admin session."""
     return {"agent_api_key": get_agent_api_key()}
+
+
+@app.get("/api/agent/keys/executor", dependencies=[Depends(require_admin_session)])
+def view_executor_key():
+    """Return the executor key, creating it on first use."""
+    return JSONResponse(
+        {"executor_api_key": get_executor_api_key()},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.post("/api/agent/keys/executor", dependencies=[Depends(require_admin_session)])
+def rotate_executor_key():
+    """Replace the executor key and immediately invalidate the old key."""
+    return JSONResponse(
+        {"executor_api_key": get_executor_api_key(rotate=True)},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 # ── Job CRUD ──────────────────────────────────────────────────────────────────
@@ -682,14 +666,7 @@ def _agent_intake_duplicate(user_id: str, index: list[dict], job: Job) -> dict |
 
 
 @app.post("/api/agent/intake")
-def agent_intake(data: AgentIntake, request: Request):
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    if not admin_id:
-        raise HTTPException(503, "No admin user configured")
-
+def agent_intake(data: AgentIntake, admin_id: str = agent_scope("management")):
     url = storage.sanitize_unicode(data.url or "").strip()
     raw_input = storage.sanitize_unicode(data.raw_input or "").strip()
     if not url and not raw_input:
@@ -994,14 +971,8 @@ async def apply_batch(
 
 
 @app.post("/api/jobs/send-scored-digest")
-def send_scored_digest(request: Request):
-    """Email digest of pending-review jobs scored >= threshold. Accepts agent API key or user session."""
-    key = request.headers.get("X-API-Key", "")
-    if key and verify_agent_api_key(key):
-        admin_id = get_admin_user_id()
-    else:
-        raise HTTPException(401, "Authentication required — use X-API-Key header")
-
+def send_scored_digest(admin_id: str = agent_scope("management")):
+    """Email a digest of pending-review jobs scored at or above the threshold."""
     config = storage.load_config(admin_id)
     if not config.smtp_user or not config.smtp_password:
         raise HTTPException(400, "SMTP not configured")
@@ -1168,7 +1139,11 @@ def digest_action_submit(token: str):
         return HTMLResponse(f'<body style="{_DIGEST_PAGE_STYLE}"><div style="{_DIGEST_CARD_STYLE}">Job not found</div></body>', status_code=404)
 
     is_approve = decoded["action"] == "approve"
-    job.review_status = ReviewStatus.APPROVED if is_approve else ReviewStatus.REJECTED
+    review_status = ReviewStatus.APPROVED if is_approve else ReviewStatus.REJECTED
+    if job.review_status != review_status:
+        job.review_status = review_status
+        job.approved_by = None
+        job.approved_at = ""
     job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(decoded["user_id"], job)
 
@@ -1202,6 +1177,8 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
     if data.notes is not None: job.notes = data.notes
     if data.review_status is not None and data.review_status != job.review_status:
         job.review_status = data.review_status
+        job.approved_by = None
+        job.approved_at = ""
         job.agent_log.append(AgentEvent(
             event_type=AgentEventType.RESOLVE, success=True,
             notes=f"review status set to {data.review_status.value} in the UI"))
@@ -1683,12 +1660,8 @@ class AtsUrlPayload(BaseModel):
 
 
 @app.get("/api/agent/jobs/{job_id}/package")
-def get_job_package(job_id: str, request: Request):
+def get_job_package(job_id: str, admin_id: str = agent_scope("executor_read")):
     """Return job details + download URLs for resume and cover letter. Called by dispatch.js."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1717,14 +1690,10 @@ def get_job_package(job_id: str, request: Request):
 
 
 @app.get("/api/agent/jobs/{job_id}/research")
-def agent_get_job_research(job_id: str, request: Request):
+def agent_get_job_research(job_id: str, admin_id: str = agent_scope("management")):
     """Return existing company research (contacts, summary) for a job, if
     any has been run. Read-only - does NOT trigger a new (paid) research
     run. Called by company-intel."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1737,16 +1706,12 @@ def agent_get_job_research(job_id: str, request: Request):
 
 
 @app.post("/api/agent/jobs/{job_id}/research")
-def agent_trigger_job_research(job_id: str, request: Request):
+def agent_trigger_job_research(job_id: str, admin_id: str = agent_scope("management")):
     """Trigger a NEW company research run for a job (uses the paid Claude
     web-search API, same as the session-authenticated /api/jobs/{id}/research
     route). Deliberately a separate opt-in endpoint from the GET above, so
     an agent reading job data doesn't silently incur API cost. Called by
     company-intel."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1784,12 +1749,8 @@ def _agent_resume_choice(admin_id: str, job: Job) -> dict:
 
 
 @app.get("/api/agent/jobs/{job_id}/resume")
-def agent_get_job_resume(job_id: str, request: Request):
+def agent_get_job_resume(job_id: str, admin_id: str = agent_scope("executor_read")):
     """The job's resume lane (which uploaded resume its tailored resume is built from) and whether a tailored resume exists."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1803,12 +1764,8 @@ def agent_get_job_resume(job_id: str, request: Request):
 
 
 @app.get("/api/agent/jobs/{job_id}/resume/download")
-def download_agent_resume(job_id: str, request: Request):
+def download_agent_resume(job_id: str, admin_id: str = agent_scope("executor_read")):
     """Download the tailored resume .docx for a job. Called by dispatch.js. 404 if the job has none."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1822,12 +1779,8 @@ def download_agent_resume(job_id: str, request: Request):
 
 
 @app.get("/api/agent/jobs/{job_id}/cover-letter/download")
-def download_agent_cover_letter(job_id: str, variant: str = "direct", request: Request = None):
+def download_agent_cover_letter(job_id: str, variant: str = "direct", admin_id: str = agent_scope("executor_read")):
     """Download a cover letter .docx for a job. Called by dispatch.js."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1838,12 +1791,8 @@ def download_agent_cover_letter(job_id: str, variant: str = "direct", request: R
 
 
 @app.patch("/api/agent/jobs/{job_id}/ats-url")
-def set_ats_url(job_id: str, payload: AtsUrlPayload, request: Request):
+def set_ats_url(job_id: str, payload: AtsUrlPayload, admin_id: str = agent_scope("management")):
     """Save the resolved ATS URL for a job. Called by dispatch.js."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1854,28 +1803,21 @@ def set_ats_url(job_id: str, payload: AtsUrlPayload, request: Request):
 
 
 @app.post("/api/agent/jobs/{job_id}/log")
-def append_agent_log(job_id: str, event: AgentEvent, request: Request):
+def append_agent_log(job_id: str, event: AgentEvent, admin_id: str = agent_scope("executor_write")):
     """Append an automation event to a job's agent_log. Called by Hermes/dispatch."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    job = storage.load_job(admin_id, job_id)
-    if not job:
-        raise HTTPException(404, "Job not found")
-    job.agent_log.append(event)
-    job.updated_at = datetime.now(timezone.utc).isoformat()
-    storage.save_job(admin_id, job)
-    return {"id": job_id, "agent_log_count": len(job.agent_log)}
+    with storage.job_activity_lock:
+        job = storage.load_job(admin_id, job_id)
+        if not job:
+            raise HTTPException(404, "Job not found")
+        job.agent_log.append(event)
+        job.updated_at = datetime.now(timezone.utc).isoformat()
+        storage.save_job_activity(admin_id, job)
+        return {"id": job_id, "agent_log_count": len(job.agent_log)}
 
 
 @app.get("/api/agent/jobs/{job_id}/log")
-def get_agent_log(job_id: str, request: Request):
+def get_agent_log(job_id: str, admin_id: str = agent_scope("executor_read")):
     """Return the full agent_log for a job."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1895,64 +1837,88 @@ def get_agent_log(job_id: str, request: Request):
 
 
 @app.post("/api/agent/jobs/{job_id}/application-result")
-def agent_record_application_result(job_id: str, result: ApplicationResult, request: Request):
+def agent_record_application_result(job_id: str, result: ApplicationResult, admin_id: str = agent_scope("executor_write")):
     """Agent-auth twin of /api/jobs/{job_id}/application-result — that endpoint requires
     an OIDC session cookie, which no agent (Codex, dispatch.js, Hermes) can ever hold.
     Called by an agent after attempting to submit an application."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
+    with storage.job_activity_lock:
+        job = storage.load_job(admin_id, job_id)
+        if not job:
+            raise HTTPException(404, "Job not found")
+        job.update_status(result.status, applied_date=result.applied_at)
+        if result.notes:
+            job.notes = (job.notes + "\n" + result.notes).strip() if job.notes else result.notes
+        if result.portal_url:
+            portal_note = f"Portal: {result.portal_url}"
+            job.follow_up.notes = (
+                job.follow_up.notes + "\n" + portal_note
+            ).strip() if job.follow_up.notes else portal_note
+        if result.error:
+            job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
+        job.updated_at = datetime.now(timezone.utc).isoformat()
+        storage.save_job_activity(admin_id, job)
+        return enrich_job(job)
+
+
+@app.post("/api/agent/jobs/{job_id}/evidence")
+def agent_record_evidence(job_id: str, evidence: PostingEvidence, admin_id: str = agent_scope("executor_write")):
+    """Record a posting or accessibility observation in the job log."""
+    with storage.job_activity_lock:
+        job = storage.load_job(admin_id, job_id)
+        if not job:
+            raise HTTPException(404, "Job not found")
+        event = AgentEvent(event_type=AgentEventType.EVIDENCE, evidence=evidence)
+        job.agent_log.append(event)
+        storage.save_job_activity(admin_id, job)
+        return {"id": job_id, "event": job.agent_log[-1].model_dump()}
+
+
+@app.get("/api/agent/jobs/{job_id}/eligibility")
+def agent_job_eligibility(job_id: str, admin_id: str = agent_scope("executor_read")):
+    """Report whether the job meets the current ready-queue criteria."""
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    job.update_status(result.status, applied_date=result.applied_at)
-    if result.notes:
-        job.notes = (job.notes + "\n" + result.notes).strip() if job.notes else result.notes
-    if result.portal_url:
-        portal_note = f"Portal: {result.portal_url}"
-        job.follow_up.notes = (
-            job.follow_up.notes + "\n" + portal_note
-        ).strip() if job.follow_up.notes else portal_note
-    if result.error:
-        job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
-    job.updated_at = datetime.now(timezone.utc).isoformat()
-    storage.save_job(admin_id, job)
-    return enrich_job(job)
+    active = (storage.get_user_dir(admin_id) / "jobs" / f"{job_id}.json").is_file()
+    reasons = []
+    if not active:
+        reasons.append("archived")
+    if not job.ready_to_apply:
+        reasons.append("not_ready_to_apply")
+    return JSONResponse({"eligible": not reasons, "reasons": reasons}, headers={"Cache-Control": "no-store"})
 
 
 @app.patch("/api/agent/jobs/{job_id}/review")
-def agent_set_review_status(job_id: str, request: Request, body: dict):
+def agent_set_review_status(job_id: str, body: dict, admin_id: str = agent_scope("management")):
     """Set review_status on a job (pending/approved/rejected). Agent-auth."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
     status_val = body.get("review_status", "")
     try:
         new_status = ReviewStatus(status_val)
     except ValueError:
         raise HTTPException(400, f"Invalid review_status '{status_val}'. Use: pending, approved, rejected")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
+    previous_status = job.review_status
     job.review_status = new_status
     job.updated_at = datetime.now(timezone.utc).isoformat()
+    if new_status == ReviewStatus.APPROVED and previous_status != ReviewStatus.APPROVED:
+        job.approved_by = "agent-management"
+        job.approved_at = job.updated_at
+    elif new_status != ReviewStatus.APPROVED:
+        job.approved_by = None
+        job.approved_at = ""
     storage.save_job(admin_id, job)
     return {"job_id": job_id, "review_status": new_status}
 
 
 @app.get("/api/agent/jobs/needs-refresh")
-def agent_jobs_needing_refresh(request: Request, url_contains: str = "", limit: int = 500):
+def agent_jobs_needing_refresh(url_contains: str = "", limit: int = 500, admin_id: str = agent_scope("management")):
     """
     List pending jobs whose raw_jd is too thin to score (e.g. digest-sourced
     listings awaiting a full JD fetch). Optionally filter by URL substring
     (e.g. 'linkedin.com') so a single-site refresher only pulls its own jobs.
     """
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
     jobs = storage.load_all_jobs(admin_id)
     candidates = [
         j for j in jobs
@@ -1977,14 +1943,10 @@ class RefreshAndScorePayload(BaseModel):
 
 
 @app.post("/api/agent/jobs/{job_id}/refresh-and-score")
-def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, request: Request):
+def agent_refresh_and_score(job_id: str, payload: RefreshAndScorePayload, admin_id: str = agent_scope("management")):
     """Replace a job's raw_jd with a freshly-fetched full JD and score it. Agent-auth."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
     if not payload.raw_jd.strip():
         raise HTTPException(400, "raw_jd is required")
-    admin_id = get_admin_user_id()
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")

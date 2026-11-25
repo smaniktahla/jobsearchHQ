@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Literal, Optional
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -152,6 +152,23 @@ class AgentEventType(str, Enum):
     RESOLVE    = "resolve"
     SUBMIT     = "submit"
     ERROR      = "error"
+    EVIDENCE = "evidence"
+    SCOPE_DENIED = "scope_denied"
+
+
+class PostingEvidence(BaseModel):
+    kind: Literal["closed_posting", "accessibility_preflight"]
+    verdict: str = Field(min_length=1, max_length=128)
+    url: str = Field(min_length=1, max_length=2048)
+    observed_at: str = Field(min_length=1, max_length=64)
+    note: str = Field(default="", max_length=2048)
+
+    @field_validator("observed_at")
+    @classmethod
+    def validate_observed_at(cls, value: str) -> str:
+        if datetime.fromisoformat(value).utcoffset() is None:
+            raise ValueError("observed_at must include a timezone")
+        return value
 
 
 class AgentEvent(BaseModel):
@@ -164,6 +181,7 @@ class AgentEvent(BaseModel):
     claude_tokens_in: int = 0
     claude_tokens_out: int = 0
     success: Optional[bool] = None
+    evidence: PostingEvidence | None = None
 
 
 class Job(BaseModel):
@@ -194,6 +212,8 @@ class Job(BaseModel):
     requisition_id: str = ""
     intake_fingerprint: str = ""  # retry identity for agent submissions
     review_status: ReviewStatus = ReviewStatus.PENDING  # human go/no-go decision
+    approved_by: str | None = None
+    approved_at: str = ""
     agent_log: list[AgentEvent] = []
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
