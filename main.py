@@ -55,6 +55,7 @@ import linkedin_intake
 import scoring
 import storage
 import archiving
+import application_queue
 import company_research
 import people_search
 import company_site_search
@@ -103,9 +104,11 @@ def enrich_job(job: Job) -> dict:
     d["score_is_user"] = job.score_is_user
     d["days_since_applied"] = job.days_since_applied
     d["ready_to_apply"] = job.ready_to_apply
+    d["apply_url"] = job.apply_url
+    d["posting_identity"] = job.posting_identity
     # Computed here because slim list responses drop cover_letters / tailored_resume.
-    d["has_resume"] = bool(job.tailored_resume_docx) and Path(job.tailored_resume_docx).exists()
-    d["has_cover_letters"] = bool(job.cover_letters)
+    d["has_resume"] = job.has_resume_file
+    d["has_cover_letters"] = job.has_cover_letter_file
     return d
 
 
@@ -314,22 +317,47 @@ def admin_save_oidc(data: OidcConfig, user: User = Depends(get_current_user)):
 
 # ── Agent endpoints (API key auth — for job-agent automation) ─────────────────
 
-@app.get("/api/agent/ready-queue")
-def agent_ready_queue(request: Request):
-    """
-    Returns ready-to-apply jobs for the admin user.
-    Requires X-API-Key header. Key is auto-generated and stored in system_config.json.
-    """
+def _archive_posting_keys(user_id: str) -> set[tuple[str, ...]]:
+    return {
+        key
+        for job in storage.load_archived_jobs(user_id)
+        for key in application_queue.posting_keys(job)
+    }
+
+
+def _apply_queue(user_id: str) -> dict:
+    jobs = storage.load_all_jobs(user_id, copy=False)
+    archived_keys = _archive_posting_keys(user_id)
+    queue = [enrich_job(job) for job in jobs if not application_queue.application_blockers(job, archived_keys)]
+    queue.sort(key=lambda job: job["effective_total"], reverse=True)
+    return {"count": len(queue), "jobs": queue}
+
+
+def _agent_queue_user(request: Request) -> str:
     key = request.headers.get("X-API-Key", "")
     if not key or not verify_agent_api_key(key):
         raise HTTPException(401, "Invalid or missing API key")
     admin_id = get_admin_user_id()
     if not admin_id:
         raise HTTPException(503, "No admin user configured")
-    jobs = storage.load_all_jobs(admin_id)
-    queue = [enrich_job(j) for j in jobs if j.ready_to_apply]
-    queue.sort(key=lambda j: (j.get("score") or {}).get("total", 0), reverse=True)
-    return {"count": len(queue), "jobs": queue}
+    return admin_id
+
+
+@app.get("/api/agent/ready-queue")
+def agent_ready_queue(request: Request):
+    """Return eligible jobs for the admin user, highest effective score first."""
+    return _apply_queue(_agent_queue_user(request))
+
+
+@app.get("/api/agent/jobs/{job_id}/eligibility")
+def agent_job_eligibility(job_id: str, request: Request):
+    """Recheck current submission eligibility, including documents and archive."""
+    admin_id = _agent_queue_user(request)
+    job = storage.load_job(admin_id, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    reasons = application_queue.application_blockers(job, _archive_posting_keys(admin_id))
+    return JSONResponse({"eligible": not reasons, "reasons": reasons}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/agent/jobs")
@@ -535,11 +563,8 @@ def list_archived_jobs(user: User = Depends(get_current_user)):
 
 @app.get("/api/jobs/apply-queue")
 def get_apply_queue(user: User = Depends(get_current_user)):
-    """Pre-filtered list of jobs that are ready_to_apply, sorted by score desc."""
-    jobs = storage.load_all_jobs(user.id)
-    queue = [enrich_job(j) for j in jobs if j.ready_to_apply]
-    queue.sort(key=lambda j: (j.get("score") or {}).get("total", 0), reverse=True)
-    return {"count": len(queue), "jobs": queue}
+    """Return eligible jobs for the current user, highest effective score first."""
+    return _apply_queue(user.id)
 
 
 @app.get("/api/jobs/{job_id}")
@@ -608,6 +633,7 @@ def create_job(data: JobCreate, user: User = Depends(get_current_user)):
     job = Job(
         raw_jd=data.raw_jd, title=data.title, company=data.company,
         url=data.url, source=data.source, pay_range=data.pay_range,
+        requisition_id=data.requisition_id,
         notes=data.notes, intake_source=IntakeSource.MANUAL_PASTE,
     )
     storage.save_job(user.id, job)
@@ -1168,7 +1194,10 @@ def digest_action_submit(token: str):
         return HTMLResponse(f'<body style="{_DIGEST_PAGE_STYLE}"><div style="{_DIGEST_CARD_STYLE}">Job not found</div></body>', status_code=404)
 
     is_approve = decoded["action"] == "approve"
-    job.review_status = ReviewStatus.APPROVED if is_approve else ReviewStatus.REJECTED
+    if is_approve:
+        job.approve("digest-link")
+    else:
+        job.review_status = ReviewStatus.REJECTED
     job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(decoded["user_id"], job)
 
@@ -1193,6 +1222,7 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
     if data.title is not None: job.title = data.title
     if data.company is not None: job.company = data.company
     if data.url is not None: job.url = data.url
+    if data.requisition_id is not None: job.requisition_id = data.requisition_id
     if data.pay_range is not None: job.pay_range = data.pay_range
     if data.market_lane is not None: job.market_lane = data.market_lane
     if data.resume_lane_override is not None:
@@ -1200,7 +1230,9 @@ def update_job(job_id: str, data: JobUpdate, user: User = Depends(get_current_us
             raise HTTPException(400, "resume_lane_override must be blank or one of: " + ", ".join(lanes.LANE_KEYS))
         job.resume_lane_override = data.resume_lane_override
     if data.notes is not None: job.notes = data.notes
-    if data.review_status is not None and data.review_status != job.review_status:
+    if data.review_status == ReviewStatus.APPROVED:
+        job.approve("human-session")
+    elif data.review_status is not None and data.review_status != job.review_status:
         job.review_status = data.review_status
         job.agent_log.append(AgentEvent(
             event_type=AgentEventType.RESOLVE, success=True,
@@ -1611,8 +1643,8 @@ def get_job_status(job_id: str, user: User = Depends(get_current_user)):
         "status": job.status,
         "market_lane": job.market_lane,
         "score": job.effective_total, "model_score": job.score.total if job.score else None, "score_is_user": job.score_override is not None,
-        "has_resume": bool(job.tailored_resume_docx),
-        "has_cover_letters": len(job.cover_letters) > 0,
+        "has_resume": job.has_resume_file,
+        "has_cover_letters": job.has_cover_letter_file,
         "ready_to_apply": job.ready_to_apply,
         "applied_at": job.applied_at,
         "follow_up_due": job.follow_up_due,
@@ -1701,6 +1733,8 @@ def get_job_package(job_id: str, request: Request):
             "company": job.company,
             "url": job.url,
             "ats_url": job.ats_url,
+            "apply_url": job.apply_url,
+            "posting_identity": job.posting_identity,
             "score": job.effective_total, "model_score": job.score.total if job.score else None, "score_is_user": job.score_override is not None,
             "lane": job.market_lane,
             "recommended_resume": choice["lane"] or (job.score.recommended_resume if job.score else "base"),
@@ -1936,7 +1970,10 @@ def agent_set_review_status(job_id: str, request: Request, body: dict):
     job = storage.load_job(admin_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    job.review_status = new_status
+    if new_status == ReviewStatus.APPROVED:
+        job.approve("agent-api")
+    else:
+        job.review_status = new_status
     job.updated_at = datetime.now(timezone.utc).isoformat()
     storage.save_job(admin_id, job)
     return {"job_id": job_id, "review_status": new_status}

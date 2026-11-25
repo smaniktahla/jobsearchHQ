@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import storage
-from models import AgentEvent, AgentEventType, AppConfig, JobStatus, MarketLane, ReviewStatus
+from models import AppConfig, JobStatus, ReviewStatus
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,10 @@ def run(user_id: str, config: AppConfig | None = None, notify: bool = True) -> d
         job = storage.load_job(user_id, stale.id)  # cache objects are read-only
         if not job or not is_eligible(job, threshold):
             continue
-        job.review_status = ReviewStatus.APPROVED
-        job.agent_log.append(AgentEvent(
-            event_type=AgentEventType.RESOLVE, success=True,
-            notes=f"{NOTE_PREFIX} (score {job.effective_total}{' (user)' if job.score_is_user else ''} ≥ {threshold})"))
+        job.approve(
+            "auto-approve",
+            notes=f"{NOTE_PREFIX} (score {job.effective_total}{' (user)' if job.score_is_user else ''} ≥ {threshold})",
+        )
         job.updated_at = datetime.now(timezone.utc).isoformat()
         storage.save_job(user_id, job)
         approved.append({"id": job.id, "company": job.company, "title": job.title, "total": job.effective_total})

@@ -1573,9 +1573,12 @@ function renderReadiness(j){
   if(j.review_status!=='approved')why.push('not approved');
   if(j.market_lane==='ignore'&&!j.score_is_user)why.push('marked skip');
   if(j.posting_status==='closed')why.push('posting closed');
+  else if(j.posting_status?.trim().toLowerCase()!=='open')why.push('posting status not confirmed open');
   if(!j.has_resume)why.push('no tailored resume');
   if(!j.has_cover_letters)why.push('no cover letters');
-  if(['applied','interview','offer','rejected','passed'].includes(j.status))why.push('status is '+j.status);
+  if(!j.apply_url)why.push('no usable apply URL');
+  const actioned=['applied','interview','offer','rejected','passed'];
+  if(j.applied_at||actioned.includes(j.status)||j.status_history?.some(entry=>actioned.includes(entry.to)||actioned.includes(entry.from)))why.push('already actioned');
   info.textContent=j.ready_to_apply?'✓ Ready for JobPilot':'Not ready for JobPilot: '+why.join(', ');
   info.style.color=j.ready_to_apply?'var(--green)':'';
   btn.textContent=j.review_status==='approved'?'Approved ✓ (undo)':'Approve for JobPilot';
@@ -2624,7 +2627,7 @@ async function toggleClosed(){
 }
 async function checkPosting(){
   if(!currentJobId)return;const b=document.getElementById('btn-check-posting');b.disabled=true;showLoading('Checking whether the posting is still open...');
-  try{const j=await api('/api/jobs/'+currentJobId+'/check-posting',{method:'POST'});currentJob=j;renderDetailPosting(j);toast('Posting '+(j.posting_status||'checked'))}
+  try{const j=await api('/api/jobs/'+currentJobId+'/check-posting',{method:'POST'});currentJob=j;renderDetailPosting(j);renderReadiness(j);toast('Posting '+(j.posting_status||'checked'))}
   catch(e){alert(e.message)}finally{b.disabled=false;hideLoading()}
 }
 function postingBadge(j){

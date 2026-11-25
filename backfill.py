@@ -31,7 +31,7 @@ def _has_resume(job) -> bool:
 
 
 def _has_letters(job) -> bool:
-    return bool(job.cover_letters)
+    return job.has_cover_letter_file
 
 
 def find_missing(user_id: str, threshold: int) -> list:
@@ -110,7 +110,7 @@ def generate_missing(user_id: str, threshold: int, limit: int | None = None) -> 
                     )
                     storage.save_job(user_id, job)  # keep the resume even if the letters fail
                 if not _has_letters(job):
-                    letters = scoring.generate_cover_letters(job, user_id)
+                    letters = job.cover_letters or scoring.generate_cover_letters(job, user_id)
                     for letter in letters:
                         letter.docx_path = docx_builder.generate_cover_letter_docx(
                             content=letter.content, variant=letter.variant, job_id=job.id,

@@ -76,8 +76,11 @@ def test_unscored_job_has_no_effective_total():
 def _ready(j, tmp_path):
     docx = tmp_path / "resume.docx"; docx.write_text("x")
     j.review_status = ReviewStatus.APPROVED
+    j.url = "https://jobs.example.test/posting/1"
+    j.posting_status = "open"
     j.tailored_resume_docx = str(docx)
-    j.cover_letters = [CoverLetter(job_id=j.id, variant="direct", content="hi")]
+    letter = tmp_path / "letter.docx"; letter.write_text("x")
+    j.cover_letters = [CoverLetter(job_id=j.id, variant="direct", content="hi", docx_path=str(letter))]
     return j
 
 

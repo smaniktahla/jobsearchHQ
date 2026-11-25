@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Literal, Optional
 from enum import Enum
 from datetime import datetime, timedelta, timezone
+import re
 import uuid
 from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
 
 
 def _aware(dt: datetime) -> datetime:
@@ -144,6 +146,37 @@ class ReviewStatus(str, Enum):
     REJECTED = "rejected"
 
 
+ApprovalSource = Literal["human-session", "digest-link", "auto-approve", "agent-api"]
+
+_ACTIONED = (JobStatus.APPLIED, JobStatus.INTERVIEW, JobStatus.OFFER, JobStatus.REJECTED, JobStatus.PASSED)
+_REQUISITION_LINE = re.compile(
+    r"^[ \t]*(?:job|posting|requisition)[ \t]+(?:id|number)[ \t]*:[ \t]*([\w.-]+)[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_POSTING_QUERY_KEYS = {"ghjid", "jobid", "postingid", "reqid", "requisitionid"}
+
+
+def usable_apply_url(value: str) -> str:
+    value = value.strip()
+    if any(c.isspace() or ord(c) < 32 or ord(c) == 127 or c == "\\" for c in value):
+        return ""
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme in {"http", "https"} and parsed.hostname
+                and parsed.username is None and parsed.port != 0):
+            return value
+    except ValueError:
+        pass
+    return ""
+
+
+def _is_file(path: str) -> bool:
+    try:
+        return bool(path) and Path(path).is_file()
+    except (OSError, ValueError):
+        return False
+
+
 class AgentEventType(str, Enum):
     INTAKE    = "intake"
     SCORE      = "score"
@@ -194,6 +227,10 @@ class Job(BaseModel):
     requisition_id: str = ""
     intake_fingerprint: str = ""  # retry identity for agent submissions
     review_status: ReviewStatus = ReviewStatus.PENDING  # human go/no-go decision
+    # Most recent approval, including after a later review decision.
+    approved_by: ApprovalSource | None = None
+    approved_at: str = ""
+    requisition_id: str = ""  # employer-provided posting or requisition identifier
     agent_log: list[AgentEvent] = []
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -203,6 +240,17 @@ class Job(BaseModel):
     posting_reason: str = ""
     posting_checked_at: str = ""
     posting_closed_at: str = ""
+
+    def approve(self, source: ApprovalSource, notes: str = "approved") -> None:
+        if self.review_status == ReviewStatus.APPROVED:
+            return
+        self.review_status = ReviewStatus.APPROVED
+        self.approved_by = source
+        self.approved_at = datetime.now(timezone.utc).isoformat()
+        self.agent_log.append(AgentEvent(
+            event_type=AgentEventType.RESOLVE, at=self.approved_at, success=True,
+            notes=f"{notes} via {source}",
+        ))
 
     def update_status(self, new_status: JobStatus, applied_date: str = ""):
         self.status_history.append({
@@ -302,27 +350,62 @@ class Job(BaseModel):
             return None
 
     @property
-    def ready_to_apply(self) -> bool:
-        """True when the job has a score, generated docs, the user has approved it,
-        and it hasn't been actioned yet. review_status must be explicit APPROVED —
-        score alone is never enough to greenlight an application."""
-        return (
-            self.effective_total is not None
-            and self.effective_total >= 5
-            and self.review_status == ReviewStatus.APPROVED
-            and not self.ai_skipped
-            and self.posting_status != "closed"
-            and bool(self.tailored_resume_docx)
-            and bool(self.cover_letters)
-            and self.status not in (
-                JobStatus.APPLIED, JobStatus.INTERVIEW,
-                JobStatus.OFFER, JobStatus.REJECTED, JobStatus.PASSED
-            )
-            # Last, so the disk check only runs for jobs that pass everything else: a recorded path
-            # whose file is gone (moved/deleted) doesn't count as having a tailored resume.
-            and Path(self.tailored_resume_docx).exists()
-        )
+    def apply_url(self) -> str:
+        return usable_apply_url(self.ats_url) or usable_apply_url(self.url)
 
+    @property
+    def posting_identity(self) -> str:
+        """Use an explicit requisition ID, a labeled description ID, or a known URL parameter."""
+        if self.requisition_id.strip():
+            return self.requisition_id.strip()
+        match = _REQUISITION_LINE.search(self.raw_jd)
+        if match:
+            return match[1]
+        for url in (self.ats_url, self.url):
+            if usable_apply_url(url):
+                for key, value in parse_qsl(urlsplit(url.strip()).query):
+                    if key.lower().replace("_", "") in _POSTING_QUERY_KEYS and value.strip():
+                        return value.strip()
+        return ""
+
+    @property
+    def has_resume_file(self) -> bool:
+        return _is_file(self.tailored_resume_docx)
+
+    @property
+    def has_cover_letter_file(self) -> bool:
+        return any(_is_file(letter.docx_path) for letter in self.cover_letters)
+
+    def application_blockers(self) -> list[str]:
+        """Job-local blockers. Queues also check the user's archive."""
+        reasons = []
+        total = self.effective_total
+        if self.review_status != ReviewStatus.APPROVED:
+            reasons.append("not_approved")
+        if total is None:
+            reasons.append("not_scored")
+        elif total < 5:
+            reasons.append("score_below_minimum")
+        if self.ai_skipped:
+            reasons.append("ignored_lane")
+        if self.posting_status.strip().lower() != "open":
+            reasons.append("posting_not_open")
+        if (self.applied_at or self.status in _ACTIONED
+                or any(entry.get("to") in _ACTIONED or entry.get("from") in _ACTIONED
+                       for entry in self.status_history)):
+            reasons.append("already_actioned")
+        if not self.has_resume_file:
+            reasons.append("missing_tailored_resume")
+        if not self.has_cover_letter_file:
+            reasons.append("missing_cover_letter")
+        if not self.apply_url:
+            reasons.append("missing_apply_url")
+        return reasons
+
+    @property
+    def ready_to_apply(self) -> bool:
+        """Job-local readiness. Submission queues additionally consult the archive."""
+        return not self.application_blockers()
 
     claude_tokens_in: int = 0
     claude_tokens_out: int = 0
@@ -343,6 +426,7 @@ class JobCreate(BaseModel):
     company: str = ""
     url: str = ""
     source: str = ""
+    requisition_id: str = ""
     raw_jd: str
     pay_range: str = ""
     notes: str = ""
@@ -352,6 +436,7 @@ class JobUpdate(BaseModel):
     title: Optional[str] = None
     company: Optional[str] = None
     url: Optional[str] = None
+    requisition_id: Optional[str] = None
     pay_range: Optional[str] = None
     status: Optional[JobStatus] = None
     market_lane: Optional[MarketLane] = None
