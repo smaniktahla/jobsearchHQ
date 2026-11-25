@@ -232,6 +232,7 @@ def dedup_entry(job: Job, archived: bool = False) -> dict:
         "url_key": _normalize_url(job.url) if job.url else "",
         "title_key": _normalize_title_company(job.title, job.company),
         "archived": archived,
+        **({"intake_fingerprint": job.intake_fingerprint} if job.intake_fingerprint else {}),
     }
 
 
@@ -257,23 +258,47 @@ def update_dedup_index(user_id: str, job: Job, archived: bool = False) -> None:
     _save_dedup_index(user_id, index)
 
 
-def find_in_dedup_index(index: list[dict], title: str, company: str, url: str) -> dict | None:
+def load_intake_dedup_index(user_id: str) -> list[dict]:
+    """Include older or partially indexed jobs without rewriting their index."""
+    index = {entry["id"]: entry for entry in load_dedup_index(user_id)}
+    result = {}
+    for folder in ("jobs_archive", "jobs"):
+        for path in (get_user_dir(user_id) / folder).glob("*.json"):
+            entry = index.get(path.stem)
+            if entry is None:
+                try:
+                    job = Job.model_validate_json(path.read_text())
+                except (OSError, ValueError):
+                    continue
+                entry = dedup_entry(job, archived=folder == "jobs_archive")
+            result[path.stem] = entry
+    return list(result.values())
+
+
+def find_in_dedup_index(
+    index: list[dict], title: str, company: str, url: str, *,
+    intake_fingerprint: str = "", require_complete_title: bool = False,
+) -> dict | None:
     """Match a candidate scrape result against a preloaded dedup index (by URL first,
     then title+company). Callers loop many candidates per index load, so the index
     is passed in rather than reloaded per call."""
     url_key = _normalize_url(url) if url else ""
-    title_key = _normalize_title_company(title, company)
+    title_key = ""
+    if not require_complete_title or (title.strip() and company.strip()):
+        title_key = _normalize_title_company(title, company)
     for e in index:
         if url_key and e.get("url_key") == url_key:
             return e
-        if e.get("title_key") == title_key:
+        if title_key and e.get("title_key") == title_key:
+            return e
+        if intake_fingerprint and e.get("intake_fingerprint") == intake_fingerprint:
             return e
     return None
 
 
 # ── Per-user config ────────────────────────────────────────────────────────────
 
-def load_config(user_id: str) -> AppConfig:
+def load_config(user_id: str, *, initialize: bool = True) -> AppConfig:
     path = get_user_dir(user_id) / "config.json"
     if path.exists():
         try:
@@ -281,6 +306,8 @@ def load_config(user_id: str) -> AppConfig:
         except Exception:
             pass
     config = AppConfig(onboarding_completed=False)
+    if not initialize:
+        return config
     save_config(user_id, config)
     # Brand-new account: start with the bundled ATS resume template (deleting it later sticks,
     # since this branch only runs when no config file exists yet).

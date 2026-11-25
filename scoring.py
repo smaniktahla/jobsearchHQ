@@ -331,9 +331,9 @@ def _apply_deal_breaker_override(score: ScoreBreakdown, raw_jd: str, deal_breake
 
 # === METADATA EXTRACTION ===
 
-def extract_job_metadata(raw_jd: str, user_id: str = None) -> dict:
+def extract_job_metadata(raw_jd: str, user_id: str = None, *, initialize_config: bool = True) -> dict:
     """Extract title, company, pay range from raw JD text."""
-    config = storage.load_config(user_id) if user_id else AppConfig()
+    config = storage.load_config(user_id, initialize=initialize_config) if user_id else AppConfig()
 
     user_msg = f"""Extract the following from this job posting. Return ONLY valid JSON, no markdown:
 {{"title": "job title", "company": "company name", "pay_range": "pay range if stated, empty string if not", "is_contract": true/false, "is_w2": true/false}}
