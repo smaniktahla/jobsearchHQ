@@ -1,7 +1,10 @@
+import fcntl
 import json
 import os
 import re
+import tempfile
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from models import Job, AppConfig
 
@@ -64,6 +67,30 @@ def ensure_dirs() -> None:
 
 def save_job(user_id: str, job: Job) -> None:
     ensure_user_dirs(user_id)
+    path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
+    _write_job(user_id, job, path)
+    update_dedup_index(user_id, job, archived=False)
+
+
+@contextmanager
+def job_write_lock(user_id: str, job_id: str):
+    """Serialize job transactions across threads and workers using a stable lock file."""
+    lock_dir = get_user_dir(user_id) / "job_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    with (lock_dir / f"{job_id}.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def save_job_activity(user_id: str, job: Job) -> None:
+    """Persist activity under the job lock, preserving archive location and dedup data."""
+    path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
+    if not path.exists():
+        path = get_archive_dir(user_id) / path.name
+    _write_job(user_id, job, path)
+
+
+def _write_job(user_id: str, job: Job, path: Path) -> None:
     job.user_id = user_id
     data = sanitize_unicode(job.model_dump())
     # Copy the sanitized values back onto the caller's job, as typed objects: model_dump()
@@ -73,9 +100,16 @@ def save_job(user_id: str, job: Job) -> None:
     clean = Job(**data)
     for field in data:
         setattr(job, field, getattr(clean, field))
-    path = get_user_dir(user_id) / "jobs" / f"{job.id}.json"
-    path.write_text(json.dumps(data, indent=2))
-    update_dedup_index(user_id, job, archived=False)
+    temp = tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False)
+    temp_path = Path(temp.name)
+    try:
+        with temp:
+            json.dump(data, temp, indent=2)
+            temp.flush()
+            os.fsync(temp.fileno())
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def load_job(user_id: str, job_id: str) -> Job | None:
