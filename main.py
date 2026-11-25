@@ -5,6 +5,7 @@ import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Optional
 
@@ -613,23 +614,18 @@ def create_job(data: JobCreate, user: User = Depends(get_current_user)):
     return enrich_job(job)
 
 
-@app.post("/api/intake")
-def intake_job(
-    source: str = "manual_paste",
-    raw_input: str = "",
-    user: User = Depends(get_current_user),
-):
-    if not raw_input.strip():
-        raise HTTPException(400, "No input provided")
-    parsed = process_intake(source, raw_input)
-    job = Job(
-        raw_jd=parsed["raw_jd"], title=parsed.get("title", ""),
-        company=parsed.get("company", ""), url=parsed.get("url", ""),
+def _build_intake_job(source: str, parsed: dict, *, title: str = "", company: str = "", url: str = "") -> Job:
+    return Job(
+        raw_jd=parsed["raw_jd"], title=title or parsed.get("title", ""),
+        company=company or parsed.get("company", ""), url=url or parsed.get("url", ""),
         source=parsed.get("source", source), pay_range=parsed.get("pay_range", ""),
-        intake_source=IntakeSource(source) if source in IntakeSource._value2member_map_ else IntakeSource.MANUAL_PASTE,
+        intake_source=IntakeSource._value2member_map_.get(source, IntakeSource.MANUAL_PASTE),
     )
+
+
+def _extract_intake_metadata(job: Job, user_id: str, *, initialize_config: bool = True) -> None:
     try:
-        meta = scoring.extract_job_metadata(job.raw_jd, user.id)
+        meta = scoring.extract_job_metadata(job.raw_jd, user_id, initialize_config=initialize_config)
         if meta:
             if not job.title and meta.get("title"):
                 job.title = meta["title"]
@@ -641,8 +637,100 @@ def intake_job(
                 job.market_lane = MarketLane.CONTRACT
     except Exception:
         pass
+
+
+@app.post("/api/intake")
+def intake_job(
+    source: str = "manual_paste",
+    raw_input: str = "",
+    user: User = Depends(get_current_user),
+):
+    if not raw_input.strip():
+        raise HTTPException(400, "No input provided")
+    job = _build_intake_job(source, process_intake(source, raw_input))
+    _extract_intake_metadata(job, user.id)
     storage.save_job(user.id, job)
     return enrich_job(job)
+
+
+class AgentIntake(BaseModel):
+    source: str = "manual_paste"
+    url: str | None = None
+    raw_input: str | None = None
+    title: str = ""
+    company: str = ""
+    apply_url: str | None = None
+    requisition_id: str | None = None
+    origin: str = ""
+
+
+_agent_intake_lock = threading.Lock()
+
+
+def _agent_intake_duplicate(user_id: str, index: list[dict], job: Job) -> dict | None:
+    match = storage.find_in_dedup_index(
+        index, job.title, job.company, job.url,
+        intake_fingerprint=job.intake_fingerprint, require_complete_title=True,
+    )
+    existing = storage.load_job(user_id, match["id"]) if match else None
+    if existing:
+        return {
+            "created": False, "id": existing.id, "reason": "duplicate",
+            "status": existing.status, "review_status": existing.review_status,
+        }
+    return None
+
+
+@app.post("/api/agent/intake")
+def agent_intake(data: AgentIntake, request: Request):
+    key = request.headers.get("X-API-Key", "")
+    if not key or not verify_agent_api_key(key):
+        raise HTTPException(401, "Invalid or missing API key")
+    admin_id = get_admin_user_id()
+    if not admin_id:
+        raise HTTPException(503, "No admin user configured")
+
+    url = storage.sanitize_unicode(data.url or "").strip()
+    raw_input = storage.sanitize_unicode(data.raw_input or "").strip()
+    if not url and not raw_input:
+        raise HTTPException(400, "No URL or job description provided")
+    title = storage.sanitize_unicode(data.title).strip()
+    company = storage.sanitize_unicode(data.company).strip()
+    requisition_id = (data.requisition_id or "").strip()
+    identity = json.dumps([data.source, url, title, company, requisition_id, raw_input])
+    fingerprint = sha256(identity.encode("utf-8")).hexdigest()
+
+    with _agent_intake_lock:
+        index = storage.load_intake_dedup_index(admin_id)
+        candidate = Job(title=title, company=company, url=url, intake_fingerprint=fingerprint)
+        duplicate = _agent_intake_duplicate(admin_id, index, candidate)
+        if duplicate:
+            return duplicate
+
+        # The URL handler expects a URL. A supplied JD should be parsed as text.
+        handler = "manual_paste" if data.source == "url_scrape" and raw_input else data.source
+        parsed = process_intake(handler, raw_input or (url if handler == "url_scrape" else ""))
+        job = _build_intake_job(data.source, parsed, title=title, company=company, url=url)
+        job.source = data.source
+        job.ats_url = (data.apply_url or "").strip()
+        job.requisition_id = requisition_id
+        job.intake_fingerprint = fingerprint
+
+        duplicate = _agent_intake_duplicate(admin_id, index, job)
+        if duplicate:
+            return duplicate
+        if job.raw_jd:
+            _extract_intake_metadata(job, admin_id, initialize_config=False)
+        duplicate = _agent_intake_duplicate(admin_id, storage.load_intake_dedup_index(admin_id), job)
+        if duplicate:
+            return duplicate
+
+        job.agent_log.append(AgentEvent(
+            event_type=AgentEventType.INTAKE, success=True,
+            notes=f"intake via agent api ({data.origin})",
+        ))
+        storage.save_job(admin_id, job)
+        return {"created": True, "id": job.id}
 
 
 @app.post("/api/intake/linkedin-bulk")

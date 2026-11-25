@@ -106,10 +106,25 @@ Browser endpoints use the signed-in session. Agent endpoints accept an `X-API-Ke
 | Account profile | `GET/PUT /api/profile` |
 | Follow-ups | `GET /api/follow-ups`, `POST /api/jobs/{job_id}/mark-followed-up` |
 | Scheduler | `GET /api/scheduler/status`, `POST /api/scheduler/run-now` |
+| Agent job intake | `POST /api/agent/intake` |
 | Agent queue and profile | `GET /api/agent/ready-queue`, `GET /api/agent/profile` |
 | Agent application handoff | `GET /api/agent/jobs/{job_id}/package`, `POST /api/agent/jobs/{job_id}/application-result` |
 
 See [`main.py`](main.py) for the route definitions and [`network/api.py`](network/api.py) for the Network directory API.
+
+### Agent job intake
+
+Send `POST /api/agent/intake` with the `X-API-Key` header and a JSON body containing
+`source`, `title`, `company`, `origin` (a free-text audit label), and at least one
+of `url` or `raw_input` (the job description). Include `apply_url` and
+`requisition_id` when available. Use `source: "url_scrape"` to fetch the posting
+when supplying a URL alone.
+
+New jobs start pending review. The endpoint returns HTTP 200 with
+`{"created": true, "id": "..."}`. A match by URL or title and company, including
+archived jobs, returns HTTP 200 with
+`{"created": false, "id": "...", "reason": "duplicate", "status": "...", "review_status": "..."}`.
+Repeating a submission returns the existing job without adding another audit entry.
 
 ## Repository layout
 

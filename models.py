@@ -145,6 +145,7 @@ class ReviewStatus(str, Enum):
 
 
 class AgentEventType(str, Enum):
+    INTAKE    = "intake"
     SCORE      = "score"
     DISPATCH   = "dispatch"
     ESCALATE   = "escalate"
@@ -190,6 +191,8 @@ class Job(BaseModel):
     research: Optional[CompanyResearch] = None
     notes: str = ""
     ats_url: str = ""          # direct ATS portal URL (set by dispatch.js)
+    requisition_id: str = ""
+    intake_fingerprint: str = ""  # retry identity for agent submissions
     review_status: ReviewStatus = ReviewStatus.PENDING  # human go/no-go decision
     agent_log: list[AgentEvent] = []
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
