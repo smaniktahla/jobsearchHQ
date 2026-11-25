@@ -44,7 +44,8 @@ from pydantic import BaseModel
 from models import (
     ReviewStatus, AgentEvent, AgentEventType, AppConfig, ApplicationResult,
     EmailCompose, EmailRecord, IntakeSource, Job, JobCreate,
-    JobStatus, JobUpdate, MarketLane, ProfileUpdate, User,
+    JobStatus, JobUpdate, LegacyApplicationResult, MarketLane, PostingEvidence,
+    ProfileUpdate, UnconfirmedSubmission, User,
 )
 import docx_builder
 import docx_utils
@@ -1566,14 +1567,28 @@ def get_application_package(job_id: str, user: User = Depends(get_current_user))
 @app.post("/api/jobs/{job_id}/application-result")
 def record_application_result(
     job_id: str,
-    result: ApplicationResult,
+    result: LegacyApplicationResult,
     user: User = Depends(get_current_user),
 ):
     """Called by Claude after attempting to submit an application."""
-    job = storage.load_job(user.id, job_id)
+    with storage.job_write_lock(user.id, job_id):
+        job = load_job_or_404(user.id, job_id)
+        apply_application_result(job, result, result.status)
+        storage.save_job(user.id, job)
+        return enrich_job(job)
+
+
+def load_job_or_404(user_id: str, job_id: str) -> Job:
+    job = storage.load_job(user_id, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    job.update_status(result.status, applied_date=result.applied_at)
+    return job
+
+
+def apply_application_result(job: Job, result: LegacyApplicationResult, status: JobStatus):
+    job.update_status(status, applied_date=result.applied_at)
+    if status == JobStatus.APPLIED:
+        job.submission_unconfirmed = None
     if result.notes:
         job.notes = (job.notes + "\n" + result.notes).strip() if job.notes else result.notes
     if result.portal_url:
@@ -1583,9 +1598,6 @@ def record_application_result(
         ).strip() if job.follow_up.notes else portal_note
     if result.error:
         job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
-    job.updated_at = datetime.now(timezone.utc).isoformat()
-    storage.save_job(user.id, job)
-    return enrich_job(job)
 
 
 # ── Agent: ATS URL + event log ────────────────────────────────────────────────
@@ -1768,17 +1780,15 @@ def set_ats_url(job_id: str, payload: AtsUrlPayload, request: Request):
 @app.post("/api/agent/jobs/{job_id}/log")
 def append_agent_log(job_id: str, event: AgentEvent, request: Request):
     """Append an automation event to a job's agent_log. Called by Hermes/dispatch."""
-    key = request.headers.get("X-API-Key", "")
-    if not key or not verify_agent_api_key(key):
-        raise HTTPException(401, "Invalid or missing API key")
-    admin_id = get_admin_user_id()
-    job = storage.load_job(admin_id, job_id)
-    if not job:
-        raise HTTPException(404, "Job not found")
-    job.agent_log.append(event)
-    job.updated_at = datetime.now(timezone.utc).isoformat()
-    storage.save_job(admin_id, job)
-    return {"id": job_id, "agent_log_count": len(job.agent_log)}
+    admin_id = require_agent_admin(request)
+    if event.event_type == AgentEventType.APPLICATION_RESULT:
+        raise HTTPException(422, "Use the application-result endpoint for this event type")
+    with storage.job_write_lock(admin_id, job_id):
+        job = load_job_or_404(admin_id, job_id)
+        job.agent_log.append(event)
+        job.updated_at = datetime.now(timezone.utc).isoformat()
+        storage.save_job_activity(admin_id, job)
+        return {"id": job_id, "agent_log_count": len(job.agent_log)}
 
 
 @app.get("/api/agent/jobs/{job_id}/log")
@@ -1806,31 +1816,68 @@ def get_agent_log(job_id: str, request: Request):
 
 
 
-@app.post("/api/agent/jobs/{job_id}/application-result")
-def agent_record_application_result(job_id: str, result: ApplicationResult, request: Request):
-    """Agent-auth twin of /api/jobs/{job_id}/application-result — that endpoint requires
-    an OIDC session cookie, which no agent (Codex, dispatch.js, Hermes) can ever hold.
-    Called by an agent after attempting to submit an application."""
+def require_agent_admin(request: Request) -> str:
     key = request.headers.get("X-API-Key", "")
     if not key or not verify_agent_api_key(key):
         raise HTTPException(401, "Invalid or missing API key")
     admin_id = get_admin_user_id()
-    job = storage.load_job(admin_id, job_id)
-    if not job:
-        raise HTTPException(404, "Job not found")
-    job.update_status(result.status, applied_date=result.applied_at)
-    if result.notes:
-        job.notes = (job.notes + "\n" + result.notes).strip() if job.notes else result.notes
-    if result.portal_url:
-        portal_note = f"Portal: {result.portal_url}"
-        job.follow_up.notes = (
-            job.follow_up.notes + "\n" + portal_note
-        ).strip() if job.follow_up.notes else portal_note
-    if result.error:
-        job.notes = (job.notes + f"\nAutomation error: {result.error}").strip()
-    job.updated_at = datetime.now(timezone.utc).isoformat()
-    storage.save_job(admin_id, job)
-    return enrich_job(job)
+    if not admin_id:
+        raise HTTPException(503, "No admin user configured")
+    return admin_id
+
+
+@app.post("/api/agent/jobs/{job_id}/application-result")
+def agent_record_application_result(job_id: str, result: ApplicationResult, request: Request):
+    """Record an executor report, allowing one explicit confirmation of a pending run."""
+    admin_id = require_agent_admin(request)
+    with storage.job_write_lock(admin_id, job_id):
+        job = load_job_or_404(admin_id, job_id)
+        # A rejected report is audit evidence, never a successful receipt for a run.
+        if result.run_id is not None:
+            for event in reversed(job.agent_log):
+                if (event.event_type == AgentEventType.APPLICATION_RESULT
+                        and event.run_id == result.run_id and event.success is not False):
+                    if event.success is True or result.outcome != "confirmed":
+                        return enrich_job(job)
+                    break
+
+        event = AgentEvent(
+            event_type=AgentEventType.APPLICATION_RESULT,
+            actor="agent",
+            run_id=result.run_id,
+            idempotency_key=result.idempotency_key,
+            evidence=result.evidence,
+        )
+        job.agent_log.append(event)
+        if job.status == JobStatus.APPLIED:
+            event.success = False
+            event.notes = "Application result rejected: job already applied"
+            storage.save_job_activity(admin_id, job)
+            raise HTTPException(409, "Job already applied")
+
+        if result.outcome == "unconfirmed":
+            event.notes = result.notes
+            job.submission_unconfirmed = UnconfirmedSubmission(
+                run_id=result.run_id, at=event.at, evidence_ref=event.id,
+            )
+            job.updated_at = event.at
+        else:
+            event.success = True
+            status = JobStatus.APPLIED if result.outcome == "confirmed" else result.status
+            apply_application_result(job, result, status)
+        storage.save_job_activity(admin_id, job)
+        return enrich_job(job)
+
+
+@app.post("/api/agent/jobs/{job_id}/evidence")
+def agent_record_evidence(job_id: str, evidence: PostingEvidence, request: Request):
+    admin_id = require_agent_admin(request)
+    with storage.job_write_lock(admin_id, job_id):
+        job = load_job_or_404(admin_id, job_id)
+        event = AgentEvent(event_type=AgentEventType.EVIDENCE, actor="agent", evidence=evidence)
+        job.agent_log.append(event)
+        storage.save_job_activity(admin_id, job)
+        return {"id": job_id, "event": job.agent_log[-1].model_dump()}
 
 
 @app.patch("/api/agent/jobs/{job_id}/review")

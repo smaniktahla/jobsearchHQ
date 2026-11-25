@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Literal, Optional
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -151,6 +151,32 @@ class AgentEventType(str, Enum):
     RESOLVE    = "resolve"
     SUBMIT     = "submit"
     ERROR      = "error"
+    APPLICATION_RESULT = "application_result"
+    EVIDENCE = "evidence"
+
+
+class ApplicationEvidence(BaseModel):
+    url: str = Field(default="", max_length=2048)
+    title: str = Field(default="", max_length=512)
+    text_sha256: str = Field(default="", max_length=64)
+    screenshot_sha256: str = Field(default="", max_length=64)
+    report_hash: str = Field(default="", max_length=128)
+    note: str = Field(default="", max_length=2048)
+
+
+class PostingEvidence(BaseModel):
+    kind: Literal["closed_posting", "accessibility_preflight"]
+    verdict: str = Field(min_length=1, max_length=128)
+    url: str = Field(min_length=1, max_length=2048)
+    observed_at: str = Field(min_length=1, max_length=64)
+    note: str = Field(default="", max_length=2048)
+
+    @field_validator("observed_at")
+    @classmethod
+    def validate_observed_at(cls, value: str) -> str:
+        if datetime.fromisoformat(value).utcoffset() is None:
+            raise ValueError("observed_at must include a timezone")
+        return value
 
 
 class AgentEvent(BaseModel):
@@ -163,6 +189,16 @@ class AgentEvent(BaseModel):
     claude_tokens_in: int = 0
     claude_tokens_out: int = 0
     success: Optional[bool] = None
+    run_id: str | None = Field(default=None, min_length=1, max_length=256)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    actor: str | None = Field(default=None, max_length=128)
+    evidence: ApplicationEvidence | PostingEvidence | None = None
+
+
+class UnconfirmedSubmission(BaseModel):
+    run_id: str | None
+    at: str
+    evidence_ref: str
 
 
 class Job(BaseModel):
@@ -185,6 +221,7 @@ class Job(BaseModel):
     tailored_resume: str = ""
     tailored_resume_docx: str = ""
     applied_at: str = ""
+    submission_unconfirmed: UnconfirmedSubmission | None = None
     follow_up: FollowUp = Field(default_factory=FollowUp)
     emails: list[EmailRecord] = []
     research: Optional[CompanyResearch] = None
@@ -308,6 +345,7 @@ class Job(BaseModel):
             and self.effective_total >= 5
             and self.review_status == ReviewStatus.APPROVED
             and not self.ai_skipped
+            and self.submission_unconfirmed is None
             and self.posting_status != "closed"
             and bool(self.tailored_resume_docx)
             and bool(self.cover_letters)
@@ -326,13 +364,29 @@ class Job(BaseModel):
     success: Optional[bool] = None
 
 
-class ApplicationResult(BaseModel):
+class LegacyApplicationResult(BaseModel):
     """Written back by the agent after attempting to submit an application."""
     status: JobStatus = JobStatus.APPLIED
     notes: str = ""
     portal_url: str = ""
     applied_at: str = ""
     error: str = ""
+
+
+class ApplicationResult(LegacyApplicationResult):
+    run_id: str | None = Field(default=None, min_length=1, max_length=256)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    outcome: Literal["confirmed", "unconfirmed"] | None = None
+    evidence: ApplicationEvidence | None = None
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, value: str | None) -> str | None:
+        if value is not None and (not value.strip() or any(
+            0xD800 <= ord(character) <= 0xDFFF for character in value
+        )):
+            raise ValueError("run_id must be nonblank and contain valid Unicode")
+        return value
 
 
 class JobCreate(BaseModel):
